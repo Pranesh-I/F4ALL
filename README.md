@@ -322,3 +322,13 @@ Each sprint = 2 weeks. Assume solo full-time or small team; adjust duration 1.5�
 3. **Every sprint's "Definition of Done" is validated against real reference data, not "it looks like it works."** Rep-counting and jump measurement need actual measured accuracy numbers before you move on.
 4. **Cheat detection is never finished.** Ship v1, expect to keep iterating as real users find gaps.
 5. **This handles minors' data and location/biometric-adjacent data.** Security and privacy are Sprint 0 concerns that get *hardened* in Sprint 11–12, not concerns you start thinking about in Sprint 11–12.
+
+
+
+
+
+
+mobile/ → Android Kotlin + Jetpack Compose
+backend/ → FastAPI + PostgreSQL
+dashboard/ → React + TypeScript
+docs/ → DB schema, API contract, architecture documentation
