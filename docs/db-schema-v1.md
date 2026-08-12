@@ -14,7 +14,14 @@
 | updated_at | TIMESTAMP | NOT NULL | |
 
 ## 2. tests
-(unchanged — this one's fine as is)
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| id | UUID | PRIMARY KEY | Unique test ID |
+| name | VARCHAR(100) | UNIQUE, NOT NULL | Test name |
+| description | TEXT | NULL | Test instructions/description |
+| unit | VARCHAR(30) | NOT NULL | Result unit, e.g. cm or reps |
+| created_at | TIMESTAMP | NOT NULL | Test creation time |
 
 ## 3. test_results
 | Column | Type | Constraints | Description |

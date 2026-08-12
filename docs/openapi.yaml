@@ -1,0 +1,658 @@
+openapi: 3.0.3
+
+info:
+  title: F4ALL Sports Talent Assessment API
+  description: >
+    API contract for the F4ALL AI-powered sports talent assessment platform.
+    The mobile application receives a provisional on-device score, while the
+    backend performs server-side verification and stores the final result.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: Athlete authentication APIs
+  - name: Tests
+    description: Test submission APIs
+  - name: Results
+    description: Athlete test result APIs
+  - name: Dashboard
+    description: Official dashboard review APIs
+
+paths:
+
+  # ============================================================
+  # AUTHENTICATION
+  # ============================================================
+
+  /api/auth/request-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Request OTP
+      description: Send an OTP to the athlete's registered phone number.
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestOtpRequest'
+
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+        '400':
+          description: Invalid phone number
+
+
+  /api/auth/verify-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Verify OTP
+      description: Verify the OTP and authenticate the athlete.
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+
+      responses:
+        '200':
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+        '400':
+          description: Invalid or expired OTP
+
+
+  # ============================================================
+  # TEST SUBMISSION
+  # ============================================================
+
+  /api/tests/submit:
+    post:
+      tags:
+        - Tests
+      summary: Submit a completed test
+      description: >
+        Submit an athlete's completed test with the provisional on-device
+        result. The server will independently verify the submission.
+
+      security:
+        - bearerAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTestRequest'
+
+      responses:
+        '201':
+          description: Test submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitTestResponse'
+
+        '400':
+          description: Invalid test submission
+
+        '401':
+          description: Authentication required
+
+
+  # ============================================================
+  # RESULTS
+  # ============================================================
+
+  /api/results/{result_id}:
+    get:
+      tags:
+        - Results
+      summary: Get test result
+      description: >
+        Get the current status and scores of a submitted test.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: result_id
+          in: path
+          required: true
+          description: Unique test result ID
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+        '200':
+          description: Test result retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestResult'
+
+        '401':
+          description: Authentication required
+
+        '404':
+          description: Result not found
+
+
+  # ============================================================
+  # DASHBOARD REVIEW
+  # ============================================================
+
+  /api/dashboard/reviews:
+    get:
+      tags:
+        - Dashboard
+      summary: Get review queue
+      description: >
+        Retrieve test submissions that require official dashboard review.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter results by review status
+          schema:
+            type: string
+            enum:
+              - flagged
+              - approved
+              - rejected
+              - processing
+
+        - name: test_type
+          in: query
+          required: false
+          description: Filter results by test type
+          schema:
+            type: string
+            enum:
+              - vertical_jump
+              - sit_ups
+
+        - name: region
+          in: query
+          required: false
+          description: Filter results by athlete region
+          schema:
+            type: string
+
+      responses:
+        '200':
+          description: Review queue retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReviewItem'
+
+        '401':
+          description: Authentication required
+
+        '403':
+          description: Insufficient dashboard permissions
+
+
+  /api/dashboard/reviews/{result_id}:
+    get:
+      tags:
+        - Dashboard
+      summary: Get review details
+      description: >
+        Retrieve complete information about a test submission for official review.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: result_id
+          in: path
+          required: true
+          description: Test result ID
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+        '200':
+          description: Review details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDetails'
+
+        '401':
+          description: Authentication required
+
+        '403':
+          description: Insufficient dashboard permissions
+
+        '404':
+          description: Result not found
+
+
+  /api/dashboard/reviews/{result_id}/action:
+    post:
+      tags:
+        - Dashboard
+      summary: Take review action
+      description: >
+        Approve, reject, or request resubmission for a test submission.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: result_id
+          in: path
+          required: true
+          description: Test result ID
+          schema:
+            type: string
+            format: uuid
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewActionRequest'
+
+      responses:
+        '200':
+          description: Review action completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewActionResponse'
+
+        '400':
+          description: Invalid review action
+
+        '401':
+          description: Authentication required
+
+        '403':
+          description: Insufficient dashboard permissions
+
+        '404':
+          description: Result not found
+
+
+# ==============================================================
+# COMPONENTS
+# ==============================================================
+
+components:
+
+  # ------------------------------------------------------------
+  # AUTHENTICATION
+  # ------------------------------------------------------------
+
+  securitySchemes:
+
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+
+  # ------------------------------------------------------------
+  # REQUEST SCHEMAS
+  # ------------------------------------------------------------
+
+  schemas:
+
+    RequestOtpRequest:
+      type: object
+      required:
+        - phone
+      properties:
+        phone:
+          type: string
+          description: Athlete phone number
+          example: '+919876543210'
+
+
+    VerifyOtpRequest:
+      type: object
+      required:
+        - phone
+        - otp
+      properties:
+        phone:
+          type: string
+          description: Athlete phone number
+          example: '+919876543210'
+
+        otp:
+          type: string
+          description: One-time password
+          example: '123456'
+
+
+    SubmitTestRequest:
+      type: object
+      required:
+        - test_id
+        - provisional_score
+      properties:
+        test_id:
+          type: string
+          format: uuid
+          description: ID of the test being submitted
+          example: '550e8400-e29b-41d4-a716-446655440000'
+
+        provisional_score:
+          type: number
+          format: double
+          description: Provisional score calculated on the athlete's device
+          example: 28
+
+        video_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the uploaded test video
+          example: '660e8400-e29b-41d4-a716-446655440000'
+
+
+    ReviewActionRequest:
+      type: object
+      required:
+        - action
+      properties:
+        action:
+          type: string
+          enum:
+            - approved
+            - rejected
+            - requested_resubmission
+          example: approved
+
+        notes:
+          type: string
+          nullable: true
+          description: Optional note from the official
+          example: 'Submission verified successfully.'
+
+
+  # ------------------------------------------------------------
+  # RESPONSE SCHEMAS
+  # ------------------------------------------------------------
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: OTP sent successfully
+
+
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+          example: jwt-token
+
+        athlete_id:
+          type: string
+          format: uuid
+          description: Authenticated athlete ID
+          example: '550e8400-e29b-41d4-a716-446655440000'
+
+
+    SubmitTestResponse:
+      type: object
+      properties:
+        result_id:
+          type: string
+          format: uuid
+          description: Created test result ID
+          example: '770e8400-e29b-41d4-a716-446655440000'
+
+        status:
+          type: string
+          enum:
+            - pending_sync
+            - processing
+            - verified
+            - flagged
+            - approved
+            - rejected
+          example: processing
+
+
+    TestResult:
+      type: object
+      properties:
+        result_id:
+          type: string
+          format: uuid
+
+        athlete_id:
+          type: string
+          format: uuid
+
+        test_id:
+          type: string
+          format: uuid
+
+        provisional_score:
+          type: number
+          format: double
+          nullable: true
+
+        server_score:
+          type: number
+          format: double
+          nullable: true
+
+        final_score:
+          type: number
+          format: double
+          nullable: true
+
+        status:
+          type: string
+          enum:
+            - pending_sync
+            - processing
+            - verified
+            - flagged
+            - approved
+            - rejected
+
+
+    ReviewItem:
+      type: object
+      properties:
+        result_id:
+          type: string
+          format: uuid
+
+        athlete_id:
+          type: string
+          format: uuid
+
+        athlete_name:
+          type: string
+          example: 'Arun Kumar'
+
+        test_name:
+          type: string
+          enum:
+            - vertical_jump
+            - sit_ups
+          example: vertical_jump
+
+        provisional_score:
+          type: number
+          format: double
+          nullable: true
+          example: 42
+
+        server_score:
+          type: number
+          format: double
+          nullable: true
+          example: 41
+
+        status:
+          type: string
+          example: flagged
+
+
+    ReviewDetails:
+      type: object
+      properties:
+        result_id:
+          type: string
+          format: uuid
+
+        athlete:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+
+            name:
+              type: string
+
+            dob:
+              type: string
+              format: date
+
+            gender:
+              type: string
+
+            region:
+              type: string
+
+        test:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+
+            name:
+              type: string
+              enum:
+                - vertical_jump
+                - sit_ups
+
+        provisional_score:
+          type: number
+          format: double
+          nullable: true
+
+        server_score:
+          type: number
+          format: double
+          nullable: true
+
+        final_score:
+          type: number
+          format: double
+          nullable: true
+
+        status:
+          type: string
+
+        video:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+
+            s3_key:
+              type: string
+
+        flags:
+          type: array
+          items:
+            type: object
+            properties:
+              reason:
+                type: string
+
+              severity:
+                type: string
+                enum:
+                  - low
+                  - medium
+                  - high
+
+        face_verification:
+          type: object
+          nullable: true
+          properties:
+            verification_status:
+              type: string
+              enum:
+                - pass
+                - fail
+                - manual_review
+
+            similarity_score:
+              type: number
+              format: double
+              nullable: true
+
+
+    ReviewActionResponse:
+      type: object
+      properties:
+        result_id:
+          type: string
+          format: uuid
+
+        action:
+          type: string
+          enum:
+            - approved
+            - rejected
+            - requested_resubmission
+
+        status:
+          type: string
+          example: approved
+
+        message:
+          type: string
+          example: Review action completed successfully.
