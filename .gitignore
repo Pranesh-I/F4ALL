@@ -25,3 +25,6 @@ local.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# Reference videos
+docs/reference-videos/**/*.mp4
