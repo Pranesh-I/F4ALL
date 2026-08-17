@@ -27,7 +27,7 @@ Build a system where **the phone does the first pass of verification, and the se
 | MVP test battery | Vertical Jump + Sit-ups first, then Shuttle Run + Endurance Run | Pose-based tests are tractable first; GPS/motion-based tests are a structurally different problem |
 | Cloud | AWS (with awareness that production/govt deployment may later require NIC/MeghRaj empanelled cloud) | Most mature ecosystem, S3 is the storage standard, best documentation |
 | On-device ML | MediaPipe Pose Landmarker (BlazePose) + TFLite | Purpose-built, runs on low-end hardware, free, Google-maintained |
-| Backend | Python + FastAPI | Keeps ML re-verification and API in one ecosystem |
+| Backend | Python + FastAPI | Keeps ML re-verification and API in   one ecosystem |
 | Server-side truth | Server ALWAYS re-verifies; on-device score is provisional only | Prevents trivial gaming via modified client |
 
 ---
