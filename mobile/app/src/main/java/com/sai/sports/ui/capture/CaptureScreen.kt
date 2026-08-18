@@ -47,6 +47,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import java.util.concurrent.Executors
+import androidx.compose.runtime.DisposableEffect
+import com.sai.sports.PoseLandmarkerHelper
 
 @Composable
 fun CaptureScreen(
@@ -100,6 +105,43 @@ private fun CameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
+
+    val poseLandmarkerHelper = remember {
+        PoseLandmarkerHelper(
+            context = context,
+            listener = object : PoseLandmarkerHelper.LandmarkerListener {
+
+                override fun onResults(
+                    result: com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult,
+                    imageWidth: Int,
+                    imageHeight: Int
+                ) {
+                    val poseCount = result.landmarks().size
+
+                    println(
+                        "MediaPipe pose result: $poseCount pose(s)"
+                    )
+                }
+
+                override fun onError(error: String) {
+                    println(
+                        "MediaPipe error: $error"
+                    )
+                }
+            }
+        )
+    }
+
+    val analysisExecutor = remember {
+        Executors.newSingleThreadExecutor()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            analysisExecutor.shutdown()
+            poseLandmarkerHelper.close()
+        }
+    }
 
     var videoCapture by remember {
         mutableStateOf<VideoCapture<Recorder>?>(null)
@@ -236,6 +278,23 @@ private fun CameraPreview(
                                     previewView.surfaceProvider
                             }
 
+                    val imageAnalysis =
+                        ImageAnalysis.Builder()
+                            .setBackpressureStrategy(
+                                ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
+                            )
+                            .build()
+
+                    imageAnalysis.setAnalyzer(
+                        analysisExecutor
+                    ) { imageProxy ->
+
+                        poseLandmarkerHelper.detectLiveStream(
+                            imageProxy = imageProxy,
+                            isFrontCamera = false
+                        )
+                    }
+
                     val recorder =
                         Recorder.Builder()
                             .setQualitySelector(
@@ -257,7 +316,8 @@ private fun CameraPreview(
                             lifecycleOwner,
                             cameraSelector,
                             preview,
-                            newVideoCapture
+                            newVideoCapture,
+                            imageAnalysis
                         )
 
                         videoCapture = newVideoCapture
