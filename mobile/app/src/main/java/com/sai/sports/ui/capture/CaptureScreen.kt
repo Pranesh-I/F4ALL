@@ -106,6 +106,10 @@ private fun CameraPreview(
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
 
+    var poseOverlayView by remember {
+        mutableStateOf<PoseOverlayView?>(null)
+    }
+
     val poseLandmarkerHelper = remember {
         PoseLandmarkerHelper(
             context = context,
@@ -121,6 +125,22 @@ private fun CameraPreview(
                     println(
                         "MediaPipe pose result: $poseCount pose(s)"
                     )
+
+                    if (result.landmarks().isNotEmpty()) {
+
+                        val poseLandmarks =
+                            result.landmarks()[0]
+
+                        poseOverlayView?.updatePose(
+                            landmarks = poseLandmarks,
+                            imageWidth = imageWidth,
+                            imageHeight = imageHeight
+                        )
+
+                    } else {
+
+                        poseOverlayView?.clearPose()
+                    }
                 }
 
                 override fun onError(error: String) {
@@ -330,6 +350,20 @@ private fun CameraPreview(
                 }, ContextCompat.getMainExecutor(ctx))
 
                 previewView
+            }
+        )
+
+        // Pose skeleton overlay
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+
+                PoseOverlayView(ctx).also {
+                    poseOverlayView = it
+                }
+            },
+            update = { view ->
+                poseOverlayView = view
             }
         )
 
