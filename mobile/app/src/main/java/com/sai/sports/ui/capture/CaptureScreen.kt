@@ -52,6 +52,7 @@ import androidx.camera.core.ImageProxy
 import java.util.concurrent.Executors
 import androidx.compose.runtime.DisposableEffect
 import com.sai.sports.PoseLandmarkerHelper
+import android.util.Log
 
 @Composable
 fun CaptureScreen(
@@ -122,24 +123,54 @@ private fun CameraPreview(
                 ) {
                     val poseCount = result.landmarks().size
 
-                    println(
-                        "MediaPipe pose result: $poseCount pose(s)"
-                    )
-
                     if (result.landmarks().isNotEmpty()) {
 
-                        val poseLandmarks =
-                            result.landmarks()[0]
+                        val landmarks = result.landmarks()[0]
 
                         poseOverlayView?.updatePose(
-                            landmarks = poseLandmarks,
+                            landmarks = landmarks,
                             imageWidth = imageWidth,
                             imageHeight = imageHeight
                         )
 
+                        val importantLandmarks = listOf(
+                            "NOSE" to 0,
+                            "LEFT_SHOULDER" to 11,
+                            "RIGHT_SHOULDER" to 12,
+                            "LEFT_HIP" to 23,
+                            "RIGHT_HIP" to 24,
+                            "LEFT_KNEE" to 25,
+                            "RIGHT_KNEE" to 26,
+                            "LEFT_ANKLE" to 27,
+                            "RIGHT_ANKLE" to 28
+                        )
+
+                        Log.d(
+                            "PoseConfidence",
+                            "========== POSE DETECTED =========="
+                        )
+
+                        importantLandmarks.forEach { (name, index) ->
+
+                            val landmark = landmarks[index]
+
+                            Log.d(
+                                "PoseConfidence",
+                                "$name | " +
+                                    "x=${"%.3f".format(landmark.x())}, " +
+                                    "y=${"%.3f".format(landmark.y())}, " +
+                                    "visibility=${"%.3f".format(landmark.visibility().orElse(0f))}"
+                            )
+                        }
+
                     } else {
 
                         poseOverlayView?.clearPose()
+
+                        Log.d(
+                            "PoseConfidence",
+                            "No pose detected"
+                        )
                     }
                 }
 
