@@ -53,6 +53,9 @@ import java.util.concurrent.Executors
 import androidx.compose.runtime.DisposableEffect
 import com.sai.sports.PoseLandmarkerHelper
 import android.util.Log
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import android.os.SystemClock
 
 @Composable
 fun CaptureScreen(
@@ -111,6 +114,18 @@ private fun CameraPreview(
         mutableStateOf<PoseOverlayView?>(null)
     }
 
+    var fpsFrameCount by remember {
+        mutableIntStateOf(0)
+    }
+
+    var fpsLastTime by remember {
+        mutableLongStateOf(SystemClock.elapsedRealtime())
+    }
+
+    var currentFps by remember {
+        mutableIntStateOf(0)
+    }
+
     val poseLandmarkerHelper = remember {
         PoseLandmarkerHelper(
             context = context,
@@ -121,6 +136,25 @@ private fun CameraPreview(
                     imageWidth: Int,
                     imageHeight: Int
                 ) {
+                    fpsFrameCount++
+
+                    val now = SystemClock.elapsedRealtime()
+
+                    val elapsed = now - fpsLastTime
+
+                    if (elapsed >= 1000L) {
+
+                        currentFps =
+                            (fpsFrameCount * 1000L / elapsed).toInt()
+
+                        fpsFrameCount = 0
+                        fpsLastTime = now
+
+                                        Log.d(
+                                            "PoseFPS",
+                                            "Pose inference FPS: $currentFps"
+                                        )
+                                    }
                     val poseCount = result.landmarks().size
 
                     if (result.landmarks().isNotEmpty()) {
