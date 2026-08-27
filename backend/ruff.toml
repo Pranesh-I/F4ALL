@@ -1,0 +1,29 @@
+line-length = 90
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+ignore = [
+    # `Depends(...)` / `Query(...)` in parameter defaults is the FastAPI idiom,
+    # not a mutable-default bug. Flagging it here would mean 36 suppressions.
+    "B008",
+    # Broad excepts are used deliberately at a few boundaries — queueing a
+    # background job, cleaning up a file — where the failure must never take
+    # down the athlete's request. Each one logs.
+    "BLE001",
+    # `str, Enum` rather than `StrEnum`. StrEnum needs Python 3.11+, and these
+    # enums are shared with SQLAlchemy and Pydantic where the mixin form is the
+    # well-trodden path. Not worth churning 17 classes for a stylistic win.
+    "UP042",
+]
+
+[lint.per-file-ignores]
+# Tests insert the backend root on sys.path before importing the app.
+"tests/conftest.py" = ["E402"]
+"alembic/env.py" = ["E402"]
+# Alembic autogenerates these; reformatting them creates noisy diffs.
+"alembic/versions/*.py" = ["E501", "I001", "UP"]
+
+[lint.isort]
+known-first-party = ["app"]

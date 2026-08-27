@@ -15,6 +15,8 @@ servers:
 tags:
   - name: Authentication
     description: Athlete authentication APIs
+  - name: Videos
+    description: Chunked, resumable video upload APIs
   - name: Tests
     description: Test submission APIs
   - name: Results
@@ -116,6 +118,186 @@ paths:
 
         '401':
           description: Authentication required
+
+
+  # ============================================================
+  # VIDEO UPLOAD (chunked + resumable)
+  # ============================================================
+  #
+  # Added in Sprint 4. The original contract referenced a video_id on
+  # /api/tests/submit but defined no way to produce one.
+  #
+  # The flow is deliberately resumable. Athletes upload over 2G/3G links that
+  # drop mid-transfer, and restarting a 6MB video from byte zero on every drop
+  # burns mobile data they paid for and may not be able to replace.
+  #
+  #   init  ->  (status)  ->  chunk x N  ->  complete
+  #
+  # The client asks the SERVER which chunks arrived rather than trusting its own
+  # record of what it sent, so an upload survives the app being killed.
+
+  /api/videos/upload/init:
+    post:
+      tags:
+        - Videos
+      summary: Begin a resumable upload
+      description: >
+        Reserve an upload slot and receive an upload_id. The client must persist
+        the upload_id before sending any bytes, so an interrupted upload can be
+        resumed rather than restarted.
+
+      security:
+        - bearerAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadInitRequest'
+
+      responses:
+        '200':
+          description: Upload session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSession'
+
+        '401':
+          description: Authentication required
+
+        '413':
+          description: File exceeds the maximum accepted size
+
+
+  /api/videos/upload/{upload_id}:
+    get:
+      tags:
+        - Videos
+      summary: Get upload progress
+      description: >
+        Report which chunk indices the server has successfully stored. This is
+        what makes resumption correct after an app restart - the client sends
+        only what is genuinely missing.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          schema:
+            type: string
+
+      responses:
+        '200':
+          description: Upload session state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSession'
+
+        '401':
+          description: Authentication required
+
+        '404':
+          description: Upload session expired or unknown
+
+
+  /api/videos/upload/{upload_id}/chunks/{index}:
+    put:
+      tags:
+        - Videos
+      summary: Upload one chunk
+      description: >
+        Send a single chunk of the video. Chunks may arrive in any order and may
+        be re-sent; the server stores each by index and ignores duplicates.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          schema:
+            type: string
+
+        - name: index
+          in: path
+          required: true
+          description: Zero-based chunk index
+          schema:
+            type: integer
+            minimum: 0
+
+      requestBody:
+        required: true
+        content:
+          video/mp4:
+            schema:
+              type: string
+              format: binary
+
+      responses:
+        '200':
+          description: Chunk stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadChunkResponse'
+
+        '401':
+          description: Authentication required
+
+        '404':
+          description: Upload session expired or unknown
+
+        '409':
+          description: Chunk index outside the declared file size
+
+
+  /api/videos/upload/{upload_id}/complete:
+    post:
+      tags:
+        - Videos
+      summary: Finalize an upload
+      description: >
+        Reassemble the stored chunks, verify the SHA-256 the client declared at
+        init against what was actually received, and persist the video. A
+        mismatch returns 422 and is NOT retryable by re-sending the same source.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          schema:
+            type: string
+
+      responses:
+        '200':
+          description: Video stored and verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadCompleteResponse'
+
+        '400':
+          description: Chunks still missing
+
+        '401':
+          description: Authentication required
+
+        '404':
+          description: Upload session expired or unknown
+
+        '422':
+          description: Checksum mismatch - assembled video does not match the client hash
 
 
   # ============================================================
@@ -384,6 +566,99 @@ components:
           nullable: true
           description: ID of the uploaded test video
           example: '660e8400-e29b-41d4-a716-446655440000'
+
+
+    UploadInitRequest:
+      type: object
+      required:
+        - test_type
+        - file_size_bytes
+        - checksum_sha256
+      properties:
+        test_type:
+          type: string
+          enum:
+            - VERTICAL_JUMP
+            - SIT_UPS
+          example: SIT_UPS
+
+        file_size_bytes:
+          type: integer
+          format: int64
+          description: Size of the compressed video the client will send
+          example: 2411724
+
+        chunk_size_bytes:
+          type: integer
+          description: >
+            Chunk size the client intends to use. The server may override it in
+            the response, and the client must honour the returned value.
+          example: 262144
+
+        checksum_sha256:
+          type: string
+          description: >
+            SHA-256 of the compressed video, computed on the device over the
+            exact bytes to be sent. Verified server-side at completion.
+          example: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+
+        content_type:
+          type: string
+          example: video/mp4
+
+
+    UploadSession:
+      type: object
+      properties:
+        upload_id:
+          type: string
+          example: up_7c1f2b90
+
+        chunk_size_bytes:
+          type: integer
+          description: Authoritative chunk size; the client must use this value
+          example: 262144
+
+        received_chunks:
+          type: array
+          description: Zero-based indices the server has stored
+          items:
+            type: integer
+
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            After this time the session may be discarded and the client must
+            start a fresh upload.
+
+
+    UploadChunkResponse:
+      type: object
+      properties:
+        received_chunks_count:
+          type: integer
+          example: 3
+
+        next_expected_index:
+          type: integer
+          nullable: true
+          example: 3
+
+
+    UploadCompleteResponse:
+      type: object
+      properties:
+        video_id:
+          type: string
+          format: uuid
+          description: Reference to pass to /api/tests/submit
+          example: '660e8400-e29b-41d4-a716-446655440000'
+
+        checksum_verified:
+          type: boolean
+          example: true
 
 
     ReviewActionRequest:

@@ -1,0 +1,11 @@
+# Manual measurements for each reference recording.
+#
+# sequence   file name inside sequences/
+# test       SIT_UPS | VERTICAL_JUMP
+# expected   manually counted reps, or manually measured jump height in cm
+# height_cm  athlete standing height; REQUIRED for VERTICAL_JUMP, blank for sit-ups
+#
+# Example rows (delete once real data is added):
+# situp_01.csv,SIT_UPS,12,
+# jump_01.csv,VERTICAL_JUMP,38.5,172
+sequence,test,expected,height_cm

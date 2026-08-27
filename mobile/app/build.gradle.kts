@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -35,6 +36,21 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+}
+
+// Room's generated schema JSON is committed so migrations can be reviewed in a
+// diff. Sprint 4 ships schema v1; every later change must arrive with a
+// migration, because by then real athletes have unsynced videos in this table
+// and a destructive migration silently discards their recorded tests.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.generateKotlin", "true")
 }
 
 dependencies {
@@ -60,4 +76,22 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.video)
     implementation(libs.mediapipe.tasks.vision)
+
+    // Sprint 4 — offline queue, compression, sync
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.media3.transformer)
+    implementation(libs.androidx.media3.effect)
+    implementation(libs.androidx.media3.common)
+    implementation(libs.okhttp)
+
+    testImplementation(libs.okhttp.mockwebserver)
+    // android.jar's org.json is a stub that throws "not mocked" on the JVM.
+    // The real implementation is test-only: production keeps using the one
+    // built into Android, so this costs nothing in the APK.
+    testImplementation(libs.json)
+    testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.room.testing)
 }

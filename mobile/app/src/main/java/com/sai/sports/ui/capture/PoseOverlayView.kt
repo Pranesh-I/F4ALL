@@ -5,20 +5,45 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.view.View
-import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
+import com.sai.sports.analyzer.AnalyzerThresholds
+import com.sai.sports.analyzer.PosePoint
 import kotlin.math.max
 
+/**
+ * Draws the pose skeleton.
+ *
+ * Takes [PosePoint] rather than MediaPipe landmarks so the same view serves the
+ * live camera overlay and the results screen's replay of a recorded sequence.
+ */
 class PoseOverlayView(
     context: Context
 ) : View(context) {
 
-    private var landmarks: List<NormalizedLandmark> = emptyList()
+    private var points: List<PosePoint> = emptyList()
 
     private var imageWidth = 1
     private var imageHeight = 1
 
+    /**
+     * FILL_CENTER matches PreviewView's default and is right for the live
+     * overlay. Replay has no camera preview underneath, so it uses FIT_CENTER
+     * to keep the whole skeleton on screen instead of cropping it.
+     */
+    var scaleMode: ScaleMode = ScaleMode.FILL_CENTER
+
+    enum class ScaleMode {
+        FILL_CENTER,
+        FIT_CENTER
+    }
+
     private val pointPaint = Paint().apply {
         color = Color.GREEN
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val lowConfidencePointPaint = Paint().apply {
+        color = Color.YELLOW
         style = Paint.Style.FILL
         isAntiAlias = true
     }
@@ -31,11 +56,11 @@ class PoseOverlayView(
     }
 
     fun updatePose(
-        landmarks: List<NormalizedLandmark>,
+        points: List<PosePoint>,
         imageWidth: Int,
         imageHeight: Int
     ) {
-        this.landmarks = landmarks
+        this.points = points
         this.imageWidth = imageWidth.coerceAtLeast(1)
         this.imageHeight = imageHeight.coerceAtLeast(1)
 
@@ -43,27 +68,24 @@ class PoseOverlayView(
     }
 
     fun clearPose() {
-        landmarks = emptyList()
+        points = emptyList()
         postInvalidateOnAnimation()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        if (landmarks.isEmpty()) {
+        if (points.isEmpty()) {
             return
         }
 
-        /*
-         * PreviewView uses FILL_CENTER by default.
-         *
-         * Therefore the source image is scaled until it
-         * completely fills the view and the excess is cropped.
-         */
-        val scale = max(
-            width.toFloat() / imageWidth,
-            height.toFloat() / imageHeight
-        )
+        val widthScale = width.toFloat() / imageWidth
+        val heightScale = height.toFloat() / imageHeight
+
+        val scale = when (scaleMode) {
+            ScaleMode.FILL_CENTER -> max(widthScale, heightScale)
+            ScaleMode.FIT_CENTER -> minOf(widthScale, heightScale)
+        }
 
         val scaledWidth = imageWidth * scale
         val scaledHeight = imageHeight * scale
@@ -73,47 +95,34 @@ class PoseOverlayView(
 
         for (connection in POSE_CONNECTIONS) {
 
-            val start = landmarks.getOrNull(connection.first)
-            val end = landmarks.getOrNull(connection.second)
+            val start = points.getOrNull(connection.first) ?: continue
+            val end = points.getOrNull(connection.second) ?: continue
 
-            if (start == null || end == null) {
-                continue
-            }
-
-            val startX =
-                offsetX + start.x() * scaledWidth
-
-            val startY =
-                offsetY + start.y() * scaledHeight
-
-            val endX =
-                offsetX + end.x() * scaledWidth
-
-            val endY =
-                offsetY + end.y() * scaledHeight
+            // Drawing a limb between landmarks the model could not see produces
+            // a skeleton that looks confident about a guess.
+            if (start.visibility < AnalyzerThresholds.MIN_LANDMARK_VISIBILITY) continue
+            if (end.visibility < AnalyzerThresholds.MIN_LANDMARK_VISIBILITY) continue
 
             canvas.drawLine(
-                startX,
-                startY,
-                endX,
-                endY,
+                offsetX + start.x * scaledWidth,
+                offsetY + start.y * scaledHeight,
+                offsetX + end.x * scaledWidth,
+                offsetY + end.y * scaledHeight,
                 linePaint
             )
         }
 
-        for (landmark in landmarks) {
+        for (point in points) {
 
-            val x =
-                offsetX + landmark.x() * scaledWidth
-
-            val y =
-                offsetY + landmark.y() * scaledHeight
+            val paint =
+                if (point.visibility >= AnalyzerThresholds.MIN_LANDMARK_VISIBILITY) pointPaint
+                else lowConfidencePointPaint
 
             canvas.drawCircle(
-                x,
-                y,
+                offsetX + point.x * scaledWidth,
+                offsetY + point.y * scaledHeight,
                 8f,
-                pointPaint
+                paint
             )
         }
     }

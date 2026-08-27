@@ -9,12 +9,11 @@ on:
       - main
 
 jobs:
-  project-check:
+  structure:
+    name: Project structure
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Check project structure
         run: |
@@ -23,5 +22,112 @@ jobs:
           test -d dashboard
           test -d docs
 
-      - name: CI passed
-        run: echo "Project structure check passed"
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest httpx ruff
+
+      - name: Lint
+        working-directory: backend
+        run: ruff check app tests
+
+      # The pose model is a ~9MB binary fetched at runtime, not committed.
+      # Without it the extraction tests skip; the rest of the suite — including
+      # the cross-language parity checks — runs regardless.
+      - name: Fetch pose model
+        working-directory: backend
+        run: python -m scripts.fetch_model
+        continue-on-error: true
+
+      - name: Tests
+        working-directory: backend
+        run: python -m pytest -q
+
+      - name: Verify migrations apply and reverse
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./var/ci.db
+        run: |
+          mkdir -p var
+          python -m alembic upgrade head
+          python -m alembic downgrade base
+
+  mobile:
+    name: Mobile build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        working-directory: mobile
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+      - name: Assemble debug APK
+        working-directory: mobile
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+  parity:
+    name: Mobile/server scoring parity
+    runs-on: ubuntu-latest
+    # The server auto-flags submissions when its score disagrees with the
+    # device's. If the Kotlin and Python scorers drift apart, that flag starts
+    # firing on honest athletes — so the fixtures are regenerated from the
+    # mobile implementation and the committed ones must still match.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Regenerate parity fixtures from the mobile implementation
+        working-directory: mobile
+        run: ./gradlew :app:testDebugUnitTest --tests "*ParityFixtureExportTest*" --no-daemon
+
+      - name: Fail if the regenerated fixtures differ from what is committed
+        run: |
+          if ! git diff --quiet backend/tests/fixtures/parity; then
+            echo "Mobile scoring changed but the committed parity fixtures were not updated."
+            echo "Run the export test locally and commit the result."
+            git diff --stat backend/tests/fixtures/parity
+            exit 1
+          fi
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest httpx
+
+      - name: Assert the Python port reproduces the mobile scores
+        working-directory: backend
+        run: python -m pytest tests/test_parity.py -q

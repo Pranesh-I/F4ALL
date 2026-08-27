@@ -33,3 +33,7 @@ docs/reference-videos/**/*.mp4
 # Environment variables
 .env
 *.env
+# Backend
+backend/.venv/
+backend/var/
+backend/models/*.task

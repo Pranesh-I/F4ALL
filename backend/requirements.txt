@@ -1,7 +1,30 @@
-fastapi
-uvicorn[standard]
-psycopg[binary]
-sqlalchemy
-alembic
-python-dotenv
-pydantic-settings
+# --- API ---
+fastapi>=0.115
+uvicorn[standard]>=0.32
+python-multipart>=0.0.20
+
+# --- Database ---
+sqlalchemy>=2.0.36
+alembic>=1.14
+psycopg[binary]>=3.2
+
+# --- Config ---
+python-dotenv>=1.0
+pydantic-settings>=2.6
+
+# --- Auth (Sprint 7 issues real tokens; the middleware verifies them now) ---
+pyjwt>=2.10
+
+# --- Async verification pipeline ---
+celery[redis]>=5.4
+redis>=5.2
+
+# --- Storage ---
+boto3>=1.35
+
+# --- Server-side pose re-verification ---
+# mediapipe pulls numpy/opencv itself. Only the frame-extraction step needs it;
+# the scoring algorithms in app/verification/ are pure Python by design, so the
+# whole test suite runs without it installed.
+mediapipe>=0.10.18
+opencv-python-headless>=4.10

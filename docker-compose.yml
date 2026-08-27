@@ -10,10 +10,37 @@ services:
       POSTGRES_PASSWORD: f4all_password
 
     ports:
+      # 5433 on the host so an existing local Postgres is not shadowed.
       - "5433:5432"
 
     volumes:
       - f4all_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U f4all_user -d f4all_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Celery broker and result backend for server-side re-verification (Sprint 5).
+  redis:
+    image: redis:7-alpine
+    container_name: f4all-redis
+    restart: unless-stopped
+
+    ports:
+      - "6379:6379"
+
+    # Verification jobs are re-queued from the database by
+    # `python -m app.cli reverify-pending`, so the broker is a cache rather than
+    # a system of record and does not need persistence.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   f4all_postgres_data:
