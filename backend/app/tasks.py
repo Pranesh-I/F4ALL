@@ -16,17 +16,18 @@ from .config import get_settings
 from .database import session_scope
 from .models import (
     Athlete,
+    FaceVerification,
+    FaceVerificationStatus,
     Flag,
     FlagSeverity,
     FlagSource,
     Test,
     TestResult,
     TestResultStatus,
+    Video,
 )
 from .storage import get_storage
 from .verification import discrepancy
-from .verification.cheat import pipeline as cheat_pipeline
-from .verification.cheat.findings import CheatReport
 from .verification.analyzers import (
     AnalyzerResult,
     AttemptStatus,
@@ -34,6 +35,8 @@ from .verification.analyzers import (
     analyze_sequence,
     build_analyzer,
 )
+from .verification.cheat import pipeline as cheat_pipeline
+from .verification.cheat.findings import CheatReport, FaceOutcome
 from .verification.extractor import ExtractionError, analyze_video
 from .worker import celery_app
 
@@ -258,6 +261,8 @@ def _persist_outcome(
                 severity=FlagSeverity(finding.severity.value),
             )
 
+        _record_face_verification(db, result_id, cheat_report.face)
+
         result.status = (
             TestResultStatus.verified
             if not score_disagrees and cheat_report.is_clean
@@ -268,6 +273,32 @@ def _persist_outcome(
         # official approves in Sprint 8 — a machine result must never be
         # presented as the official one.
         db.add(result)
+
+
+def _record_face_verification(
+    db, result_id: str, outcome: FaceOutcome | None
+) -> None:
+    """Write the identity check to `face_verifications`.
+
+    No row when the comparison did not run. An absent row means "not checked",
+    and that must stay distinguishable from a recorded `pass` — an athlete with
+    no registration photo on file has not been identity-verified, and a row
+    saying otherwise would be a false assurance in the one table an official
+    would consult to ask whether they had been.
+    """
+    if outcome is None:
+        return
+
+    db.add(
+        FaceVerification(
+            test_result_id=result_id,
+            verification_status=FaceVerificationStatus(outcome.verdict.value),
+            similarity_score=(
+                round(outcome.similarity, 4) if outcome.similarity is not None else None
+            ),
+            verified_at=datetime.now(UTC),
+        )
+    )
 
 
 def _persist_video_duration(video_id, video_metadata) -> None:

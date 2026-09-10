@@ -22,6 +22,7 @@ from app.verification.cheat.frames import (
     find_looped_runs,
     hamming,
     mean_adjacent_motion,
+    signature_difference,
 )
 from app.verification.cheat.metadata import VideoMetadata, check_metadata
 from app.verification.cheat.subject import check_subject
@@ -29,9 +30,12 @@ from app.verification.pose import LandmarkIndex, PoseFrame, PosePoint
 
 LANDMARK_COUNT = 33
 
-# Hashes are 256-bit; test fixtures must span the same width or distances are
-# not comparable to the production thresholds.
-HASH_BITS = 256
+# Frames are modelled as 16x16 greyscale grids — the same size the extractor
+# downsamples to — and both representations are derived from the grid exactly
+# as `extractor.perceptual_hash` and `extractor.frame_signature` derive them
+# from a real frame. Fixtures that invented the hash and the signature
+# independently could disagree with each other in ways no real video can.
+GRID = 16
 
 
 # ---------------------------------------------------------------------------
@@ -43,54 +47,121 @@ def timestamps(count: int, interval_ms: int = 33) -> list[int]:
     return [index * interval_ms for index in range(count)]
 
 
-def drifting_hashes(count: int, seed: int = 7) -> list[int]:
-    """Hashes that change a little each frame, like a real moving scene.
+def _dhash(grid: list[list[int]]) -> int:
+    """Difference hash over the grid — the same rule the extractor applies."""
+    value = 0
+    bit = 0
+    for row in grid:
+        for column in range(len(row) - 1):
+            if row[column] > row[column + 1]:
+                value |= 1 << bit
+            bit += 1
+    return value
 
-    A random walk, not a deterministic bit rotation — an earlier version of this
-    helper XOR-ed bit `index % 64` and cycled with period 64, manufacturing
-    genuine repetition and making the loop detector look wrong when it was
-    correctly reporting what the fixture actually contained.
+
+def _signature(grid: list[list[int]]) -> bytes:
+    return bytes(value for row in grid for value in row)
+
+
+def representations(grids: list[list[list[int]]]):
+    """The (hashes, signatures) pair the checks consume."""
+    return [_dhash(grid) for grid in grids], [_signature(grid) for grid in grids]
+
+
+def _background(seed: int = 99) -> list[list[int]]:
+    """A textured static scene — a wall behind the athlete.
+
+    Textured rather than flat because a uniform background makes every
+    difference-hash bit a coin flip on sensor noise, which is not how real
+    footage behaves.
     """
     generator = random.Random(seed)
-    values = []
-    current = generator.getrandbits(HASH_BITS)
+    return [[generator.randint(30, 70) for _ in range(GRID)] for _ in range(GRID)]
+
+
+def _with_noise(
+    grid: list[list[int]], generator: random.Random, amount: int = 3
+) -> list[list[int]]:
+    """Every real camera adds sensor noise.
+
+    This is the whole reason loop detection can work: two genuine recordings of
+    the same motionless scene are never identical, and a copy-pasted segment
+    is. A noiseless fixture would make the detector look far better than it is.
+    """
+    return [
+        [max(0, min(255, value + generator.randint(-amount, amount))) for value in row]
+        for row in grid
+    ]
+
+
+def _draw_figure(
+    grid: list[list[int]], column: int, height: int, brightness: int = 160
+) -> list[list[int]]:
+    drawn = [row[:] for row in grid]
+    for row in range(max(0, GRID - height), GRID):
+        for offset in range(3):
+            if column + offset < GRID:
+                drawn[row][column + offset] = brightness
+    return drawn
+
+
+def moving_scene(count: int, seed: int = 7) -> list[list[list[int]]]:
+    """An athlete moving in front of a fixed background.
+
+    The figure follows a random walk, not a sine wave. An earlier version of
+    this fixture used a periodic drive, which made the "honest" recording a
+    literal loop — the detector was correctly flagging a fixture that really
+    did repeat itself.
+    """
+    generator = random.Random(seed)
+    background = _background()
+    grids = []
+    height, column = 8, 7
+
     for _ in range(count):
-        # ~2% of bits per frame: the scale of real frame-to-frame motion.
-        for _ in range(generator.randint(4, 8)):
-            current ^= 1 << generator.randrange(HASH_BITS)
-        values.append(current)
-    return values
+        height = max(3, min(13, height + generator.randint(-1, 1)))
+        column = max(1, min(GRID - 4, column + generator.choice([-1, 0, 0, 1])))
+        grids.append(
+            _with_noise(_draw_figure(background, column, height), generator)
+        )
+
+    return grids
 
 
-def repetitive_exercise_hashes(
+def still_scene(count: int, seed: int = 3) -> list[list[list[int]]]:
+    """A frozen picture: no motion, no noise. A camera on a photograph."""
+    grid = _draw_figure(_background(seed), 7, 8)
+    return [grid for _ in range(count)]
+
+
+def repetitive_exercise_scene(
     reps: int = 12, seed: int = 11, rest_frames: int = 10
-) -> list[int]:
+) -> list[list[list[int]]]:
     """A sit-up test: the athlete returns to the same rest position every rep.
 
     This is the shape of an HONEST recording and the most dangerous false
     positive in the whole check. The rest frames between reps are near-identical
-    across the entire video against an unchanging background.
+    across the entire video against an unchanging background, so runs of similar
+    frames genuinely repeat throughout a legitimate submission.
     """
     generator = random.Random(seed)
-    rest = generator.getrandbits(HASH_BITS)
-    values: list[int] = []
+    background = _background()
+    grids: list[list[list[int]]] = []
 
     for _ in range(reps):
-        # Rest position: nearly identical every time, give or take sensor noise.
+        # Rest position: the same pose every rep, give or take sensor noise.
+        rest = _draw_figure(background, 7, 4)
         for _ in range(rest_frames):
-            noisy = rest
-            if generator.random() < 0.4:
-                noisy ^= 1 << generator.randrange(HASH_BITS)
-            values.append(noisy)
+            grids.append(_with_noise(rest, generator, amount=1))
 
-        # The rep itself: the athlete moves, so the picture genuinely changes.
-        current = rest
-        for _ in range(20):
-            for _ in range(6):
-                current ^= 1 << generator.randrange(HASH_BITS)
-            values.append(current)
+        # The rep itself: the athlete sits up, so the picture genuinely changes.
+        for step in range(20):
+            height = 4 + int(9 * abs(1 - abs(step - 10) / 10))
+            grids.append(
+                _with_noise(_draw_figure(background, 7, height), generator, amount=1)
+            )
 
-    return values
+    return grids
 
 
 def pose_frame(
@@ -125,12 +196,25 @@ def test_hamming_distance():
     assert hamming(0b1111, 0b0000) == 4
 
 
-def test_a_copied_segment_is_detected():
-    original = drifting_hashes(60)
-    # Frames 0..34 pasted in again later — roughly a second of copied footage.
-    tampered = original + drifting_hashes(20, seed=0xAAAA) + original[:35]
+def test_signature_difference_measures_magnitude():
+    """The property the hash cannot provide.
 
-    matches = find_looped_runs(tampered)
+    A difference hash binarises each comparison and throws magnitude away, and
+    magnitude is exactly what lossy re-encoding perturbs. This is why loop
+    detection confirms with signatures rather than deciding on hashes.
+    """
+    flat = bytes([100] * 256)
+    assert signature_difference(flat, flat) == 0.0
+    assert signature_difference(flat, bytes([110] * 256)) == 10.0
+
+
+def test_a_copied_segment_is_detected():
+    original = moving_scene(60)
+    # Frames 0..34 pasted in again later — roughly a second of copied footage.
+    tampered = original + moving_scene(20, seed=0xAAAA) + original[:35]
+    hashes, signatures = representations(tampered)
+
+    matches = find_looped_runs(hashes, signatures)
 
     assert matches, "A repeated 35-frame run should be detected"
     assert matches[0].length >= 20
@@ -143,7 +227,8 @@ def test_an_honest_recording_is_not_flagged_as_looped():
     unchanging background. If that reads as a loop, every honest submission gets
     flagged and the signal becomes worthless.
     """
-    assert find_looped_runs(drifting_hashes(300)) == []
+    hashes, signatures = representations(moving_scene(300))
+    assert find_looped_runs(hashes, signatures) == []
 
 
 def test_a_real_sit_up_test_is_not_flagged_as_looped():
@@ -155,39 +240,43 @@ def test_a_real_sit_up_test_is_not_flagged_as_looped():
     submission in the review queue and make the queue useless for the cases
     that matter.
 
-    The guard is that a repeated run must contain internal MOVEMENT. A repeat of
-    a motionless scene is a motionless scene, reported separately.
+    Two guards stop it: sensor noise keeps genuinely-recorded rest frames above
+    the identical threshold, and a repeated run must contain internal MOVEMENT
+    — a repeat of a motionless scene is a motionless scene, reported separately.
     """
-    assert find_looped_runs(repetitive_exercise_hashes()) == []
+    hashes, signatures = representations(repetitive_exercise_scene())
+    assert find_looped_runs(hashes, signatures) == []
 
 
 def test_near_still_frames_are_not_a_loop_of_themselves():
     """An athlete standing still during jump calibration."""
-    still = [0x0F0F0F0F0F0F0F0F] * 40
-    moving = drifting_hashes(100, seed=0x1234)
+    grids = still_scene(40) + moving_scene(100, seed=0x1234)
+    hashes, signatures = representations(grids)
 
     # Consecutive identical frames must not count as a repeat, or every
     # calibration period would be flagged.
-    matches = find_looped_runs(still + moving)
+    matches = find_looped_runs(hashes, signatures)
 
     assert all(match.repeat_index - match.source_index >= 15 for match in matches)
 
 
 def test_abrupt_cut_is_detected():
-    before = [0] * 20
-    after = [(1 << HASH_BITS) - 1] * 20  # every bit flipped: a scene change
+    before = [[[0] * GRID for _ in range(GRID)] for _ in range(20)]
+    after = [[[255] * GRID for _ in range(GRID)] for _ in range(20)]
 
-    cuts = find_abrupt_cuts(before + after)
+    _, signatures = representations(before + after)
 
-    assert cuts == [20]
+    assert find_abrupt_cuts(signatures) == [20]
 
 
 def test_smooth_motion_is_not_a_cut():
-    assert find_abrupt_cuts(drifting_hashes(200)) == []
+    _, signatures = representations(moving_scene(200))
+    assert find_abrupt_cuts(signatures) == []
 
 
 def test_static_video_is_detected():
-    report = check_frames([0x1234567812345678] * 120, timestamps(120))
+    hashes, signatures = representations(still_scene(120))
+    report = check_frames(hashes, signatures, timestamps(120))
 
     assert any(f.check is CheatCheck.STATIC_VIDEO for f in report.findings)
 
@@ -198,23 +287,29 @@ def test_motion_measure_separates_still_from_moving():
     What matters is the decision the value drives: a frozen scene must fall
     below the threshold and a moving one must sit clearly above it.
     """
-    frozen = mean_adjacent_motion([0x1111111111111111] * 50)
-    moving = mean_adjacent_motion(drifting_hashes(50))
+    _, frozen_signatures = representations(still_scene(50))
+    _, moving_signatures = representations(moving_scene(50))
+
+    frozen = mean_adjacent_motion(frozen_signatures)
+    moving = mean_adjacent_motion(moving_signatures)
 
     assert frozen < MIN_MEAN_ADJACENT_MOTION
     assert moving > MIN_MEAN_ADJACENT_MOTION * 3
 
 
 def test_a_moving_recording_is_not_flagged_as_static():
-    report = check_frames(drifting_hashes(200), timestamps(200))
+    hashes, signatures = representations(moving_scene(200))
+    report = check_frames(hashes, signatures, timestamps(200))
+
     assert not any(f.check is CheatCheck.STATIC_VIDEO for f in report.findings)
 
 
 def test_loop_finding_names_where_to_look():
-    original = drifting_hashes(60)
-    tampered = original + drifting_hashes(20, seed=0xBEEF) + original[:35]
+    original = moving_scene(60)
+    tampered = original + moving_scene(20, seed=0xBEEF) + original[:35]
+    hashes, signatures = representations(tampered)
 
-    report = check_frames(tampered, timestamps(len(tampered)))
+    report = check_frames(hashes, signatures, timestamps(len(tampered)))
     looped = [f for f in report.findings if f.check is CheatCheck.LOOPED_FRAMES]
 
     assert looped
@@ -225,7 +320,8 @@ def test_loop_finding_names_where_to_look():
 
 
 def test_too_few_frames_is_skipped_not_passed():
-    report = check_frames([1, 2, 3, 4, 5], timestamps(5))
+    hashes, signatures = representations(moving_scene(5))
+    report = check_frames(hashes, signatures, timestamps(5))
 
     assert report.is_clean
     # "We could not look" must never be recorded as "we looked and it was fine".

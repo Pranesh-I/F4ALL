@@ -36,4 +36,7 @@ docs/reference-videos/**/*.mp4
 # Backend
 backend/.venv/
 backend/var/
+# Model binaries: multi-megabyte, fetched by `python -m scripts.fetch_model`,
+# and versioned upstream independently of this repo.
 backend/models/*.task
+backend/models/*.tflite

@@ -60,9 +60,46 @@ class CheatFinding:
     evidence: dict[str, float] = field(default_factory=dict)
 
 
+class FaceVerdict(str, Enum):
+    """What the face check concluded, in `face_verifications.verification_status`.
+
+    `FAIL` is deliberately never produced by the automatic path. This check is a
+    generic image embedder over a face crop, with an unvalidated error rate on
+    exactly the population the platform serves (see the module docstring in
+    `face.py`). A machine here can say "these two do not obviously match" and
+    route the pair to a human; it cannot say "this is not the athlete". The value
+    exists because a reviewer, having compared the photographs themselves, can.
+    """
+
+    PASS = "pass"
+    FAIL = "fail"
+    MANUAL_REVIEW = "manual_review"
+
+
+@dataclass(frozen=True)
+class FaceOutcome:
+    """The face comparison, kept so it can be persisted.
+
+    Separate from `CheatFinding` because a *passing* comparison is also worth
+    recording — `face_verifications` is the evidence that the check ran and what
+    it saw, and a row only written on mismatch could not distinguish "compared
+    and matched" from "never compared".
+    """
+
+    verdict: FaceVerdict
+    similarity: float | None
+    frames_with_face: int = 0
+    frames_sampled: int = 0
+
+
 @dataclass
 class CheatReport:
     findings: list[CheatFinding] = field(default_factory=list)
+
+    # None means the comparison did not happen at all — no registration photo,
+    # no models, no face found. Distinct from a recorded `PASS`, and the reason
+    # is in `skipped`.
+    face: FaceOutcome | None = None
 
     # Checks that could not run — a missing model, no registration photo on
     # file. Recorded explicitly, because "we did not look" must never be
@@ -75,9 +112,11 @@ class CheatReport:
     def skip(self, check: CheatCheck, reason: str) -> None:
         self.skipped[check.value] = reason
 
-    def extend(self, other: "CheatReport") -> None:
+    def extend(self, other: CheatReport) -> None:
         self.findings.extend(other.findings)
         self.skipped.update(other.skipped)
+        if other.face is not None:
+            self.face = other.face
 
     @property
     def is_clean(self) -> bool:

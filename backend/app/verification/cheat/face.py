@@ -32,7 +32,14 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from .findings import CheatCheck, CheatFinding, CheatReport, Severity
+from .findings import (
+    CheatCheck,
+    CheatFinding,
+    CheatReport,
+    FaceOutcome,
+    FaceVerdict,
+    Severity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -280,9 +287,27 @@ def check_face(
         return report
 
     if comparison.matches:
+        # Recorded even though nothing is flagged. `face_verifications` is the
+        # record that the comparison happened, and a table written only on
+        # mismatch cannot tell "matched" from "never ran".
+        report.face = FaceOutcome(
+            verdict=FaceVerdict.PASS,
+            similarity=comparison.similarity,
+            frames_with_face=comparison.frames_with_face,
+            frames_sampled=comparison.frames_sampled,
+        )
         return report
 
     strong = comparison.similarity < STRONG_MISMATCH_THRESHOLD
+
+    # MANUAL_REVIEW, never FAIL — see FaceVerdict. The threshold decides who
+    # looks next, not whether the athlete cheated.
+    report.face = FaceOutcome(
+        verdict=FaceVerdict.MANUAL_REVIEW,
+        similarity=comparison.similarity,
+        frames_with_face=comparison.frames_with_face,
+        frames_sampled=comparison.frames_sampled,
+    )
 
     report.add(
         CheatFinding(

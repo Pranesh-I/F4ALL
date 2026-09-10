@@ -9,15 +9,16 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.config import get_settings  # noqa: E402
-from app.models import Base  # noqa: E402
+from app.config import get_settings
+from app.models import Base
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url)

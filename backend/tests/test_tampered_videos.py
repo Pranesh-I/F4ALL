@@ -22,7 +22,12 @@ from app.verification.cheat.findings import CheatCheck
 from app.verification.cheat.frames import check_frames
 from app.verification.cheat.metadata import VideoMetadata, check_metadata
 from app.verification.cheat.subject import check_subject
-from app.verification.extractor import analyze_video, model_path, perceptual_hash
+from app.verification.extractor import (
+    analyze_video,
+    frame_signature,
+    model_path,
+    perceptual_hash,
+)
 
 cv2 = pytest.importorskip("cv2", reason="opencv not installed")
 np = pytest.importorskip("numpy", reason="numpy not installed")
@@ -83,7 +88,8 @@ def draw_scene(
         # pixel-identical.
         jitter = np.random.default_rng(seed=1000 + rep) if rep_jitter else None
         fatigue = max(0.0, 1.0 - index / 600.0) if rep_jitter else 1.0
-        amplitude = (0.45 + (0.10 * jitter.random() if jitter is not None else 0.0)) * fatigue
+        wobble = 0.10 * jitter.random() if jitter is not None else 0.0
+        amplitude = (0.45 + wobble) * fatigue
         period = 18.0 + (3.0 * jitter.random() if jitter is not None else 0.0)
         drift_x = int(18 * jitter.random()) if jitter is not None else 0
         drift_y = int(12 * jitter.random()) if jitter is not None else 0
@@ -141,6 +147,22 @@ def hashes_of(frames: list) -> list[int]:
     return [perceptual_hash(frame) for frame in frames]
 
 
+def signatures_of(frames: list) -> list[bytes]:
+    return [frame_signature(frame) for frame in frames]
+
+
+def frame_checks(frames: list):
+    """Run the frame checks over rendered frames.
+
+    Both representations come from the same frames, exactly as the single
+    decode pass in `analyze_video` produces them. The hash prefilters; the
+    signature confirms.
+    """
+    return check_frames(
+        hashes_of(frames), signatures_of(frames), timestamps_for(len(frames))
+    )
+
+
 def timestamps_for(count: int) -> list[int]:
     return [int(index * 1000 / FPS) for index in range(count)]
 
@@ -157,9 +179,7 @@ def test_honest_recording_is_not_flagged():
     worse than no detector, because it destroys the review queue's signal.
     """
     frames = honest_frames()
-    hashes = hashes_of(frames)
-
-    report = check_frames(hashes, timestamps_for(len(hashes)))
+    report = frame_checks(frames)
 
     assert report.is_clean, f"Honest recording was flagged: {report.summary()}"
 
@@ -188,8 +208,7 @@ def test_looped_clip_is_flagged(tmp_path):
     path = write_video(tmp_path / "looped.mp4", looped)
     assert path.exists()
 
-    hashes = hashes_of(looped)
-    report = check_frames(hashes, timestamps_for(len(hashes)))
+    report = frame_checks(looped)
 
     findings = [f for f in report.findings if f.check is CheatCheck.LOOPED_FRAMES]
     assert findings, f"Looped video was not flagged: {report.summary()}"
@@ -201,7 +220,7 @@ def test_partially_looped_clip_is_flagged():
     original = honest_frames(120)
     tampered = original[:80] + original[20:60] + original[80:]
 
-    report = check_frames(hashes_of(tampered), timestamps_for(len(tampered)))
+    report = frame_checks(tampered)
 
     assert any(f.check is CheatCheck.LOOPED_FRAMES for f in report.findings)
 
@@ -221,9 +240,7 @@ def test_spliced_footage_is_flagged():
         for index in range(60)
     ]
 
-    report = check_frames(
-        hashes_of(first + second), timestamps_for(120)
-    )
+    report = frame_checks(first + second)
 
     assert any(f.check is CheatCheck.ABRUPT_CUT for f in report.findings)
 
@@ -236,7 +253,7 @@ def test_spliced_footage_is_flagged():
 def test_camera_pointed_at_a_still_image_is_flagged():
     frozen = [draw_scene(10)] * 120
 
-    report = check_frames(hashes_of(frozen), timestamps_for(120))
+    report = frame_checks(frozen)
 
     assert any(f.check is CheatCheck.STATIC_VIDEO for f in report.findings)
 
@@ -318,6 +335,7 @@ def test_looped_real_video_survives_re_encoding(tmp_path):
 
     report = check_frames(
         analysis.frame_hashes,
+        analysis.frame_signatures,
         [frame.timestamp_ms for frame in analysis.frames],
     )
 
@@ -334,6 +352,7 @@ def test_honest_real_video_survives_re_encoding(tmp_path):
 
     report = check_frames(
         analysis.frame_hashes,
+        analysis.frame_signatures,
         [frame.timestamp_ms for frame in analysis.frames],
     )
 

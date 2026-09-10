@@ -20,8 +20,8 @@ Update the checkboxes as work lands. **Do not tick a sprint's Definition of Done
 | **3** | **Rep-Counting & Jump Measurement** | **`[~]` Built + unit-tested; accuracy validation blocked on reference videos** |
 | **4** | **Offline Queue, Compression & Sync** | **`[~]` Built + 99 tests; backend now exists — DoD walk needs only a device** |
 | **5** | **Backend Ingest + Re-Verification** | **`[~]` Built + 63 tests; SLA + Postgres unmeasured** |
-| **6** | **Cheat Detection v1** | **`[ ]` ← NEXT** |
-| 7 | Auth, Profiles & Benchmarking | `[ ]` Not started |
+| **6** | **Cheat Detection v1** | **`[x]` Complete — 114 tests, DoD met against rendered tampered video** |
+| **7** | **Auth, Profiles & Benchmarking** | **`[ ]` ← NEXT** |
 | 8 | Official Dashboard v1 | `[ ]` Not started (`dashboard/` empty) |
 | 9 | Gamification & UX Polish | `[ ]` Not started |
 | 10 | Shuttle Run & Endurance Run | `[ ]` Not started |
@@ -263,18 +263,31 @@ Update the checkboxes as work lands. **Do not tick a sprint's Definition of Done
 
 > **Goal:** Obvious manipulation attempts get caught automatically.
 
-- [ ] Frame-consistency checks: perceptual hash comparison to detect duplicated/looped frames
-- [ ] Abrupt-cut detection (unnatural scene changes between adjacent frames)
-- [ ] Single-person-in-frame validation (flag videos with multiple people or no clear subject)
-- [ ] Face crop from the test video
-- [ ] Face embedding similarity vs the athlete's registration photo (`athletes.reference_face_key`)
-- [ ] Persist results to the `face_verifications` table (`pass` / `fail` / `manual_review`)
-- [ ] Metadata sanity checks: duration vs expected test duration, resolution consistency, re-encoding artifacts
-- [ ] Flag reason system: store *why* something was flagged, with severity, into the `flags` table
-- [ ] Build a tampered-video test set (looped clip, wrong person, edited footage)
+> Implementation complete, 114 tests green (none skipped), lint clean; see [docs/SPRINT-6.md](docs/SPRINT-6.md).
+> Every check runs off Sprint 5's **single decode pass**, so the SLA is not multiplied per check.
+
+- [x] Frame-consistency checks: perceptual hash comparison to detect duplicated/looped frames — [frames.py](backend/app/verification/cheat/frames.py)
+  - [x] **Hashes alone do not work** and the measurement is recorded: after the mobile 480p transcode, hash distance for true copies (8.4 mean) overlaps honest frames one rep apart (3.0 min). A 16x16 greyscale signature separates them tenfold. Hash prefilters, signature confirms
+  - [x] False-positive guards: 20-frame minimum run, 15-frame minimum gap, and a matched run must contain internal movement
+- [x] Abrupt-cut detection (unnatural scene changes between adjacent frames)
+- [x] Single-person-in-frame validation — [subject.py](backend/app/verification/cheat/subject.py) (sustained second person flagged; brief passer-by not; subject-swap detected)
+- [x] Face crop from the test video — largest face, sampled across 12 frames — [face.py](backend/app/verification/cheat/face.py)
+- [x] Face embedding similarity vs the athlete's registration photo (`athletes.reference_face_key`)
+  - [x] Never returns `fail` and never `high` severity — an unvalidated embedder must not be given authority to accuse a minor
+- [x] Persist results to the `face_verifications` table (`pass` / `fail` / `manual_review`)
+  - [x] **No row at all when the check did not run** — an absent row means "not verified"; a `pass` row there would be a false assurance
+- [x] Metadata sanity checks: duration vs expected test duration, resolution consistency, re-encoding artifacts — [metadata.py](backend/app/verification/cheat/metadata.py)
+- [x] Flag reason system: store *why* something was flagged, with severity and a timestamp to look at, into the `flags` table
+- [x] Build a tampered-video test set (looped clip, partial loop, spliced footage, still image, short clip, sped-up) — rendered, not committed — [test_tampered_videos.py](backend/tests/test_tampered_videos.py)
+  - [x] Honest controls alongside every tampered case; a detector that flags everything passes all of them and is worse than none
+- [x] **Fixed: `_persist_video_duration` referenced an unimported `Video`** — a guaranteed `NameError`, swallowed by the task's outer handler, which would have flagged *every* cleanly-scored submission with a Python error as the reason
+- [x] **Fixed: 16 frame-check tests still called the removed hash-only API** and failed with `TypeError`. Fixtures rebuilt to derive both representations from one grid the way the extractor derives them from a real frame
+- [x] `scripts/fetch_model.py` also fetches the two face models (optional — absent models report "not run")
+- [x] Write [docs/SPRINT-6.md](docs/SPRINT-6.md)
 
 **DoD**
-- [ ] A deliberately tampered test video gets correctly auto-flagged in the test set
+- [x] **A deliberately tampered test video gets correctly auto-flagged in the test set** — 6 tampering modes against real rendered video, including a loop that survives a real re-encode
+- [x] The honest control is **not** flagged — the property that keeps the review queue worth reading
 
 ---
 

@@ -102,7 +102,10 @@ def signature_difference(first: bytes, second: bytes) -> float:
     if not first or len(first) != len(second):
         return 255.0
     total = 0
-    for a, b in zip(first, second):
+    # Lengths are checked above, so strict= would only re-test what the guard
+    # already established — but state it explicitly rather than leave the
+    # silent-truncation behaviour implied.
+    for a, b in zip(first, second, strict=True):
         total += a - b if a > b else b - a
     return total / len(first)
 
