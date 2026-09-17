@@ -6,11 +6,21 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .logging_config import RequestIdMiddleware, configure_logging
-from .routers import auth, dashboard, health, tests_submit, videos
+from .routers import (
+    athletes,
+    auth,
+    dashboard,
+    dashboard_auth,
+    health,
+    media,
+    tests_submit,
+    videos,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +70,24 @@ def create_app() -> FastAPI:
 
     app.add_middleware(RequestIdMiddleware)
 
+    # The official dashboard runs on its own origin. Bearer tokens, not
+    # cookies, so credentials are not enabled and CSRF does not apply.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        expose_headers=["X-Request-ID", "Retry-After", "X-Total-Count"],
+    )
+
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(athletes.router)
     app.include_router(videos.router)
     app.include_router(tests_submit.router)
+    app.include_router(dashboard_auth.router)
     app.include_router(dashboard.router)
+    app.include_router(media.router)
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):

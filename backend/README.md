@@ -19,7 +19,11 @@ docker compose -f ../docker-compose.yml up -d
 
 python -m alembic upgrade head  # create the schema
 python -m app.cli seed          # create the test battery rows
-python -m scripts.fetch_model   # ~9MB pose model, not committed
+python -m app.cli seed-benchmarks   # PROVISIONAL age/gender norms (see below)
+python -m scripts.fetch_model   # pose + face models, not committed
+
+# a dashboard account (password is prompted for, never passed as an argument)
+python -m app.cli create-official --email you@sai.example --name "Your Name"     --role regional_reviewer --region "Tamil Nadu"
 
 uvicorn app.main:app --reload   # API on :8000
 celery -A app.worker.celery_app worker --loglevel=info   # verification worker
@@ -96,15 +100,27 @@ CI does this automatically and fails if the committed fixtures are stale.
 ## Tests
 
 ```bash
-python -m pytest          # 63 tests, no Postgres/Redis/S3/network needed
+python -m pytest          # 222 tests, no Postgres/Redis/S3/network needed
 python -m ruff check app tests
 ```
 
 SQLite in-memory and local-disk storage throughout. A suite that only runs when
 four services are up is a suite people stop running.
 
-The pose-extraction tests skip unless `python -m scripts.fetch_model` has been
-run; everything else, parity included, runs on a clean checkout.
+The pose-extraction and rendered-tampering tests skip unless
+`python -m scripts.fetch_model` has been run; everything else, parity included,
+runs on a clean checkout.
+
+## Benchmarks are provisional
+
+`app/data/benchmarks_provisional.csv` is a placeholder. SAI's published Khelo
+India norms cover a different battery (600m, 50m, sit-and-reach, push-ups,
+partial curl-ups) with no vertical jump and no classic sit-up, so there is no
+official table to encode for the MVP tests. Every row carries a `source`; the
+API marks comparisons from it `provisional: true` and both the app and the
+dashboard show that caveat. Load an official table with
+`python -m app.cli seed-benchmarks --file official.csv --replace` and the caveat
+disappears without a code change.
 
 ## Operations
 
@@ -113,6 +129,8 @@ python -m app.cli seed                # idempotent; safe on every deploy
 python -m app.cli sla                 # verification backlog vs the SLA
 python -m app.cli reverify-pending    # re-queue submissions stuck in processing
 python -m app.cli reverify <id>       # re-queue one
+python -m app.cli seed-benchmarks     # load norms (--file, --replace)
+python -m app.cli create-official     # provision or reset a dashboard account
 ```
 
 `GET /health`, `GET /ready` and `GET /health/verification` cover liveness,

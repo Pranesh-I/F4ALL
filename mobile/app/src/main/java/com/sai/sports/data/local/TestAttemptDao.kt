@@ -84,6 +84,17 @@ interface TestAttemptDao {
     )
     suspend fun recoverInterrupted(): Int
 
+    /** Videos the server has, with no test submitted against them yet. Oldest first. */
+    @Query(
+        "SELECT * FROM test_attempts " +
+            "WHERE sync_status = 'SYNCED' AND video_id IS NOT NULL AND result_id IS NULL " +
+            "ORDER BY recorded_at_ms ASC"
+    )
+    suspend fun findUnsubmitted(): List<TestAttemptEntity>
+
+    @Query("UPDATE test_attempts SET result_id = :resultId WHERE id = :id")
+    suspend fun updateResultId(id: String, resultId: String)
+
     @Query("DELETE FROM test_attempts WHERE id = :id")
     suspend fun delete(id: String)
 }

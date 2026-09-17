@@ -1,0 +1,46 @@
+! PROVISIONAL BENCHMARKS - NOT AN OFFICIAL SAI STANDARD
+! -----------------------------------------------------
+! Lines beginning with "!" are comments and are ignored by the loader.
+!
+! These numbers are placeholders so the benchmarking engine can be built,
+! tested and demonstrated end to end. They are NOT SAI's published norms.
+!
+! Why there are no official numbers here: the Khelo India fitness assessment
+! for ages 9-18 measures a 600m run, a 50m dash, sit-and-reach, push-ups and
+! partial curl-ups. It contains no standing vertical jump, and its abdominal
+! item is partial curl-ups rather than the sit-up this app scores. There is
+! therefore no published SAI norm table for either MVP test to encode.
+!
+! The values below are order-of-magnitude figures for youth fitness in these
+! two movements, spaced to give the engine a realistic distribution shape.
+! Every row carries source="PROVISIONAL ..." so nothing downstream can present
+! them as official: the API marks the comparison provisional, and the athlete
+! and the reviewer both see that caveat.
+!
+! Replacing them:
+!   python -m app.cli seed-benchmarks --file path/to/official.csv --replace
+! A file whose source column does not contain "PROVISIONAL" is treated as
+! official and the caveat disappears with no code change.
+!
+! Columns: test_code,gender,age_min,age_max,p50,p75,p90,source
+test_code,gender,age_min,age_max,p50,p75,p90,source
+SIT_UPS,male,9,11,24,30,36,PROVISIONAL placeholder - awaiting SAI Annexure A
+SIT_UPS,male,12,13,30,36,42,PROVISIONAL placeholder - awaiting SAI Annexure A
+SIT_UPS,male,14,15,34,40,46,PROVISIONAL placeholder - awaiting SAI Annexure A
+SIT_UPS,male,16,17,36,42,48,PROVISIONAL placeholder - awaiting SAI Annexure A
+SIT_UPS,male,18,25,36,43,49,PROVISIONAL placeholder - awaiting SAI Annexure A
+SIT_UPS,female,9,11,20,26,32,PROVISIONAL placeholder - awaiting SAI Annexure A
+SIT_UPS,female,12,13,24,30,36,PROVISIONAL placeholder - awaiting SAI Annexure A
+SIT_UPS,female,14,15,26,32,38,PROVISIONAL placeholder - awaiting SAI Annexure A
+SIT_UPS,female,16,17,28,34,40,PROVISIONAL placeholder - awaiting SAI Annexure A
+SIT_UPS,female,18,25,28,34,40,PROVISIONAL placeholder - awaiting SAI Annexure A
+VERTICAL_JUMP,male,9,11,26,32,38,PROVISIONAL placeholder - awaiting SAI Annexure A
+VERTICAL_JUMP,male,12,13,32,39,45,PROVISIONAL placeholder - awaiting SAI Annexure A
+VERTICAL_JUMP,male,14,15,38,45,52,PROVISIONAL placeholder - awaiting SAI Annexure A
+VERTICAL_JUMP,male,16,17,43,51,58,PROVISIONAL placeholder - awaiting SAI Annexure A
+VERTICAL_JUMP,male,18,25,46,54,61,PROVISIONAL placeholder - awaiting SAI Annexure A
+VERTICAL_JUMP,female,9,11,23,28,34,PROVISIONAL placeholder - awaiting SAI Annexure A
+VERTICAL_JUMP,female,12,13,27,33,38,PROVISIONAL placeholder - awaiting SAI Annexure A
+VERTICAL_JUMP,female,14,15,30,36,42,PROVISIONAL placeholder - awaiting SAI Annexure A
+VERTICAL_JUMP,female,16,17,32,38,44,PROVISIONAL placeholder - awaiting SAI Annexure A
+VERTICAL_JUMP,female,18,25,33,39,45,PROVISIONAL placeholder - awaiting SAI Annexure A

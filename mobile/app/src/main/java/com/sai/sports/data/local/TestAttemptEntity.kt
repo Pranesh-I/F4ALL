@@ -90,7 +90,20 @@ data class TestAttemptEntity(
     val lastAttemptAtMs: Long? = null,
 
     @ColumnInfo(name = "synced_at_ms")
-    val syncedAtMs: Long? = null
+    val syncedAtMs: Long? = null,
+
+    /**
+     * The server's result id, once the test has been submitted against the
+     * uploaded video.
+     *
+     * Separate from SYNCED on purpose: the video can arrive and the submit call
+     * fail on the next bar of signal. A SYNCED row with no result id is still
+     * owed a submission, and the worker keeps trying until it has one —
+     * otherwise the video would sit on the server with no test attached and
+     * never be verified.
+     */
+    @ColumnInfo(name = "result_id")
+    val resultId: String? = null
 ) {
 
     /** Upload progress 0.0..1.0 for the sync screen. */

@@ -13,18 +13,23 @@ from ..config import Settings, get_settings
 from ..database import get_db
 from ..models import (
     Athlete,
+    ReviewActionRecord,
     Test,
     TestResult,
     TestResultStatus,
+    UploadSession,
     Video,
 )
 from ..schemas import (
+    BenchmarkComparisonResponse,
     FlagResponse,
+    LatestReview,
+    ResultWithBenchmarkResponse,
     SubmitTestRequest,
     SubmitTestResponse,
-    TestResultResponse,
 )
 from ..security import current_athlete
+from ..services import benchmarks as benchmark_service
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +75,12 @@ def submit_test(
             detail=f"Unknown test '{payload.test_id}'",
         )
 
+    athlete_id = athlete.id if athlete else None
+    if athlete_id is None:
+        # Development path only; production requires a token, so this cannot be
+        # reached there.
+        athlete_id = _development_athlete(db).id
+
     video: Video | None = None
     if payload.video_id is not None:
         video = db.get(Video, payload.video_id)
@@ -79,11 +90,23 @@ def submit_test(
                 detail="Unknown video_id",
             )
 
-    athlete_id = athlete.id if athlete else None
-    if athlete_id is None:
-        # Development path only; production requires a token, so this cannot be
-        # reached there.
-        athlete_id = _development_athlete(db).id
+        _assert_video_owner(db, video, athlete)
+
+        if video.test_result_id is not None:
+            # Idempotent on the video. A phone on a bad network routinely loses
+            # the response to a request the server already committed, and its
+            # retry must return the same result rather than creating a second
+            # attempt and verifying the same video twice.
+            existing = db.get(TestResult, video.test_result_id)
+            if existing is not None:
+                if existing.athlete_id != athlete_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="This video has already been submitted",
+                    )
+                return SubmitTestResponse(
+                    result_id=existing.id, status=_value(existing.status)
+                )
 
     attempt_number = (
         db.execute(
@@ -126,6 +149,31 @@ def submit_test(
         )
 
     return SubmitTestResponse(result_id=result.id, status=result.status.value)
+
+
+def _assert_video_owner(db: Session, video: Video, athlete: Athlete | None) -> None:
+    """A video can only be submitted by the athlete who uploaded it.
+
+    Ownership is recorded on the upload session. Without this check any athlete
+    holding another's video id could claim that recording as their own test.
+    It answers exactly as for an id that does not exist, so the endpoint cannot
+    be used to confirm whose videos exist.
+    """
+    if athlete is None:
+        return
+
+    session = db.execute(
+        select(UploadSession).where(UploadSession.video_id == video.id)
+    ).scalar_one_or_none()
+
+    if session is not None and session.athlete_id not in (None, athlete.id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown video_id"
+        )
+
+
+def _value(value) -> str:
+    return value.value if hasattr(value, "value") else str(value)
 
 
 def _height_for(athlete: Athlete | None, payload: SubmitTestRequest) -> float | None:
@@ -193,7 +241,7 @@ def _development_athlete(db: Session) -> Athlete:
     return athlete
 
 
-@router.get("/results/{result_id}", response_model=TestResultResponse)
+@router.get("/results/{result_id}", response_model=ResultWithBenchmarkResponse)
 def get_result(
     result_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -212,8 +260,28 @@ def get_result(
         )
 
     test = db.get(Test, result.test_id)
+    comparison, unavailable = _benchmark_for(db, result, test, athlete)
 
-    return TestResultResponse(
+    latest = db.execute(
+        select(ReviewActionRecord)
+        .where(ReviewActionRecord.test_result_id == result.id)
+        .order_by(ReviewActionRecord.created_at.desc())
+    ).scalars().first()
+
+    return ResultWithBenchmarkResponse(
+        benchmark=comparison,
+        benchmark_unavailable=unavailable,
+        # The official's decision and reason, reflected back to the athlete.
+        # Which official made it is deliberately not included.
+        latest_review=(
+            LatestReview(
+                action=_value(latest.action),
+                notes=latest.notes,
+                created_at=latest.created_at,
+            )
+            if latest is not None
+            else None
+        ),
         result_id=result.id,
         test_type=test.code if test else "UNKNOWN",
         status=result.status.value
@@ -246,4 +314,68 @@ def get_result(
             )
             for flag in result.flags
         ],
+    )
+
+
+def _benchmark_for(
+    db: Session,
+    result: TestResult,
+    test: Test | None,
+    athlete: Athlete | None,
+) -> tuple[BenchmarkComparisonResponse | None, str | None]:
+    """Where this result stands against the athlete's cohort.
+
+    Only computed from a score the SERVER stands behind. Benchmarking a
+    provisional on-device number would tell an athlete they placed in the top
+    25% on the strength of a measurement that has not been verified — and the
+    whole design of this system rests on those two never looking the same.
+
+    Returns (comparison, reason_it_is_unavailable); exactly one is non-None.
+    """
+    if test is None:
+        return None, None
+
+    if athlete is None:
+        athlete = db.get(Athlete, result.athlete_id)
+    if athlete is None:
+        return None, None
+
+    score = result.final_score if result.final_score is not None else result.server_score
+    if score is None:
+        return None, "This result has not been verified by SAI yet"
+
+    age = benchmark_service.age_on(athlete.dob)
+    benchmark = benchmark_service.find_benchmark(
+        db, test_id=test.id, gender=athlete.gender, age_years=age
+    )
+
+    if benchmark is None:
+        return None, (
+            "No benchmark cohort is defined for this athlete's age and gender yet"
+        )
+
+    comparison = benchmark_service.compare(
+        benchmark,
+        float(score),
+        age_years=age,
+        unit=test.unit,
+        # From the test row: for timed tests a lower score is the better one.
+        higher_is_better=test.higher_is_better,
+    )
+
+    return (
+        BenchmarkComparisonResponse(
+            band=comparison.band.value,
+            label=comparison.label,
+            percentile=comparison.percentile,
+            percentile_50=comparison.percentile_50,
+            percentile_75=comparison.percentile_75,
+            percentile_90=comparison.percentile_90,
+            next_target=comparison.next_target,
+            cohort=comparison.cohort,
+            unit=comparison.unit,
+            source=comparison.source,
+            provisional=comparison.provisional,
+        ),
+        None,
     )

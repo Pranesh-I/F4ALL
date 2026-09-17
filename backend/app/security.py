@@ -30,8 +30,28 @@ logger = logging.getLogger(__name__)
 BEARER_PREFIX = "bearer "
 
 
+# A token issued to a phone that verified an OTP but has no profile yet. It is
+# accepted by exactly one endpoint — athlete registration — and nowhere else.
+REGISTERING_ROLE = "registering"
+
+OFFICIAL_ROLES = {"sai_admin", "regional_reviewer"}
+
+
+def phone_subject(phone: str) -> uuid.UUID:
+    """A stable token subject for a verified phone that has no profile yet.
+
+    Derived from the number so the same phone always yields the same subject,
+    which is what lets registration find and revoke the registering session.
+    """
+    return uuid.uuid5(uuid.NAMESPACE_OID, f"f4all-phone:{phone}")
+
+
 def create_access_token(
-    subject: str, settings: Settings, *, role: str = "athlete"
+    subject: str,
+    settings: Settings,
+    *,
+    role: str = "athlete",
+    claims: dict | None = None,
 ) -> str:
     now = datetime.now(UTC)
     payload = {
@@ -40,6 +60,8 @@ def create_access_token(
         "iat": now,
         "exp": now + timedelta(minutes=settings.jwt_expiry_minutes),
     }
+    if claims:
+        payload.update(claims)
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -137,7 +159,7 @@ def current_official(
 
     payload = decode_token(token, settings)
 
-    if payload.get("role") not in {"sai_admin", "regional_reviewer"}:
+    if payload.get("role") not in OFFICIAL_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Dashboard access requires an official account",
@@ -154,8 +176,46 @@ def current_official(
         select(Official).where(Official.id == official_id)
     ).scalar_one_or_none()
 
-    if official is None:
+    if official is None or not official.is_active:
+        # A deactivated official's unexpired access token stops working here,
+        # immediately, rather than when it happens to expire.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown official"
         )
     return official
+
+
+def registration_claim(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> str:
+    """The phone number a `registering` token was issued for.
+
+    Registration binds the new profile to this claim rather than to a phone in
+    the request body. Trusting the body would let anyone with a token for their
+    own number create an account against someone else's — and phone number is
+    the identity this whole system hangs off.
+    """
+    token = _bearer_token(request)
+    if token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Verify your phone number first",
+        )
+
+    payload = decode_token(token, settings)
+
+    if payload.get("role") != REGISTERING_ROLE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This token cannot be used to register",
+        )
+
+    phone = payload.get("phone")
+    if not phone:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token is missing its phone claim",
+        )
+
+    return str(phone)

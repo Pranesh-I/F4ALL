@@ -21,9 +21,9 @@ Update the checkboxes as work lands. **Do not tick a sprint's Definition of Done
 | **4** | **Offline Queue, Compression & Sync** | **`[~]` Built + 99 tests; backend now exists — DoD walk needs only a device** |
 | **5** | **Backend Ingest + Re-Verification** | **`[~]` Built + 63 tests; SLA + Postgres unmeasured** |
 | **6** | **Cheat Detection v1** | **`[x]` Complete — 114 tests, DoD met against rendered tampered video** |
-| **7** | **Auth, Profiles & Benchmarking** | **`[ ]` ← NEXT** |
-| 8 | Official Dashboard v1 | `[ ]` Not started (`dashboard/` empty) |
-| 9 | Gamification & UX Polish | `[ ]` Not started |
+| **7** | **Auth, Profiles & Benchmarking** | **`[x]` Complete — backend + mobile; walked live. Benchmarks honestly provisional (no SAI norms exist for these tests)** |
+| **8** | **Official Dashboard v1** | **`[x]` Complete — DoD walked live end to end** |
+| **9** | **Gamification & UX Polish** | **`[ ]` ← NEXT** |
 | 10 | Shuttle Run & Endurance Run | `[ ]` Not started |
 | 11–12 | Hardening | `[ ]` Not started |
 | 13–14 | Field Pilot | `[ ]` Not started |
@@ -294,43 +294,63 @@ Update the checkboxes as work lands. **Do not tick a sprint's Definition of Done
 ## Sprint 7 — Auth, Athlete Profiles & Benchmarking Engine
 
 > **Goal:** Athletes have real accounts, and their scores mean something against age/gender norms.
+> Complete; see [docs/SPRINT-7.md](docs/SPRINT-7.md).
 
-- [ ] OTP-based phone auth backend (request-otp / verify-otp per the OpenAPI contract)
-- [ ] OTP rate limiting and expiry
-- [ ] JWT issuance + refresh
-- [ ] Mobile auth flow: phone entry, OTP entry, token storage (EncryptedSharedPreferences)
-- [ ] Athlete registration: name, DOB, gender, region, self-reported height/weight
-- [ ] Registration photo capture (feeds Sprint 6 face verification)
-- [ ] Research SAI's published fitness benchmarks (Annexure A) and encode into the `benchmarks` table
-- [ ] Benchmark seed/migration script
-- [ ] Benchmark comparison service: given athlete age/gender + score, return percentile standing
-- [ ] Instant feedback UI after a verified test: where the athlete stands vs their cohort
-- [ ] Athlete profile screen: test history, personal bests, benchmark comparison
+- [x] OTP-based phone auth backend (request-otp / verify-otp per the OpenAPI contract) — [otp.py](backend/app/services/otp.py), [auth.py](backend/app/routers/auth.py)
+  - [x] Codes stored as keyed HMAC; same response for registered and unregistered numbers (no account enumeration)
+  - [x] SMS behind an interface — console in dev, HTTP gateway in production, which refuses to run without one — [sms.py](backend/app/services/sms.py)
+- [x] OTP rate limiting and expiry — 5 guesses/code, 5-minute TTL, 60s resend cooldown, 5/hour per phone, `429` + `Retry-After`
+- [x] JWT issuance + refresh — 60-minute access, 90-day refresh stored hashed, **rotated on every use, reuse revokes the chain** — [tokens.py](backend/app/services/tokens.py)
+- [x] Mobile auth flow: phone entry, OTP entry, token storage (EncryptedSharedPreferences) — [LoginScreen.kt](mobile/app/src/main/java/com/sai/sports/ui/auth/LoginScreen.kt), [AuthSession.kt](mobile/app/src/main/java/com/sai/sports/auth/AuthSession.kt)
+  - [x] A network failure never logs the athlete out; only a rejected refresh does
+  - [x] Session file excluded from backup and device transfer
+- [x] Athlete registration: name, DOB, gender, region, self-reported height/weight — [athletes.py](backend/app/routers/athletes.py), [RegistrationScreen.kt](mobile/app/src/main/java/com/sai/sports/ui/auth/RegistrationScreen.kt)
+  - [x] Phone bound from the token, never the request body
+  - [x] Region is a fixed list of states/UTs, mirrored on the phone and checked by a test — free text would hide athletes from their regional reviewer
+- [x] Registration photo capture (feeds Sprint 6 face verification) — downscaled, EXIF-rotated, original deleted; superseded photos deleted server-side
+- [x] Research SAI's published fitness benchmarks — **none exist for vertical jump or classic sit-ups** (Khelo India uses a different battery). Engine built; provisional table shipped and labelled at every layer
+- [x] Benchmark seed/migration script — `python -m app.cli seed-benchmarks [--file --replace]`, idempotent, direction-aware validation
+- [x] Benchmark comparison service — [benchmarks.py](backend/app/services/benchmarks.py); no percentile invented below the median; `other` gender gets no guessed cohort; `tests.higher_is_better` for timed tests
+- [x] Instant feedback UI after a verified test — [ServerResultScreen.kt](mobile/app/src/main/java/com/sai/sports/ui/profile/ServerResultScreen.kt); only server-measured scores are benchmarked
+- [x] Athlete profile screen: test history, personal bests, benchmark comparison — [ProfileScreen.kt](mobile/app/src/main/java/com/sai/sports/ui/profile/ProfileScreen.kt)
+- [x] **Fixed: the app never called `/api/tests/submit`** — uploaded videos had no test attached and were never verified. Worker now submits and retries until it has a `result_id` (Room v2 migration + instrumented test)
+- [x] **Fixed: registration left the phone with a token naming the phone, not the athlete** — every following request would have 401'd. Registration now returns athlete tokens
+- [x] **Fixed: submit was not idempotent** (lost response → duplicate attempt) **and had no video ownership check**
+- [x] Write [docs/SPRINT-7.md](docs/SPRINT-7.md)
 
 **DoD**
-- [ ] A registered athlete completes a test and sees an accurate benchmark comparison based on their age/gender cohort
+- [x] A registered athlete completes a test and sees an accurate benchmark comparison based on their age/gender cohort — walked live over HTTP with the real verification pipeline; comparison is accurate to the loaded table, which is labelled provisional until SAI provides norms
+- [ ] On a physical device — **not walked; no device on this machine** (all mobile logic unit-tested, app builds)
+- [ ] Real SMS delivery — **BLOCKED: needs an SMS gateway and DLT-registered sender/template from SAI**
 
 ---
 
 ## Sprint 8 — Official Dashboard v1
 
 > **Goal:** SAI officials can actually review and act on submitted results.
-> Current state: `dashboard/` is empty.
+> Complete; see [docs/SPRINT-8.md](docs/SPRINT-8.md).
 
-- [ ] React + TypeScript project setup (Vite, Tailwind, React Query)
-- [ ] Official auth with role-based access: `sai_admin` vs `regional_reviewer`
-- [ ] Region scoping: regional reviewers only see their own region
-- [ ] Review queue: pending/flagged submissions, filterable by region / test type / status
-- [ ] Video review screen: playback with skeleton overlay
-- [ ] Flag reasons displayed with severity
-- [ ] On-device vs server score comparison view
-- [ ] Approve / reject / request-resubmission actions
-- [ ] Audit trail written to `review_actions` (who approved what, when, notes)
-- [ ] Basic leaderboard view (top performers by test / region / age group)
-- [ ] Add `dashboard/` to CI: typecheck + build
+- [x] React + TypeScript project setup (Vite, Tailwind, React Query) — [dashboard/](dashboard/)
+- [x] Official auth with role-based access: `sai_admin` vs `regional_reviewer` — [dashboard_auth.py](backend/app/routers/dashboard_auth.py)
+  - [x] scrypt passwords, lockout after 5 failures, identical responses for unknown accounts, deactivation kills live tokens
+  - [x] Accounts provisioned only via `python -m app.cli create-official`
+- [x] Region scoping: regional reviewers only see their own region — in SQL, **now fails closed** (an unset region previously saw everything)
+- [x] Review queue: pending/flagged submissions, filterable by region / test type / status — severity-then-age ordering, paging
+- [x] Video review screen: playback with skeleton overlay — the **server's** landmarks, stored during verification — [VideoWithSkeleton.tsx](dashboard/src/components/VideoWithSkeleton.tsx)
+- [x] Flag reasons displayed with severity — plain-language, with jump-to-timestamp
+- [x] On-device vs server score comparison view
+- [x] Approve / reject / request-resubmission actions — reasons required; phone score never promoted; decided results locked
+- [x] Audit trail written to `review_actions` (who approved what, when, notes) — shown on the review screen; decision and notes reflected to the athlete
+- [x] Basic leaderboard view (top performers by test / region / age group) — approved results only, best per athlete
+- [x] Add `dashboard/` to CI: typecheck + build — plus tests
+- [x] **Fixed: every real verification job crashed** — Celery passes a string id, the ORM needed a UUID, and the error handler crashed the same way, leaving all submissions in `processing`. Found by the live end-to-end run
+- [x] **Fixed: local video URLs were `file://` paths** no browser plays — now signed, expiring, range-capable `/api/media` URLs
+- [x] CORS for the dashboard origin (explicit list, never `*`)
+- [x] Write [docs/SPRINT-8.md](docs/SPRINT-8.md)
 
 **DoD**
-- [ ] An official can log in, review a flagged submission with full context, and approve or reject it — action is logged and reflected back to the athlete
+- [x] An official can log in, review a flagged submission with full context, and approve or reject it — action is logged and reflected back to the athlete — **walked live: 26/26 checks**
+- [ ] Clicked through in a real browser by a person — **not done from this machine** (served, built and tested; see SPRINT-8.md)
 
 ---
 

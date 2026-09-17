@@ -42,6 +42,13 @@ android {
             isIncludeAndroidResources = true
         }
     }
+
+    // MigrationTestHelper reads the exported Room schemas as test assets.
+    sourceSets {
+        getByName("androidTest") {
+            assets.srcDir("$projectDir/schemas")
+        }
+    }
 }
 
 // Room's generated schema JSON is committed so migrations can be reviewed in a
@@ -86,6 +93,9 @@ dependencies {
     implementation(libs.androidx.media3.effect)
     implementation(libs.androidx.media3.common)
     implementation(libs.okhttp)
+
+    // Sprint 7 — auth tokens encrypted at rest with a Keystore-held key
+    implementation(libs.androidx.security.crypto)
 
     testImplementation(libs.okhttp.mockwebserver)
     // android.jar's org.json is a stub that throws "not mocked" on the JVM.

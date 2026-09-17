@@ -7,7 +7,7 @@ already coded against that contract, so a rename here is a wire break there.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -116,6 +116,16 @@ class FlagResponse(BaseModel):
     severity: str
     source: str
     created_at: datetime
+    resolution: str | None = None
+    resolved_at: datetime | None = None
+
+
+class LatestReview(BaseModel):
+    """The most recent official decision, as the athlete is allowed to see it."""
+
+    action: str
+    notes: str | None = None
+    created_at: datetime
 
 
 class TestResultResponse(BaseModel):
@@ -128,11 +138,33 @@ class TestResultResponse(BaseModel):
     unit: str
     verified_at: datetime | None = None
     flags: list[FlagResponse] = Field(default_factory=list)
+    latest_review: LatestReview | None = None
 
 
 # ---------------------------------------------------------------------------
-# Dashboard (Sprint 8 builds the UI; these endpoints exist to serve it)
+# Dashboard (Sprint 8)
 # ---------------------------------------------------------------------------
+
+
+class OfficialLoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=150)
+    password: str = Field(min_length=1, max_length=256)
+
+
+class OfficialProfileResponse(BaseModel):
+    official_id: uuid.UUID
+    name: str
+    email: str
+    role: str
+    region: str | None
+
+
+class OfficialTokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    official: OfficialProfileResponse
 
 
 class ReviewItemResponse(BaseModel):
@@ -144,6 +176,31 @@ class ReviewItemResponse(BaseModel):
     provisional_score: float | None
     server_score: float | None
     flag_count: int
+    created_at: datetime
+
+    # Highest unresolved flag severity, so the queue can be triaged at a glance.
+    max_severity: str | None = None
+    attempt_number: int = 1
+    unit: str = ""
+
+
+class ReviewQueuePage(BaseModel):
+    items: list[ReviewItemResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class FaceVerificationResponse(BaseModel):
+    status: str
+    similarity_score: float | None
+    verified_at: datetime | None
+
+
+class ReviewHistoryItem(BaseModel):
+    action: str
+    notes: str | None
+    official_name: str
     created_at: datetime
 
 
@@ -161,10 +218,33 @@ class ReviewDetailResponse(BaseModel):
     created_at: datetime
     verified_at: datetime | None
 
+    final_score: float | None = None
+    attempt_number: int = 1
+    athlete_id: uuid.UUID | None = None
+    athlete_age_years: int | None = None
+    athlete_gender: str | None = None
+    athlete_height_cm: float | None = None
+    video_duration_seconds: float | None = None
+
+    # Short-lived signed URL; null when no photo is on file.
+    reference_photo_url: str | None = None
+    face_verification: FaceVerificationResponse | None = None
+    has_pose_sequence: bool = False
+    benchmark: BenchmarkComparisonResponse | None = None
+    review_history: list[ReviewHistoryItem] = Field(default_factory=list)
+
+    # Which actions this official may take on this result right now.
+    allowed_actions: list[str] = Field(default_factory=list)
+
 
 class ReviewActionRequest(BaseModel):
     action: str
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+
+    # Only for approving a result the server could not score. The reviewer has
+    # watched the video and states the number; it is recorded in the audit
+    # trail as theirs, never passed off as a measurement.
+    final_score: float | None = Field(default=None, ge=0, le=10000)
 
 
 class ReviewActionResponse(BaseModel):
@@ -172,3 +252,164 @@ class ReviewActionResponse(BaseModel):
     action: str
     status: str
     message: str
+
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    athlete_id: uuid.UUID
+    athlete_name: str
+    region: str
+    gender: str
+    age_years: int
+    score: float
+    unit: str
+    achieved_at: datetime
+
+
+class LeaderboardResponse(BaseModel):
+    test_type: str
+    unit: str
+    higher_is_better: bool
+    entries: list[LeaderboardEntry]
+
+
+class DashboardStats(BaseModel):
+    by_status: dict[str, int]
+    flagged_high_severity: int
+    breaching_sla: int
+
+
+# ---------------------------------------------------------------------------
+# Auth (Sprint 7)
+# ---------------------------------------------------------------------------
+
+
+class RequestOtpResponse(BaseModel):
+    message: str
+    expires_at: datetime
+
+    # Echoed only on a development server so the flow can be walked without an
+    # SMS gateway. Always null in production.
+    development_code: str | None = None
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+    # Null when the phone verified successfully but no profile exists yet. The
+    # client uses this to decide between the home screen and registration, and
+    # the token is already valid so registration itself is authenticated.
+    athlete_id: uuid.UUID | None = None
+    registered: bool = True
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
+    all_devices: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Athlete profile (Sprint 7)
+# ---------------------------------------------------------------------------
+
+
+class AthleteRegistrationRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+    dob: date
+    gender: str
+    region: str = Field(min_length=1, max_length=100)
+    height_cm: float | None = Field(default=None, gt=50, lt=260)
+    weight_kg: float | None = Field(default=None, gt=10, lt=250)
+
+
+class RegistrationResponse(BaseModel):
+    profile: AthleteProfileResponse
+    # A fresh athlete session. The registering token that authorised this call
+    # names a phone, not an athlete, and is revoked by registration.
+    tokens: TokenResponse
+
+
+class AthleteProfileUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=150)
+    region: str | None = Field(default=None, min_length=1, max_length=100)
+    height_cm: float | None = Field(default=None, gt=50, lt=260)
+    weight_kg: float | None = Field(default=None, gt=10, lt=250)
+
+
+class AthleteProfileResponse(BaseModel):
+    athlete_id: uuid.UUID
+    name: str
+    dob: date
+    age_years: int
+    gender: str
+    region: str
+    phone: str
+    height_cm: float | None
+    weight_kg: float | None
+    has_reference_photo: bool
+
+
+class PersonalBest(BaseModel):
+    test_type: str
+    unit: str
+    score: float
+    achieved_at: datetime
+
+    # Whether this best comes from an official's approval or is still only the
+    # server's measurement. The two must never look the same to an athlete.
+    official: bool
+
+
+class BenchmarkComparisonResponse(BaseModel):
+    band: str
+    label: str
+    percentile: int | None = None
+    percentile_50: float
+    percentile_75: float
+    percentile_90: float
+    next_target: float | None = None
+    cohort: str
+    unit: str
+
+    # Where the norms came from, and whether they are a placeholder. Carried
+    # all the way to the athlete: a percentile against invented numbers is
+    # misinformation, and the caveat is what stops it being presented as fact.
+    source: str
+    provisional: bool
+
+
+class BenchmarkUnavailable(BaseModel):
+    reason: str
+
+
+class ResultWithBenchmarkResponse(TestResultResponse):
+    benchmark: BenchmarkComparisonResponse | None = None
+    benchmark_unavailable: str | None = None
+
+
+class TestHistoryItem(BaseModel):
+    result_id: uuid.UUID
+    test_type: str
+    unit: str
+    status: str
+    provisional_score: float | None
+    server_score: float | None
+    final_score: float | None
+    created_at: datetime
+
+
+class AthleteSummaryResponse(BaseModel):
+    profile: AthleteProfileResponse
+    personal_bests: list[PersonalBest] = Field(default_factory=list)
+    history: list[TestHistoryItem] = Field(default_factory=list)
+    total_tests: int = 0
+
+
+ReviewDetailResponse.model_rebuild()

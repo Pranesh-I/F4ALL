@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import tempfile
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -45,6 +46,16 @@ logger = logging.getLogger(__name__)
 MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 
 
+def as_result_uuid(value: str | uuid.UUID) -> uuid.UUID:
+    """Celery serialises the result id to a string; the ORM needs a UUID.
+
+    Without this every job crashed on its first lookup, and the error handler
+    crashed on the same lookup — leaving every submission in `processing`
+    forever. Normalised once here so no call site can reintroduce it.
+    """
+    return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+
+
 @celery_app.task(name="app.tasks.verify_test_result", bind=True, max_retries=3)
 def verify_test_result(
     self, result_id: str, athlete_height_cm: float | None = None
@@ -57,6 +68,12 @@ def verify_test_result(
     waiting on something that will never resolve itself.
     """
     settings = get_settings()
+
+    try:
+        as_result_uuid(result_id)
+    except ValueError:
+        logger.error("Verification requested for malformed result id %r", result_id)
+        return {"result_id": str(result_id), "status": "missing"}
 
     try:
         return _run_verification(result_id, athlete_height_cm, settings)
@@ -87,10 +104,13 @@ def verify_test_result(
 
 
 def _run_verification(
-    result_id: str, athlete_height_cm: float | None, settings
+    result_id: str | uuid.UUID, athlete_height_cm: float | None, settings
 ) -> dict:
+    result_uuid = as_result_uuid(result_id)
+    result_id = str(result_uuid)
+
     with session_scope() as db:
-        result = db.get(TestResult, result_id)
+        result = db.get(TestResult, result_uuid)
         if result is None:
             logger.error("Result %s no longer exists", result_id)
             return {"result_id": result_id, "status": "missing"}
@@ -182,8 +202,9 @@ def _run_verification(
         settings=settings,
     )
 
-    _persist_outcome(result_id, server_result, outcome, cheat_report)
+    _persist_outcome(result_uuid, server_result, outcome, cheat_report)
     _persist_video_duration(video_id, analysis.metadata)
+    _persist_pose_sequence(storage, video_id, storage_key, analysis.frames)
 
     logger.info(
         "Verified %s: device=%s server=%s verdict=%s integrity=%s",
@@ -217,12 +238,14 @@ def _final_status(
 
 
 def _persist_outcome(
-    result_id: str,
+    result_id: str | uuid.UUID,
     server_result: AnalyzerResult,
     outcome: discrepancy.DiscrepancyOutcome,
     cheat_report: CheatReport | None = None,
 ) -> None:
     cheat_report = cheat_report or CheatReport()
+
+    result_id = as_result_uuid(result_id)
 
     with session_scope() as db:
         result = db.get(TestResult, result_id)
@@ -276,7 +299,7 @@ def _persist_outcome(
 
 
 def _record_face_verification(
-    db, result_id: str, outcome: FaceOutcome | None
+    db, result_id: str | uuid.UUID, outcome: FaceOutcome | None
 ) -> None:
     """Write the identity check to `face_verifications`.
 
@@ -291,7 +314,7 @@ def _record_face_verification(
 
     db.add(
         FaceVerification(
-            test_result_id=result_id,
+            test_result_id=as_result_uuid(result_id),
             verification_status=FaceVerificationStatus(outcome.verdict.value),
             similarity_score=(
                 round(outcome.similarity, 4) if outcome.similarity is not None else None
@@ -312,6 +335,68 @@ def _persist_video_duration(video_id, video_metadata) -> None:
             return
         video.duration_seconds = round(video_metadata.duration_seconds, 2)
         db.add(video)
+
+
+def pose_sequence_json(frames) -> bytes:
+    """The server's landmarks, compact enough to send to a browser.
+
+    Rounded to four decimals — a tenth of a pixel on a 1080p frame — which
+    roughly halves the payload for a reviewer on a government office connection
+    without any visible change to the overlay.
+    """
+    import json
+
+    return json.dumps(
+        {
+            "version": 1,
+            "landmarks": len(frames[0].points) if frames else 0,
+            "frames": [
+                {
+                    "t": frame.timestamp_ms,
+                    "p": [
+                        value
+                        for point in frame.points
+                        for value in (
+                            round(point.x, 4),
+                            round(point.y, 4),
+                            round(point.visibility, 3),
+                        )
+                    ],
+                }
+                for frame in frames
+            ],
+        },
+        separators=(",", ":"),
+    ).encode()
+
+
+def pose_sequence_key_for(video_key: str) -> str:
+    return video_key.rsplit(".", 1)[0] + ".pose.json"
+
+
+def _persist_pose_sequence(storage, video_id, video_key: str, frames) -> None:
+    """Store what the server saw, for the reviewer's skeleton overlay.
+
+    Best effort. A failure here costs the reviewer an overlay, never the
+    athlete a verified result, so it is logged and swallowed.
+    """
+    if not frames:
+        return
+
+    try:
+        key = pose_sequence_key_for(video_key)
+        storage.store_bytes(
+            key, pose_sequence_json(frames), content_type="application/json"
+        )
+        with session_scope() as db:
+            video = db.get(Video, video_id)
+            if video is not None:
+                video.pose_sequence_key = key
+                db.add(video)
+    except Exception:
+        logger.warning(
+            "Could not store pose sequence for video %s", video_id, exc_info=True
+        )
 
 
 def _materialise_reference_face(storage, reference_face_key, working_dir: Path):
@@ -349,10 +434,10 @@ def _apply_flag(
 
 
 def _flag_and_finish(
-    result_id: str, *, reason: str, detail: str, severity: FlagSeverity
+    result_id: str | uuid.UUID, *, reason: str, detail: str, severity: FlagSeverity
 ) -> None:
     with session_scope() as db:
-        result = db.get(TestResult, result_id)
+        result = db.get(TestResult, as_result_uuid(result_id))
         if result is None:
             return
         result.status = TestResultStatus.flagged

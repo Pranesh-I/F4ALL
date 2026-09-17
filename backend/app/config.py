@@ -35,11 +35,39 @@ class Settings(BaseSettings):
     # only tolerable because nothing real is protected by it yet.
     jwt_secret: str = "dev-only-insecure-secret-change-me"
     jwt_algorithm: str = "HS256"
-    jwt_expiry_minutes: int = 60 * 24 * 7
 
-    # Lets the mobile app talk to a dev server before Sprint 7 issues tokens.
+    # An access token cannot be withdrawn before it expires, so it is kept
+    # short and paired with a revocable refresh token. One hour is long enough
+    # that a test recorded offline and synced later still carries a live token
+    # in the common case, and the sync client refreshes when it does not.
+    jwt_expiry_minutes: int = 60
+
+    # Long, because these athletes may go weeks between sessions and have
+    # patchy signal. Safe to be long only because refresh tokens are stored,
+    # rotated on every use, and revocable.
+    refresh_token_expiry_days: int = 90
+
+    # Lets the mobile app talk to a dev server before a real login exists.
     # Fails closed: any non-development environment ignores it.
     allow_unauthenticated: bool = True
+
+    # --- SMS (OTP delivery) ---
+    # "console" logs, "memory" captures for tests, "http" posts to a gateway.
+    # Production accepts only "http" — a deployment quietly logging OTPs to
+    # stdout instead of sending them is an outage that looks like uptime.
+    sms_backend: str = "console"
+    sms_api_url: str = ""
+    sms_api_key: str = ""
+    sms_content_type: str = "application/x-www-form-urlencoded"
+
+    # Indian transactional SMS requires both of these to be DLT-registered with
+    # TRAI by SAI. Neither is something this code can arrange.
+    sms_sender_id: str = ""
+    sms_template_id: str = ""
+
+    # Placeholders: {phone} {message} {sender_id} {template_id}. A template
+    # rather than a vendor SDK, so changing provider is configuration.
+    sms_payload_template: str = "to={phone}&body={message}&sender={sender_id}"
 
     # --- Storage ---
     # "local" writes under storage_local_path; "s3" uses the bucket below.
@@ -52,6 +80,14 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     s3_region: str = "ap-south-1"
     s3_endpoint_url: str | None = None
+
+    # Where this API is reachable from a browser. Local-storage media URLs are
+    # built against it, so a dashboard on another port can play videos.
+    public_base_url: str = "http://localhost:8000"
+
+    # Browser origins allowed to call the API — the official dashboard. Never
+    # "*": the dashboard sends bearer tokens for accounts that approve results.
+    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     # --- Upload ---
     upload_chunk_size_bytes: int = 256 * 1024
@@ -73,6 +109,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() in {"production", "prod", "staging"}
+
+    @property
+    def sms_configured(self) -> bool:
+        return self.sms_backend != "http" or bool(self.sms_api_url)
 
     @property
     def unauthenticated_allowed(self) -> bool:

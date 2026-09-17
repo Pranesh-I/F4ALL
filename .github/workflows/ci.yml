@@ -64,7 +64,37 @@ jobs:
         run: |
           mkdir -p var
           python -m alembic upgrade head
+          # Fails if a model changed without a matching migration.
+          python -m alembic check
           python -m alembic downgrade base
+
+  dashboard:
+    name: Dashboard typecheck, tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: dashboard
+        run: npm run typecheck
+
+      - name: Tests
+        working-directory: dashboard
+        run: npm test
+
+      - name: Build
+        working-directory: dashboard
+        run: npx vite build
 
   mobile:
     name: Mobile build and tests

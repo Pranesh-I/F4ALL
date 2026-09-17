@@ -4,6 +4,8 @@
     python -m app.cli reverify-pending     re-queue submissions stuck in processing
     python -m app.cli reverify <result_id> re-run one submission
     python -m app.cli sla                  report the verification backlog
+    python -m app.cli seed-benchmarks      load age/gender norms
+    python -m app.cli create-official      provision a dashboard account
 """
 
 from __future__ import annotations
@@ -60,6 +62,107 @@ def seed() -> int:
             created += 1
 
     print(f"Seeded test battery ({created} created, {len(TEST_BATTERY)} total)")
+    return 0
+
+
+def seed_benchmarks_command(file: str | None, replace: bool) -> int:
+    """Load benchmark norms.
+
+    Defaults to the bundled provisional set. Those numbers are placeholders,
+    not SAI's published standards — see the header of the CSV — and every row
+    carries a `source` that keeps them labelled all the way to the athlete.
+    """
+    from pathlib import Path
+
+    from .services.benchmark_seed import BenchmarkSeedError, seed_benchmarks
+
+    path = Path(file) if file else None
+
+    with session_scope() as db:
+        try:
+            report = seed_benchmarks(db, path=path, replace=replace)
+        except BenchmarkSeedError as exc:
+            print(f"Benchmark seeding failed: {exc}", file=sys.stderr)
+            return 1
+
+    print(f"Benchmarks: {report.summary()}")
+
+    if path is None:
+        print(
+            "NOTE: these are PROVISIONAL placeholders, not official SAI norms. "
+            "Load the official table with --file when it is available."
+        )
+
+    return 0
+
+
+def create_official_command(
+    email: str, name: str, role: str, region: str | None, password: str | None
+) -> int:
+    """Create or reset a dashboard account.
+
+    The password is read from the terminal (or F4ALL_OFFICIAL_PASSWORD for
+    scripted provisioning), never taken as a command-line argument, where it
+    would land in shell history and the process list.
+    """
+    import getpass
+    import os
+
+    from .models import Official, OfficialRole
+    from .regions import canonical_region
+    from .services.passwords import WeakPassword, hash_password, validate_strength
+
+    try:
+        role_value = OfficialRole(role)
+    except ValueError:
+        print(f"Role must be one of: {[r.value for r in OfficialRole]}", file=sys.stderr)
+        return 1
+
+    canonical = None
+    if role_value is OfficialRole.regional_reviewer:
+        canonical = canonical_region(region or "")
+        if canonical is None:
+            # A regional reviewer without a valid region would see nothing; one
+            # with a misspelt region would see nothing and not know why.
+            print("A regional reviewer needs a valid --region", file=sys.stderr)
+            return 1
+    elif region:
+        print("sai_admin sees every region; --region is ignored", file=sys.stderr)
+
+    secret = password or os.environ.get("F4ALL_OFFICIAL_PASSWORD")
+    if not secret:
+        secret = getpass.getpass("Password: ")
+        if secret != getpass.getpass("Repeat password: "):
+            print("Passwords did not match", file=sys.stderr)
+            return 1
+
+    try:
+        validate_strength(secret)
+    except WeakPassword as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    normalised = email.strip().lower()
+
+    with session_scope() as db:
+        official = db.execute(
+            select(Official).where(Official.email == normalised)
+        ).scalar_one_or_none()
+
+        created = official is None
+        if created:
+            official = Official(email=normalised, name=name, role=role_value)
+
+        official.name = name
+        official.role = role_value
+        official.region = canonical
+        official.password_hash = hash_password(secret)
+        official.failed_login_attempts = 0
+        official.locked_until = None
+        official.is_active = True
+        db.add(official)
+
+    print(f"{'Created' if created else 'Updated'} {role_value.value} {normalised}")
     return 0
 
 
@@ -154,6 +257,28 @@ def main(argv: list[str] | None = None) -> int:
 
     subparsers.add_parser("sla", help="Report the verification backlog")
 
+    benchmark_parser = subparsers.add_parser(
+        "seed-benchmarks", help="Load age/gender benchmark norms from a CSV"
+    )
+    benchmark_parser.add_argument(
+        "--file", default=None, help="CSV to load (default: bundled provisional set)"
+    )
+    benchmark_parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="Clear existing benchmarks first, for swapping in an official table",
+    )
+
+    official_parser = subparsers.add_parser(
+        "create-official", help="Create or reset an SAI dashboard account"
+    )
+    official_parser.add_argument("--email", required=True)
+    official_parser.add_argument("--name", required=True)
+    official_parser.add_argument(
+        "--role", required=True, choices=["sai_admin", "regional_reviewer"]
+    )
+    official_parser.add_argument("--region", default=None)
+
     args = parser.parse_args(argv)
 
     if args.command == "seed":
@@ -164,6 +289,12 @@ def main(argv: list[str] | None = None) -> int:
         return reverify(args.result_id)
     if args.command == "sla":
         return sla_report()
+    if args.command == "seed-benchmarks":
+        return seed_benchmarks_command(args.file, args.replace)
+    if args.command == "create-official":
+        return create_official_command(
+            args.email, args.name, args.role, args.region, password=None
+        )
 
     return 1
 

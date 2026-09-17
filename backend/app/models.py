@@ -176,6 +176,14 @@ class Test(Base):
     # verification pipeline off a translatable string would be a bug waiting.
     code: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
 
+    # False for timed tests, where a lower number is the better performance.
+    # It lives on the test rather than being passed in by each caller because
+    # every caller getting it right is not a property anything enforces — and
+    # getting it wrong tells the fastest athletes they are the slowest.
+    higher_is_better: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
@@ -251,6 +259,11 @@ class Video(Base):
         Numeric(10, 2), nullable=True
     )
     sensor_telemetry_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    # The landmarks the SERVER extracted, written during verification. This is
+    # what the dashboard draws over the video: a reviewer needs to see what the
+    # measurement saw, and the device's landmarks are the ones not to trust.
+    pose_sequence_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
@@ -331,6 +344,24 @@ class Official(Base):
     # Null for sai_admin, who sees every region.
     region: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # scrypt, via the standard library. Null means the account cannot sign in
+    # until an administrator sets a password — never "any password works".
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Officials can approve results that decide a child's selection. An account
+    # that can be guessed at indefinitely is not acceptable for that, so failed
+    # sign-ins lock it for a period.
+    failed_login_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    # Deactivated rather than deleted: review_actions references this row, and
+    # the audit trail must still say who approved what after they leave.
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
@@ -370,8 +401,24 @@ class Benchmark(Base):
     percentile_50: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     percentile_75: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     percentile_90: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+
+    # Where these numbers came from. Not in db-schema-v1, and added because the
+    # alternative is a table of authoritative-looking numbers with no way to
+    # tell an official SAI norm from a placeholder. This value is surfaced all
+    # the way to the athlete, who is being told something about themselves.
+    source: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    __table_args__ = (
+        # Without this, two overlapping rows would make the cohort an athlete
+        # is measured against depend on row order.
+        UniqueConstraint(
+            "test_id", "gender", "age_min", "age_max", name="uq_benchmark_cohort"
+        ),
+        Index("ix_benchmarks_lookup", "test_id", "gender"),
     )
 
 
@@ -428,3 +475,94 @@ class UploadSession(Base):
 
     def is_complete(self) -> bool:
         return len(self.received_set()) == self.total_chunks
+
+
+class OtpChallenge(Base):
+    """One outstanding OTP for one phone number.
+
+    The code is stored as an HMAC, never in plaintext. A six-digit code is
+    trivially brute-forced offline whatever the hash, so the hash is not what
+    protects it — `attempts` and `expires_at` are. What the HMAC does buy is
+    that a leaked database dump does not hand the reader a set of live,
+    ready-to-use login codes for real phone numbers.
+
+    Rows are kept after use rather than deleted: `consumed_at` and `attempts`
+    are the only evidence available if someone later asks whether an account was
+    brute-forced.
+    """
+
+    __tablename__ = "otp_challenges"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_new_uuid)
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    __table_args__ = (
+        # Every lookup is "the live challenges for this phone, newest first".
+        Index("ix_otp_challenges_phone_created", "phone", "created_at"),
+    )
+
+
+class RefreshToken(Base):
+    """A long-lived token that can mint new access tokens.
+
+    Stored as a SHA-256 of the token, so the table cannot be used to
+    impersonate anyone. Unlike the OTP this is a 256-bit random value, so a
+    plain digest is enough — there is nothing to brute-force.
+
+    Refresh tokens exist because the alternative on this product is worse. An
+    athlete in a village with intermittent connectivity cannot be asked to
+    re-do an SMS round trip every week, and the answer to that must not be an
+    access token with a one-year expiry that can never be withdrawn.
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_new_uuid)
+    token_hash: Mapped[str] = mapped_column(
+        String(64), nullable=False, unique=True, index=True
+    )
+    subject_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+
+    # "athlete", "registering", or an OfficialRole value. Not a foreign key,
+    # because the subject may be in either of two tables — or, while
+    # registering, in neither.
+    subject_role: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    # Only set for the "registering" role, where the subject is a phone number
+    # that has verified an OTP but has no profile yet. Stored so a rotation
+    # can reproduce the claim from the server's own record rather than copying
+    # it out of the token being presented.
+    subject_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    # Set when this token is exchanged, pointing at what replaced it. Rotation
+    # means a stolen refresh token stops working the moment the real device
+    # uses its own, and reuse of a rotated token is detectable.
+    replaced_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (Index("ix_refresh_tokens_subject", "subject_id"),)

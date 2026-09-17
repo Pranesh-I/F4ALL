@@ -23,7 +23,8 @@ import com.sai.sports.data.SyncRepository
 @Composable
 fun HomeScreen(
     onTestSelected: (String) -> Unit,
-    onSyncStatus: () -> Unit
+    onSyncStatus: () -> Unit,
+    onProfile: () -> Unit
 ) {
     val context = LocalContext.current
     val repository = remember { SyncRepository(context) }
@@ -72,6 +73,12 @@ fun HomeScreen(
          * that a test has not reached SAI yet — otherwise they assume it
          * has, and find out otherwise far too late.
          */
+        OutlinedButton(onClick = onProfile) {
+            Text(text = "My profile & results")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         OutlinedButton(onClick = onSyncStatus) {
             Text(
                 text = if (pendingCount > 0) {

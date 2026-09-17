@@ -48,7 +48,8 @@ import java.util.Locale
  */
 @Composable
 fun SyncStatusScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onResultSelected: (resultId: String) -> Unit = {}
 ) {
 
     val context = LocalContext.current
@@ -123,6 +124,7 @@ fun SyncStatusScreen(
             items(attempts, key = { it.id }) { attempt ->
                 AttemptRow(
                     attempt = attempt,
+                    onViewResult = onResultSelected,
                     onRetry = {
                         scope.launch {
                             withContext(Dispatchers.IO) {
@@ -140,6 +142,7 @@ fun SyncStatusScreen(
 @Composable
 private fun AttemptRow(
     attempt: TestAttemptEntity,
+    onViewResult: (String) -> Unit,
     onRetry: () -> Unit
 ) {
 
@@ -189,6 +192,14 @@ private fun AttemptRow(
                     progress = { attempt.progress() },
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+
+            // Once submitted, the athlete can follow the result through SAI's
+            // checks. Before that there is nothing on the server to show.
+            attempt.resultId?.let { resultId ->
+                TextButton(onClick = { onViewResult(resultId) }) {
+                    Text("See SAI result")
+                }
             }
 
             // Shown only on FAILED. Surfacing the last transient error while an

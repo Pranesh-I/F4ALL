@@ -165,3 +165,58 @@ def test_a_face_mismatch_is_never_high_severity():
     assert findings[0].severity is not Severity.HIGH
     assert report.face is not None
     assert report.face.verdict is FaceVerdict.MANUAL_REVIEW
+
+
+# ---------------------------------------------------------------------------
+# Result ids arrive from Celery as strings
+# ---------------------------------------------------------------------------
+
+
+def test_task_helpers_accept_the_string_ids_celery_delivers(
+    db, db_session_factory, result, monkeypatch
+):
+    """Regression: every verification job used to crash on its first lookup.
+
+    `_enqueue_verification` passes `str(result.id)` through Celery, and the ORM's
+    Uuid column rejects a str. The error handler repeated the same lookup and
+    crashed too, leaving every real submission in `processing` forever.
+    """
+    import contextlib
+
+    import app.tasks as tasks
+    from app.models import Flag, FlagSeverity
+
+    @contextlib.contextmanager
+    def scope():
+        session = db_session_factory()
+        try:
+            yield session
+            session.commit()
+        finally:
+            session.close()
+
+    monkeypatch.setattr(tasks, "session_scope", scope)
+
+    tasks._flag_and_finish(
+        str(result.id),
+        reason="server_could_not_score",
+        detail="boom",
+        severity=FlagSeverity.high,
+    )
+
+    db.expire_all()
+    assert db.get(TestResult, result.id).status is TestResultStatus.flagged
+    assert db.execute(select(Flag)).scalars().one().reason == "server_could_not_score"
+
+    _record_face_verification(
+        db, str(result.id), FaceOutcome(verdict=FaceVerdict.PASS, similarity=0.9)
+    )
+    db.commit()
+    assert rows_for(db, result)
+
+
+def test_a_malformed_result_id_is_reported_not_crashed():
+    from app.tasks import verify_test_result
+
+    outcome = verify_test_result.run("not-a-uuid")
+    assert outcome["status"] == "missing"

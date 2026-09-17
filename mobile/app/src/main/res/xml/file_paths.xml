@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the registration photo's cache folder is shareable, and only with the
+     camera app for the duration of one capture. -->
+<paths>
+    <cache-path name="reference" path="reference/" />
+</paths>

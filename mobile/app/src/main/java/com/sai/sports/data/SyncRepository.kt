@@ -125,6 +125,11 @@ class SyncRepository(
         )
     }
 
+    suspend fun unsubmitted(): List<TestAttemptEntity> = dao.findUnsubmitted()
+
+    suspend fun recordResultId(id: String, resultId: String) =
+        dao.updateResultId(id, resultId)
+
     suspend fun recordUploadId(id: String, uploadId: String) =
         dao.updateUploadId(id, uploadId)
 
@@ -151,7 +156,11 @@ class SyncRepository(
                 videoId = videoId,
                 uploadedBytes = current.compressedSizeBytes,
                 syncedAtMs = System.currentTimeMillis(),
-                lastError = null
+                lastError = null,
+                // A fresh budget for the submit step. Retries spent getting the
+                // video through a bad connection say nothing about whether the
+                // submission will succeed.
+                attemptCount = 0
             )
         )
 
