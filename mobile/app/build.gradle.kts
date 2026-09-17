@@ -43,6 +43,17 @@ android {
         }
     }
 
+    // Every language must ship in every install. Play splits an App Bundle by
+    // the phone's SYSTEM language, so an athlete with an English-set phone who
+    // picks Hindi in the app would otherwise get English: the Hindi strings
+    // were never downloaded. The whole point of the in-app picker is that the
+    // phone's language and the athlete's language often differ.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     // MigrationTestHelper reads the exported Room schemas as test assets.
     sourceSets {
         getByName("androidTest") {

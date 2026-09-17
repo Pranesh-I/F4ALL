@@ -21,20 +21,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.sai.sports.R
 import com.sai.sports.api.ApiResult
 import com.sai.sports.api.AthleteSummary
 import com.sai.sports.auth.AppServices
 import com.sai.sports.data.AthleteProfileStore
 import com.sai.sports.ui.auth.ReferencePhotoStep
+import com.sai.sports.ui.common.ErrorText
+import com.sai.sports.ui.common.Labels
+import com.sai.sports.ui.common.LoadFailed
+import com.sai.sports.ui.common.SectionTitle
+import com.sai.sports.ui.common.TitleBar
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** The athlete's profile, personal bests and every result SAI holds for them. */
@@ -42,16 +49,16 @@ import kotlinx.coroutines.withContext
 fun ProfileScreen(
     onBack: () -> Unit,
     onResultSelected: (String) -> Unit,
-    onLoggedOut: () -> Unit
+    onBadges: () -> Unit,
+    onLeaderboard: () -> Unit,
+    onSettings: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val api = remember { AppServices.api(context) }
-    val session = remember { AppServices.session(context) }
     val profileStore = remember { AthleteProfileStore(context) }
 
     var summary by remember { mutableStateOf<AthleteSummary?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<Int?>(null) }
     var reload by remember { mutableIntStateOf(0) }
     var addingPhoto by remember { mutableStateOf(false) }
 
@@ -63,7 +70,7 @@ fun ProfileScreen(
                 // Keep the on-device jump calibration in step with the profile.
                 result.value.profile.heightCm?.let(profileStore::setHeightCm)
             }
-            is ApiResult.Failure -> error = result.message
+            is ApiResult.Failure -> error = Labels.failure(result.kind, R.string.error_load)
         }
     }
 
@@ -81,24 +88,15 @@ fun ProfileScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("My profile", style = MaterialTheme.typography.headlineSmall)
-            TextButton(onClick = onBack) { Text("Back") }
-        }
+        TitleBar(stringResource(R.string.profile_title), onBack)
 
         val current = summary
+        val failure = error
 
         when {
-            current == null && error == null -> CircularProgressIndicator()
+            current == null && failure == null -> CircularProgressIndicator()
 
-            current == null -> {
-                Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
-                OutlinedButton(onClick = { reload += 1 }) { Text("Try again") }
-            }
+            current == null -> LoadFailed(stringResource(failure!!)) { reload += 1 }
 
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
@@ -106,28 +104,49 @@ fun ProfileScreen(
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(profile.name, style = MaterialTheme.typography.titleLarge)
-                            Text("${profile.ageYears} years · ${profile.gender.replaceFirstChar { it.uppercase() }} · ${profile.region}")
-                            profile.heightCm?.let { Text("Height: ${ResultPresentation.formatScore(it, "cm")}") }
-                            if (!profile.hasReferencePhoto) {
-                                Text(
-                                    "No photo on file — SAI cannot confirm your identity in test videos.",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall
+                            Text(
+                                stringResource(
+                                    R.string.profile_summary_line,
+                                    profile.ageYears,
+                                    stringResource(Labels.gender(profile.gender)),
+                                    profile.region
                                 )
-                                TextButton(onClick = { addingPhoto = true }) { Text("Add photo") }
+                            )
+                            profile.heightCm?.let {
+                                Text(
+                                    stringResource(
+                                        R.string.profile_height,
+                                        ResultPresentation.formatNumber(it)
+                                    )
+                                )
+                            }
+                            if (!profile.hasReferencePhoto) {
+                                ErrorText(stringResource(R.string.profile_no_photo))
+                                TextButton(onClick = { addingPhoto = true }) {
+                                    Text(stringResource(R.string.profile_add_photo))
+                                }
                             }
                         }
                     }
                 }
 
                 item {
-                    Text("Personal bests", style = MaterialTheme.typography.titleMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onBadges, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.nav_badges))
+                        }
+                        OutlinedButton(onClick = onLeaderboard, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.nav_leaderboard))
+                        }
+                    }
                 }
+
+                item { SectionTitle(stringResource(R.string.profile_bests)) }
 
                 if (current.personalBests.isEmpty()) {
                     item {
                         Text(
-                            "Your best scores appear here once SAI has checked a test.",
+                            stringResource(R.string.profile_bests_empty),
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -141,11 +160,14 @@ fun ProfileScreen(
                                 .padding(16.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(ResultPresentation.testName(best.testType), fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(Labels.testName(best.testType)), fontWeight = FontWeight.SemiBold)
                             Column(horizontalAlignment = Alignment.End) {
-                                Text(ResultPresentation.formatScore(best.score, best.unit))
                                 Text(
-                                    if (best.official) "Official" else "Not yet approved",
+                                    "${ResultPresentation.formatNumber(best.score)} " +
+                                        stringResource(Labels.unit(best.unit))
+                                )
+                                Text(
+                                    stringResource(ResultPresentation.officialLabel(best.official)),
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }
@@ -153,14 +175,12 @@ fun ProfileScreen(
                     }
                 }
 
-                item {
-                    Text("All results", style = MaterialTheme.typography.titleMedium)
-                }
+                item { SectionTitle(stringResource(R.string.profile_results)) }
 
                 if (current.history.isEmpty()) {
                     item {
                         Text(
-                            "Tests you record appear here after they reach SAI.",
+                            stringResource(R.string.profile_results_empty),
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -170,18 +190,30 @@ fun ProfileScreen(
                     val (score, _) = ResultPresentation.headline(
                         item.provisionalScore, item.serverScore, item.finalScore
                     )
+                    val openLabel = stringResource(R.string.profile_open_result)
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onResultSelected(item.resultId) }
+                            // Names the action for screen readers, which would
+                            // otherwise announce only "double tap to activate".
+                            .semantics {
+                                onClick(label = openLabel) {
+                                    onResultSelected(item.resultId)
+                                    true
+                                }
+                            }
                     ) {
                         Column(Modifier.padding(16.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(ResultPresentation.testName(item.testType), fontWeight = FontWeight.SemiBold)
-                                Text(ResultPresentation.formatScore(score, item.unit))
+                                Text(stringResource(Labels.testName(item.testType)), fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    "${ResultPresentation.formatNumber(score)} " +
+                                        stringResource(Labels.unit(item.unit))
+                                )
                             }
                             Text(
-                                ResultPresentation.statusLabel(item.status),
+                                stringResource(Labels.resultStatus(item.status)),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -189,20 +221,8 @@ fun ProfileScreen(
                 }
 
                 item {
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                withContext(Dispatchers.IO) {
-                                    // Best effort: signing out must work with no signal.
-                                    runCatching { api.logout(session.current()?.refreshToken) }
-                                    session.clear()
-                                }
-                                onLoggedOut()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Sign out")
+                    OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.nav_settings))
                     }
                 }
             }

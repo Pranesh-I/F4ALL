@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sit-up top position: sat all the way up towards the knees. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M8,92 L112,92 M40,30 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 M48,38 L62,84 M62,84 L80,62 L96,86 M52,52 L74,60" />
+</vector>

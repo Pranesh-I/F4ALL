@@ -23,8 +23,8 @@ Update the checkboxes as work lands. **Do not tick a sprint's Definition of Done
 | **6** | **Cheat Detection v1** | **`[x]` Complete — 114 tests, DoD met against rendered tampered video** |
 | **7** | **Auth, Profiles & Benchmarking** | **`[x]` Complete — backend + mobile; walked live. Benchmarks honestly provisional (no SAI norms exist for these tests)** |
 | **8** | **Official Dashboard v1** | **`[x]` Complete — DoD walked live end to end** |
-| **9** | **Gamification & UX Polish** | **`[ ]` ← NEXT** |
-| 10 | Shuttle Run & Endurance Run | `[ ]` Not started |
+| **9** | **Gamification & UX Polish** | **`[x]` Built — 4 languages, badges, private leaderboards. DoD needs a real-user session** |
+| **10** | **Shuttle Run & Endurance Run** | **`[ ]` ← NEXT** |
 | 11–12 | Hardening | `[ ]` Not started |
 | 13–14 | Field Pilot | `[ ]` Not started |
 
@@ -357,18 +357,27 @@ Update the checkboxes as work lands. **Do not tick a sprint's Definition of Done
 ## Sprint 9 — Gamification & UX Polish
 
 > **Goal:** Athletes actually want to use this repeatedly, not just once.
+> Implementation complete; see [docs/SPRINT-9.md](docs/SPRINT-9.md).
 
-- [ ] Progress badges: first test completed, personal best broken, consistency streaks
-- [ ] Regional/age-group leaderboards visible to athletes
-- [ ] Privacy controls: opt-in for public leaderboard display
-- [ ] Onboarding flow polish
-- [ ] Multi-language support: Hindi + 2–3 regional languages
-- [ ] Instructional videos/diagrams for each test
-- [ ] Low-bandwidth testing: throttle to 2G/3G, verify graceful degradation (no hangs, clear "queued for upload" states)
-- [ ] Accessibility pass: font scaling, colour contrast, screen reader labels on key flows
+- [x] Progress badges: first test completed, personal best broken, consistency streaks — [badges.py](backend/app/services/badges.py), [BadgesScreen.kt](mobile/app/src/main/java/com/sai/sports/ui/engage/BadgesScreen.kt)
+  - [x] **Computed from results, never stored** — a later rejection removes the badge
+  - [x] Score badges count only SAI-verified/approved results; weeks are IST weeks
+- [x] Regional/age-group leaderboards visible to athletes — [athlete_leaderboard.py](backend/app/services/athlete_leaderboard.py), [LeaderboardScreen.kt](mobile/app/src/main/java/com/sai/sports/ui/engage/LeaderboardScreen.kt)
+- [x] Privacy controls: opt-in for public leaderboard display — **off by default**, first name + initial only, athletes always see their own rank — [SettingsScreen.kt](mobile/app/src/main/java/com/sai/sports/ui/engage/SettingsScreen.kt)
+- [x] Onboarding flow polish — language first (each option in its own script), then three pages — [OnboardingScreen.kt](mobile/app/src/main/java/com/sai/sports/ui/onboarding/OnboardingScreen.kt)
+- [x] Multi-language support: Hindi + Tamil + Bengali — all 248 athlete-facing strings, every screen from Sprints 1–9
+  - [x] `TranslationCompletenessTest`: same keys, same format arguments, nothing left in English
+  - [x] Analyzer messages, server codes and upload errors never reach the athlete untranslated — `LabelsTest` reads analyzer source to enforce it
+  - [x] **Fixed: App Bundle language splitting** would have installed only the system language, silently breaking the in-app picker
+  - [ ] **Native-speaker review of the translations** — not done
+- [~] Instructional videos/diagrams for each test — **diagrams and step-by-step instructions done** ([InstructionsScreen.kt](mobile/app/src/main/java/com/sai/sports/ui/instructions/InstructionsScreen.kt)); videos need filming
+- [~] Low-bandwidth testing — automated: throttled (~1KB/s) responses complete, stalled connections fail cleanly within bounded timeouts, every screen has retry ([Sprint9ApiTest.kt](mobile/app/src/test/java/com/sai/sports/api/Sprint9ApiTest.kt)); **manual 2G walk on a device not done**
+- [x] Accessibility pass: semantic headings, live regions for errors/rep count/countdown, merged row announcements, toggleable rows, content descriptions, scrolling screens for large fonts
+- [x] Android lint added to CI; fixed pre-existing lint errors (Media3 opt-in, camera feature declaration)
+- [x] Write [docs/SPRINT-9.md](docs/SPRINT-9.md)
 
 **DoD**
-- [ ] A non-technical test user outside the dev circle completes onboarding and a full test cycle without help, in a non-English language, on a throttled connection
+- [ ] A non-technical test user outside the dev circle completes onboarding and a full test cycle without help, in a non-English language, on a throttled connection — **BLOCKED: needs a real person, a device and a throttled network; everything it exercises is built and tested**
 
 ---
 

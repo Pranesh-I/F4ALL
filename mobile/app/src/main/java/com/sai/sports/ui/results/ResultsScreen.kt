@@ -33,12 +33,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import com.sai.sports.R
 import com.sai.sports.analyzer.AnalyzerResult
 import com.sai.sports.analyzer.AttemptStatus
 import com.sai.sports.analyzer.PoseFrame
 import com.sai.sports.data.Attempt
 import com.sai.sports.data.AttemptStore
 import com.sai.sports.ui.capture.PoseOverlayView
+import com.sai.sports.ui.common.Labels
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -81,7 +87,7 @@ fun ResultsScreen(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Text("Loading result…")
+            Text(stringResource(R.string.loading))
         }
         return
     }
@@ -120,14 +126,14 @@ fun ResultsScreen(
                 onClick = onRetry,
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Try again")
+                Text(stringResource(R.string.action_try_again))
             }
 
             Button(
                 onClick = onDone,
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Done")
+                Text(stringResource(R.string.action_done))
             }
         }
     }
@@ -147,8 +153,9 @@ private fun ScoreCard(result: AnalyzerResult) {
         ) {
 
             Text(
-                text = result.testType.displayName,
-                style = MaterialTheme.typography.titleMedium
+                text = stringResource(Labels.testName(result.testType)),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() }
             )
 
             if (result.status == AttemptStatus.COMPLETE) {
@@ -160,20 +167,20 @@ private fun ScoreCard(result: AnalyzerResult) {
                 )
 
                 Text(
-                    text = result.unit,
+                    text = stringResource(Labels.unit(result.unit)),
                     style = MaterialTheme.typography.titleMedium
                 )
 
             } else {
 
                 Text(
-                    text = "Attempt not scored",
+                    text = stringResource(R.string.result_not_scored),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.error
                 )
 
                 Text(
-                    text = result.invalidReason ?: "Unknown problem",
+                    text = stringResource(Labels.invalidReason(result.invalidReason)),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -239,8 +246,9 @@ private fun SkeletonReplay(
         ) {
 
             Text(
-                text = "What the app saw",
-                style = MaterialTheme.typography.titleSmall
+                text = stringResource(R.string.result_replay_title),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.semantics { heading() }
             )
 
             Box(
@@ -249,8 +257,11 @@ private fun SkeletonReplay(
                     .aspectRatio(safeWidth.toFloat() / safeHeight.toFloat())
                     .background(Color.Black)
             ) {
+                val replayDescription = stringResource(R.string.result_replay_description)
                 AndroidView(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .semantics { contentDescription = replayDescription },
                     factory = { context ->
                         PoseOverlayView(context).also {
                             it.scaleMode = PoseOverlayView.ScaleMode.FIT_CENTER
@@ -283,11 +294,13 @@ private fun SkeletonReplay(
                         isPlaying = !isPlaying
                     }
                 ) {
-                    Text(if (isPlaying) "Pause" else "Play")
+                    Text(
+                        stringResource(if (isPlaying) R.string.action_pause else R.string.action_play)
+                    )
                 }
 
                 Text(
-                    text = "Frame ${frameIndex + 1} / ${frames.size}",
+                    text = stringResource(R.string.result_frame_counter, frameIndex + 1, frames.size),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -308,8 +321,9 @@ private fun QualityCard(result: AnalyzerResult) {
         ) {
 
             Text(
-                text = "Tracking quality",
-                style = MaterialTheme.typography.titleSmall
+                text = stringResource(R.string.result_tracking_title),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.semantics { heading() }
             )
 
             LinearProgressIndicator(
@@ -318,16 +332,18 @@ private fun QualityCard(result: AnalyzerResult) {
             )
 
             Text(
-                text = "${(result.confidence * 100).toInt()}% — " +
-                    "${result.framesAnalyzed} frames used, " +
-                    "${result.framesRejected} skipped",
+                text = stringResource(
+                    R.string.result_tracking_detail,
+                    (result.confidence * 100).toInt(),
+                    result.framesAnalyzed,
+                    result.framesRejected
+                ),
                 style = MaterialTheme.typography.bodySmall
             )
 
             if (result.framesRejected > result.framesAnalyzed) {
                 Text(
-                    text = "Most frames were unusable. Move further back so your " +
-                        "whole body is in shot, and make sure the area is well lit.",
+                    text = stringResource(R.string.result_tracking_poor),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -336,8 +352,27 @@ private fun QualityCard(result: AnalyzerResult) {
     }
 }
 
+/**
+ * What happened during the attempt, in plain language.
+ *
+ * Replaces the raw analyzer log, which was English diagnostics ("rep_rejected_
+ * partial — Reached 82 deg"). What an athlete needs is "2 sit-ups did not count
+ * because you did not sit all the way up" — in their own language.
+ */
 @Composable
 private fun EventsCard(result: AnalyzerResult) {
+
+    val summary = Labels.summarise(result.events)
+    val lines = buildList {
+        if (summary.repsCounted > 0) add(stringResource(R.string.summary_reps_counted, summary.repsCounted))
+        if (summary.partialReps > 0) add(stringResource(R.string.summary_partial_reps, summary.partialReps))
+        if (summary.tooFastReps > 0) add(stringResource(R.string.summary_too_fast_reps, summary.tooFastReps))
+        if (summary.jumpsMeasured > 0) add(stringResource(R.string.summary_jumps_measured, summary.jumpsMeasured))
+        if (summary.jumpsRejected > 0) add(stringResource(R.string.summary_jumps_rejected, summary.jumpsRejected))
+        if (summary.trackingLost > 0) add(stringResource(R.string.summary_tracking_lost, summary.trackingLost))
+    }
+
+    if (lines.isEmpty()) return
 
     Card(modifier = Modifier.fillMaxWidth()) {
 
@@ -349,16 +384,13 @@ private fun EventsCard(result: AnalyzerResult) {
         ) {
 
             Text(
-                text = "Attempt log",
-                style = MaterialTheme.typography.titleSmall
+                text = stringResource(R.string.result_summary_title),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.semantics { heading() }
             )
 
-            result.events.forEach { event ->
-                Text(
-                    text = "• ${event.label.replace('_', ' ')}" +
-                        if (event.detail.isNotEmpty()) " — ${event.detail}" else "",
-                    style = MaterialTheme.typography.bodySmall
-                )
+            lines.forEach { line ->
+                Text(text = "• $line", style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -374,8 +406,7 @@ private fun EventsCard(result: AnalyzerResult) {
 private fun ProvisionalNotice() {
 
     Text(
-        text = "This is a provisional score calculated on your phone. " +
-            "Your official result is confirmed after SAI verifies the recording.",
+        text = stringResource(R.string.result_provisional_notice),
         style = MaterialTheme.typography.bodySmall
     )
 }

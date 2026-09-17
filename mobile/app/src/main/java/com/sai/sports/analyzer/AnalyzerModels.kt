@@ -65,7 +65,7 @@ data class AnalyzerResult(
     fun formattedScore(): String =
         when (testType) {
             TestType.SIT_UPS -> score.toInt().toString()
-            TestType.VERTICAL_JUMP -> String.format("%.1f", score)
+            TestType.VERTICAL_JUMP -> String.format(java.util.Locale.US, "%.1f", score)
         }
 
     companion object {

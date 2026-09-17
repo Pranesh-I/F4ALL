@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tamil. Written for this app, not produced by a certified translator: must be
+  reviewed by a native speaker (ideally a coach who works with young athletes)
+  before release. Format arguments must match values/strings.xml exactly.
+-->
+<resources>
+    <string name="app_name">SAI விளையாட்டுத் திறன் மதிப்பீடு</string>
+
+    <string name="action_back">பின்செல்</string>
+    <string name="action_cancel">ரத்து செய்</string>
+    <string name="action_done">முடிந்தது</string>
+    <string name="action_next">அடுத்து</string>
+    <string name="action_ok">சரி</string>
+    <string name="action_pause">இடைநிறுத்து</string>
+    <string name="action_play">இயக்கு</string>
+    <string name="action_retry">மீண்டும் அனுப்பு</string>
+    <string name="action_save">சேமி</string>
+    <string name="action_try_again">மீண்டும் முயற்சி செய்</string>
+    <string name="loading">ஏற்றப்படுகிறது…</string>
+
+    <string name="error_load">இதை ஏற்ற முடியவில்லை. மீண்டும் முயற்சி செய்யவும்.</string>
+    <string name="error_network">இணைய இணைப்பு இல்லை. சிக்னலைப் பார்த்து மீண்டும் முயற்சி செய்யவும்.</string>
+    <string name="error_rate_limited">அதிக முயற்சிகள். ஒரு நிமிடம் காத்திருந்து மீண்டும் முயற்சி செய்யவும்.</string>
+    <string name="error_server">SAI சர்வரில் சிக்கல் உள்ளது. பிறகு முயற்சி செய்யவும்.</string>
+    <string name="error_session_expired">உங்கள் அமர்வு முடிந்துவிட்டது. மீண்டும் உள்நுழையவும்.</string>
+
+    <string name="test_sit_ups">சிட்-அப்</string>
+    <string name="test_vertical_jump">செங்குத்துத் தாவல்</string>
+    <string name="test_unknown">சோதனை</string>
+    <string name="unit_reps">முறை</string>
+    <string name="unit_cm">செ.மீ</string>
+    <string name="unit_seconds">வினாடிகள்</string>
+    <string name="unit_blank"></string>
+
+    <string name="gender_male">ஆண்</string>
+    <string name="gender_female">பெண்</string>
+    <string name="gender_other">மற்றவை</string>
+    <string name="gender_all">அனைவரும்</string>
+
+    <string name="nav_badges">பதக்கங்கள்</string>
+    <string name="nav_leaderboard">தரவரிசை</string>
+    <string name="nav_settings">அமைப்புகள்</string>
+
+    <string name="onboarding_step">படி %1$d / %2$d</string>
+    <string name="onboarding_1_title">உங்கள் திறமையை SAI-க்குக் காட்டுங்கள்</string>
+    <string name="onboarding_1_body">நீங்கள் எங்கிருந்தாலும் உங்கள் தொலைபேசியில் அதிகாரப்பூர்வ உடற்தகுதிச் சோதனைகளைப் பதிவு செய்யுங்கள். மையத்திற்குப் பயணம் செய்யத் தேவையில்லை.</string>
+    <string name="onboarding_2_title">தொலைபேசி மதிப்பெண் ஒரு தொடக்கம் மட்டுமே</string>
+    <string name="onboarding_2_body">உங்கள் தொலைபேசி உடனே ஒரு மதிப்பெண்ணைக் காட்டும். பிறகு SAI உங்கள் காணொளியைச் சரிபார்க்கும், SAI அதிகாரி முடிவை ஒப்புதல் அளிப்பார். ஒப்புதல் பெற்ற முடிவு மட்டுமே அதிகாரப்பூர்வமானது.</string>
+    <string name="onboarding_3_title">உங்கள் காணொளிகள் தனிப்பட்டவை</string>
+    <string name="onboarding_3_body">உங்கள் சோதனைக் காணொளிகளை SAI அதிகாரிகள் மட்டுமே பார்க்க முடியும். மற்ற வீரர்கள் அவற்றைப் பார்க்க மாட்டார்கள். நீங்கள் விரும்பினால் மட்டுமே உங்கள் பெயர் தரவரிசையில் தெரியும்.</string>
+    <string name="onboarding_start">தொடங்குங்கள்</string>
+
+    <string name="home_choose_test">ஒரு சோதனையைத் தேர்ந்தெடுக்கவும்</string>
+    <string name="home_sync">SAI-க்கு அனுப்பப்பட்டவை</string>
+    <string name="home_sync_waiting">அனுப்பக் காத்திருப்பவை: %1$d</string>
+    <string name="home_profile">என் சுயவிவரம் மற்றும் முடிவுகள்</string>
+    <string name="home_provisional_note">தொலைபேசியில் உள்ள மதிப்பெண்கள் தற்காலிகமானவை. அதிகாரப்பூர்வ முடிவை SAI உறுதி செய்யும்.</string>
+
+    <string name="login_title">உள்நுழை</string>
+    <string name="login_body">நீங்கள்தான் என்பதை உறுதிசெய்ய உங்கள் தொலைபேசிக்கு ஒரு குறியீட்டை அனுப்புவோம்.</string>
+    <string name="login_phone_label">கைபேசி எண்</string>
+    <string name="login_code_label">%1$d இலக்கக் குறியீடு</string>
+    <string name="login_dev_code">சோதனை சர்வர்: உங்கள் குறியீடு %1$s</string>
+    <string name="login_send_code">குறியீட்டை அனுப்பு</string>
+    <string name="login_verify">சரிபார்</string>
+    <string name="login_resend">குறியீட்டை மீண்டும் அனுப்பு</string>
+    <string name="login_resend_in">மீண்டும் அனுப்பு (காத்திருப்பு: %1$d)</string>
+    <string name="login_change_number">எண்ணை மாற்று</string>
+    <string name="login_error_phone">10 இலக்க கைபேசி எண்ணை உள்ளிடவும்</string>
+    <string name="login_error_send">குறியீட்டை அனுப்ப முடியவில்லை. மீண்டும் முயற்சி செய்யவும்.</string>
+    <string name="login_error_code_length">முழுக் குறியீட்டையும் உள்ளிடவும்</string>
+    <string name="login_error_code_wrong">இந்தக் குறியீடு தவறு அல்லது காலாவதியானது</string>
+
+    <string name="register_title">உங்கள் வீரர் சுயவிவரத்தை உருவாக்குங்கள்</string>
+    <string name="register_name">முழுப் பெயர்</string>
+    <string name="register_dob_choose">பிறந்த தேதியைத் தேர்ந்தெடுக்கவும்</string>
+    <string name="register_dob_value">பிறந்த தேதி: %1$s</string>
+    <string name="register_gender">பாலினம்</string>
+    <string name="register_region_choose">உங்கள் மாநிலம் அல்லது யூனியன் பிரதேசத்தைத் தேர்ந்தெடுக்கவும்</string>
+    <string name="register_height">உயரம் (செ.மீ)</string>
+    <string name="register_weight">எடை (கி.கி, விருப்பத்தேர்வு)</string>
+    <string name="register_cohort_note">உங்கள் பிறந்த தேதியும் பாலினமும் எந்த வயதுப் பிரிவுடன் ஒப்பிடப்படுவீர்கள் என்பதைத் தீர்மானிக்கின்றன. இவற்றைப் பின்னர் செயலியில் மாற்ற முடியாது.</string>
+    <string name="register_submit">சுயவிவரத்தை உருவாக்கு</string>
+    <string name="register_error_name">உங்கள் பெயரை உள்ளிடவும்</string>
+    <string name="register_error_dob">பிறந்த தேதியைத் தேர்ந்தெடுக்கவும்</string>
+    <string name="register_error_dob_future">பிறந்த தேதி எதிர்காலத்தில் இருக்க முடியாது</string>
+    <string name="register_error_age">%1$d முதல் %2$d வயது வரையிலான வீரர்கள் பதிவு செய்யலாம்</string>
+    <string name="register_error_gender">பாலினத்தைத் தேர்ந்தெடுக்கவும்</string>
+    <string name="register_error_region">உங்கள் மாநிலம் அல்லது யூனியன் பிரதேசத்தைத் தேர்ந்தெடுக்கவும்</string>
+    <string name="register_error_height">உங்கள் உயரத்தை செ.மீ-இல் உள்ளிடவும்</string>
+    <string name="register_error_height_range">உயரம் %1$d முதல் %2$d செ.மீ வரை இருக்க வேண்டும்</string>
+    <string name="register_error_weight">எடை ஒரு எண்ணாக இருக்க வேண்டும்</string>
+    <string name="register_error_weight_range">எடை %1$d முதல் %2$d கி.கி வரை இருக்க வேண்டும்</string>
+    <string name="register_error_exists">இந்த எண்ணுக்கு ஏற்கனவே சுயவிவரம் உள்ளது</string>
+    <string name="register_error_generic">சுயவிவரத்தை உருவாக்க முடியவில்லை. உங்கள் விவரங்களைச் சரிபார்க்கவும்.</string>
+
+    <string name="photo_title">உங்கள் புகைப்படத்தைச் சேர்க்கவும்</string>
+    <string name="photo_body">சோதனைக் காணொளிகளில் இருப்பது நீங்கள்தான் என்பதை உறுதிசெய்ய SAI இந்தப் புகைப்படத்தைப் பயன்படுத்துகிறது. நல்ல வெளிச்சத்தில், தொப்பி அல்லது கருப்புக் கண்ணாடி இல்லாமல் கேமராவைப் பாருங்கள்.</string>
+    <string name="photo_privacy">உங்கள் புகைப்படம் தனிப்பட்ட முறையில் சேமிக்கப்படும்; உங்கள் முடிவுகளைச் சரிபார்க்கும் SAI அதிகாரிகள் மட்டுமே பார்ப்பார்கள்.</string>
+    <string name="photo_take">புகைப்படம் எடு</string>
+    <string name="photo_skip">இப்போது தவிர்</string>
+    <string name="photo_error_none">புகைப்படம் எடுக்கப்படவில்லை. மீண்டும் முயற்சி செய்யவும் அல்லது இப்போது தவிர்க்கவும்.</string>
+    <string name="photo_error_unreadable">இந்தப் புகைப்படத்தைப் படிக்க முடியவில்லை. மீண்டும் முயற்சி செய்யவும்.</string>
+    <string name="photo_error_upload">புகைப்படத்தைப் பதிவேற்ற முடியவில்லை. மீண்டும் முயற்சி செய்யவும்.</string>
+
+    <string name="instructions_setup">தொலைபேசியை அமைக்கவும்</string>
+    <string name="instructions_movement">சோதனையை எப்படிச் செய்வது</string>
+    <string name="instructions_start">நான் தயார் — தொடங்கு</string>
+    <string name="diagram_setup">படம்: நிலையான தாங்கியில் தொலைபேசி, வீரரிடமிருந்து இரண்டு முதல் மூன்று மீட்டர் தொலைவில், வீரர் பக்கவாட்டில் நிற்கிறார்</string>
+    <string name="setup_step_distance">தொலைபேசியை 2 முதல் 3 மீட்டர் தொலைவில், இடுப்பு உயரத்தில் வைக்கவும்.</string>
+    <string name="setup_step_steady">தொலைபேசியை அசையாமல் வைக்கவும். எதன் மீதாவது சாய்த்து வைக்கவும் அல்லது யாரையாவது நிலையாகப் பிடிக்கச் சொல்லவும்.</string>
+    <string name="setup_step_side_on">தொலைபேசிக்குப் பக்கவாட்டில் நிற்கவும் அல்லது படுக்கவும்; தலை முதல் கால் வரை முழு உடலும் தெரிய வேண்டும்.</string>
+    <string name="setup_step_light">வெளிச்சமான இடத்தைப் பயன்படுத்தவும். பின்னால் ஜன்னல் அல்லது சூரியன் இருக்கக் கூடாது.</string>
+    <string name="diagram_situp_down">தொடக்கம்: மல்லாந்து படுத்து, முழங்கால்களை மடக்கவும்</string>
+    <string name="diagram_situp_up">மேலே: முழுமையாக எழுந்து உட்காரவும்</string>
+    <string name="situp_step_lie">மல்லாந்து படுத்து, முழங்கால்களை மடக்கி, பாதங்களைத் தரையில் வைக்கவும்.</string>
+    <string name="situp_step_up">மார்பு முழங்கால்களுக்கு அருகில் வரும் வரை முழுமையாக எழுந்து உட்காரவும்.</string>
+    <string name="situp_step_down">அடுத்த முறைக்கு முன் முழுமையாகப் பின்னால் படுக்கவும்.</string>
+    <string name="situp_step_repeat">நேரம் முடியும் வரை முடிந்தவரை அதிகம் செய்யவும்.</string>
+    <string name="situp_counts">முழுமையாக எழுந்து, முழுமையாகப் பின்னால் படுத்தால் மட்டுமே சிட்-அப் கணக்கிடப்படும். பாதி சிட்-அப்கள் கணக்கிடப்படாது.</string>
+    <string name="diagram_jump_stand">தொடக்கம்: அசையாமல் நில்லுங்கள்</string>
+    <string name="diagram_jump_peak">நேராக மேலே தாவுங்கள்</string>
+    <string name="jump_step_still">3-2-1 எண்ணிக்கையின் போது அசையாமல் நில்லுங்கள். இதனால் செயலி உங்கள் உயரத்தை அளக்கும்.</string>
+    <string name="jump_step_jump">முடிந்தவரை உயரமாக நேராக மேலே தாவுங்கள்.</string>
+    <string name="jump_step_land">தொடங்கிய அதே இடத்தில் இறங்குங்கள்.</string>
+    <string name="jump_step_repeat">ஒன்றுக்கு மேற்பட்ட முறை தாவலாம். உங்கள் சிறந்த தாவல் கணக்கிடப்படும்.</string>
+    <string name="jump_counts">சோதனையின் போது தொலைபேசியை நோக்கியோ அதிலிருந்து விலகியோ நகர வேண்டாம் — அளவீடு தவறாகி முயற்சி கணக்கிடப்படாது.</string>
+
+    <string name="capture_hint_situps">கேமராவுக்குப் பக்கவாட்டில், முழு உடலும் தெரியும்படி படுக்கவும். ஒவ்வொரு முறையும் முழுமையாக எழுந்து உட்காரவும்.</string>
+    <string name="capture_hint_jump">பக்கவாட்டில், முழு உடலும் தெரியும்படி நில்லுங்கள். எண்ணிக்கை முடியும் வரை அசையாமல் இருந்து, பிறகு தாவுங்கள்.</string>
+    <string name="capture_recording">● பதிவாகிறது</string>
+    <string name="capture_scoring">உங்கள் முயற்சி சரிபார்க்கப்படுகிறது…</string>
+    <string name="capture_record">பதிவு செய்</string>
+    <string name="capture_stop">நிறுத்து</string>
+    <string name="live_torso_angle">உடல் கோணம் %1$d°</string>
+    <string name="live_stand_still">அசையாமல் நில்லுங்கள்…</string>
+    <string name="live_ready">தயார்</string>
+    <string name="live_ready_cm">தயார் — %1$d செ.மீ</string>
+    <string name="live_airborne">காற்றில்</string>
+    <string name="live_failed">முயற்சி கணக்கிடப்படவில்லை</string>
+    <string name="camera_permission_title">கேமரா தேவை</string>
+    <string name="camera_permission_body">சோதனையைப் பதிவு செய்ய செயலிக்கு கேமரா தேவை. காணொளி SAI-க்கு மட்டுமே அனுப்பப்படும்.</string>
+    <string name="camera_permission_allow">கேமராவை அனுமதி</string>
+    <string name="height_dialog_title">உங்கள் உயரம்</string>
+    <string name="height_dialog_body">தாவல் உயரம் உங்கள் நின்ற உயரத்தைக் கொண்டு அளக்கப்படுகிறது, எனவே முதல் தாவலுக்கு முன் அது தேவை.</string>
+    <string name="height_dialog_label">உயரம் செ.மீ-இல்</string>
+    <string name="height_dialog_invalid">%1$d முதல் %2$d செ.மீ வரையிலான உயரத்தை உள்ளிடவும்</string>
+
+    <string name="result_not_scored">முயற்சிக்கு மதிப்பெண் இல்லை</string>
+    <string name="result_replay_title">செயலி என்ன பார்த்தது</string>
+    <string name="result_replay_description">உங்கள் முயற்சியின் போது செயலி கண்காணித்த உடல் நிலைகளின் மறுஒளிபரப்பு</string>
+    <string name="result_frame_counter">சட்டகம் %1$d / %2$d</string>
+    <string name="result_tracking_title">கண்காணிப்புத் தரம்</string>
+    <string name="result_tracking_detail">%1$d%% — பயன்படுத்திய சட்டகங்கள்: %2$d, தவிர்த்தவை: %3$d</string>
+    <string name="result_tracking_poor">பெரும்பாலான சட்டகங்களைப் பயன்படுத்த முடியவில்லை. முழு உடலும் தெரியும்படி சற்றுப் பின்னால் செல்லவும், வெளிச்சமான இடத்தைப் பயன்படுத்தவும்.</string>
+    <string name="result_summary_title">என்ன நடந்தது</string>
+    <string name="result_provisional_notice">இது உங்கள் தொலைபேசியின் தற்காலிக மதிப்பெண். SAI காணொளியைச் சரிபார்த்த பிறகு அதிகாரப்பூர்வ முடிவு உறுதிசெய்யப்படும்.</string>
+    <string name="summary_reps_counted">கணக்கிடப்பட்ட சிட்-அப்கள்: %1$d</string>
+    <string name="summary_partial_reps">கணக்கிடப்படவில்லை, முழுமையாக எழவில்லை: %1$d</string>
+    <string name="summary_too_fast_reps">கணக்கிடப்படவில்லை, மிக வேகம்: %1$d</string>
+    <string name="summary_jumps_measured">அளக்கப்பட்ட தாவல்கள்: %1$d</string>
+    <string name="summary_jumps_rejected">கணக்கிடப்படாத தாவல்கள்: %1$d</string>
+    <string name="summary_tracking_lost">உடல் பார்வையிலிருந்து விலகிய முறைகள்: %1$d</string>
+    <string name="invalid_generic">இந்த முயற்சிக்கு மதிப்பெண் கொடுக்க முடியவில்லை. வழிமுறைகளைப் பார்த்து மீண்டும் முயற்சி செய்யவும்.</string>
+    <string name="invalid_no_pose">செயலியால் உங்களைப் பார்க்க முடியவில்லை. முழு உடலும் தெரிகிறதா என உறுதிசெய்யவும்.</string>
+    <string name="invalid_no_start">தொடக்க நிலை தெரியவில்லை. தொடங்கும் முன் முழுமையாகப் பின்னால் படுக்கவும்.</string>
+    <string name="invalid_lost_track">தாவலின் போது செயலி உங்களைப் பார்க்கவில்லை. முழு உடலும் தெரியும்படி இருங்கள்.</string>
+    <string name="invalid_no_landing">சரியான இறக்கம் தெரியவில்லை. தொடங்கிய இடத்திலேயே இறங்குங்கள்.</string>
+    <string name="invalid_no_reference">உங்கள் உயரத்தை அளக்க முடியவில்லை. தாவும் முன் எண்ணிக்கை வரை அசையாமல் நில்லுங்கள்.</string>
+    <string name="invalid_stopped_mid_jump">தாவலின் நடுவில் பதிவு நின்றுவிட்டது. நிறுத்து அழுத்தும் முன் இறங்குங்கள்.</string>
+    <string name="invalid_no_jump">எந்தத் தாவலும் தெரியவில்லை.</string>
+    <string name="invalid_moved">சோதனையின் போது நீங்களோ தொலைபேசியோ நகர்ந்துவிட்டீர்கள். இரண்டையும் அசையாமல் வைத்து மீண்டும் முயற்சி செய்யவும்.</string>
+
+    <string name="sync_title">SAI-க்கு அனுப்பப்பட்டவை</string>
+    <string name="sync_none">இன்னும் எந்தச் சோதனையும் பதிவு செய்யப்படவில்லை.</string>
+    <string name="sync_all_sent">உங்கள் எல்லாச் சோதனைகளும் SAI-ஐ அடைந்துவிட்டன.</string>
+    <string name="sync_uploading_count">அனுப்பப்படுகிறது. மீதம்: %1$d</string>
+    <string name="sync_waiting_count">இணைப்புக்காகக் காத்திருப்பவை: %1$d</string>
+    <string name="sync_try_now">இப்போது முயற்சி செய்</string>
+    <string name="sync_empty">நீங்கள் பதிவு செய்யும் சோதனைகள் SAI-ஐ அடையும் வரை இங்கே தெரியும்.</string>
+    <string name="sync_see_result">SAI முடிவைப் பார்</string>
+    <string name="sync_failed_hint">இந்தச் சோதனையை அனுப்ப முடியவில்லை. சிக்னல் கிடைத்ததும் மீண்டும் அனுப்பு என்பதை அழுத்தவும்.</string>
+    <string name="sync_recorded">இந்தத் தொலைபேசியில் சேமிக்கப்பட்டது</string>
+    <string name="sync_compressing">அனுப்பத் தயாராகிறது…</string>
+    <string name="sync_compressed">அனுப்பத் தயார்</string>
+    <string name="sync_queued">இணைப்புக்காகக் காத்திருக்கிறது</string>
+    <string name="sync_uploading">SAI-க்கு அனுப்பப்படுகிறது…</string>
+    <string name="sync_synced">SAI-க்கு அனுப்பப்பட்டது ✓</string>
+    <string name="sync_failed">அனுப்ப முடியவில்லை</string>
+
+    <string name="profile_title">என் சுயவிவரம்</string>
+    <string name="profile_summary_line">%1$d வயது · %2$s · %3$s</string>
+    <string name="profile_height">உயரம்: %1$s செ.மீ</string>
+    <string name="profile_no_photo">புகைப்படம் இல்லை — சோதனைக் காணொளிகளில் இருப்பது நீங்கள்தான் என SAI உறுதிசெய்ய முடியாது.</string>
+    <string name="profile_add_photo">புகைப்படம் சேர்</string>
+    <string name="profile_bests">சிறந்த மதிப்பெண்கள்</string>
+    <string name="profile_bests_empty">SAI ஒரு சோதனையைச் சரிபார்த்த பிறகு உங்கள் சிறந்த மதிப்பெண்கள் இங்கே தெரியும்.</string>
+    <string name="profile_results">அனைத்து முடிவுகளும்</string>
+    <string name="profile_results_empty">நீங்கள் பதிவு செய்யும் சோதனைகள் SAI-ஐ அடைந்த பிறகு இங்கே தெரியும்.</string>
+    <string name="profile_open_result">முடிவைத் திற</string>
+    <string name="best_official">அதிகாரப்பூர்வம்</string>
+    <string name="best_not_approved">இன்னும் ஒப்புதல் இல்லை</string>
+
+    <string name="result_title">முடிவு</string>
+    <string name="score_official">அதிகாரப்பூர்வ மதிப்பெண்</string>
+    <string name="score_server">SAI அளந்த மதிப்பெண் (இன்னும் அதிகாரப்பூர்வம் இல்லை)</string>
+    <string name="score_provisional">உங்கள் தொலைபேசி மதிப்பெண் (தற்காலிகம்)</string>
+    <string name="result_phone_counted">உங்கள் தொலைபேசி %1$s என்று கணக்கிட்டது. SAI அளந்த மதிப்பெண்ணே செல்லுபடியாகும்.</string>
+    <string name="status_processing">SAI சரிபார்க்கிறது</string>
+    <string name="status_verified">SAI சரிபார்த்தது — அதிகாரியின் ஒப்புதலுக்காகக் காத்திருக்கிறது</string>
+    <string name="status_flagged">SAI அதிகாரி மதிப்பாய்வு செய்கிறார்</string>
+    <string name="status_approved">SAI ஒப்புதல் அளித்தது</string>
+    <string name="status_rejected">ஏற்கப்படவில்லை</string>
+    <string name="status_resubmission">இந்தச் சோதனையை மீண்டும் பதிவு செய்யவும்</string>
+    <string name="status_unknown">நிலை தெரியவில்லை</string>
+    <string name="review_approved">SAI அதிகாரி இந்த முடிவுக்கு ஒப்புதல் அளித்தார்</string>
+    <string name="review_rejected">SAI அதிகாரி இந்த முடிவை ஏற்கவில்லை</string>
+    <string name="review_resubmission">இந்தச் சோதனையை மீண்டும் பதிவு செய்யுமாறு SAI அதிகாரி கேட்டுள்ளார்</string>
+    <string name="review_other">SAI அதிகாரி இந்த முடிவை மதிப்பாய்வு செய்தார்</string>
+
+    <string name="benchmark_title">உங்கள் வயதுப் பிரிவுடன் ஒப்பீடு</string>
+    <string name="band_top_10" formatted="false">உங்கள் வயதுப் பிரிவில் முதல் 10%</string>
+    <string name="band_top_25" formatted="false">உங்கள் வயதுப் பிரிவில் முதல் 25%</string>
+    <string name="band_above_average">உங்கள் வயதுப் பிரிவின் சராசரியை விட அதிகம்</string>
+    <string name="band_below_average">பயிற்சியைத் தொடருங்கள் — உங்கள் வயதுப் பிரிவின் சராசரியை நோக்கி முன்னேறுகிறீர்கள்</string>
+    <string name="benchmark_percentile">சுமார் சதமானம் %1$d</string>
+    <string name="benchmark_next_goal">அடுத்த இலக்கு: %1$s</string>
+    <string name="benchmark_group">பிரிவு: %1$s, வயது %2$s</string>
+    <string name="benchmark_provisional">இந்த ஒப்பீட்டு எண்கள் தற்காலிகமானவை; இன்னும் SAI-இன் அதிகாரப்பூர்வ தரநிலைகள் அல்ல. தோராயமான வழிகாட்டியாக மட்டும் பயன்படுத்தவும்.</string>
+    <string name="benchmark_not_verified">SAI இந்த முடிவைச் சரிபார்த்த பிறகு ஒப்பீடு தெரியும்.</string>
+    <string name="benchmark_no_cohort">உங்கள் வயது மற்றும் பாலினத்திற்கு இன்னும் ஒப்பீட்டுப் பிரிவு இல்லை.</string>
+
+    <string name="badges_title">பதக்கங்கள்</string>
+    <string name="badges_streak_current">தொடர் வாரங்கள்: %1$d</string>
+    <string name="badges_streak_longest">மிக நீண்ட தொடர்: %1$d</string>
+    <string name="badges_earned">பெற்றது</string>
+    <string name="badges_progress">முன்னேற்றம்: %1$d / %2$d</string>
+    <string name="badges_note">மதிப்பெண் பதக்கங்கள் SAI சரிபார்த்த முடிவுகளுக்கு மட்டுமே. SAI ஏற்காத சோதனையின் பதக்கங்கள் நீக்கப்படும்.</string>
+    <string name="badge_first_test">முதல் சோதனை</string>
+    <string name="badge_first_test_desc">உங்கள் முதல் சோதனையைப் பதிவு செய்து அனுப்புங்கள்</string>
+    <string name="badge_first_verified">SAI சரிபார்த்தது</string>
+    <string name="badge_first_verified_desc">ஒரு முடிவை SAI சரிபார்க்கச் செய்யுங்கள்</string>
+    <string name="badge_personal_best">புதிய சாதனை</string>
+    <string name="badge_personal_best_desc">ஏதேனும் ஒரு சோதனையில் உங்கள் சிறந்த மதிப்பெண்ணை முறியடியுங்கள்</string>
+    <string name="badge_all_tests">பன்முகத் திறனாளர்</string>
+    <string name="badge_all_tests_desc">ஒவ்வொரு சோதனையிலும் சரிபார்க்கப்பட்ட முடிவைப் பெறுங்கள்</string>
+    <string name="badge_streak_2">இரண்டு வாரத் தொடர்</string>
+    <string name="badge_streak_4">நான்கு வாரத் தொடர்</string>
+    <string name="badge_streak_8">எட்டு வாரத் தொடர்</string>
+    <string name="badge_streak_desc">தொடர்ந்து %1$d வாரங்கள் ஒவ்வொரு வாரமும் குறைந்தது ஒரு சோதனையைப் பதிவு செய்யுங்கள்</string>
+    <string name="badge_unknown">பதக்கம்</string>
+
+    <string name="leaderboard_title">தரவரிசை</string>
+    <string name="leaderboard_my_state">என் மாநிலம்</string>
+    <string name="leaderboard_india">இந்தியா முழுவதும்</string>
+    <string name="leaderboard_cohort">%1$s, வயது %2$s · %3$s</string>
+    <string name="leaderboard_you_rank">உங்கள் இடம்: %1$d (%2$s)</string>
+    <string name="leaderboard_you_visible">மற்ற வீரர்கள் இந்தத் தரவரிசையில் உங்களைப் பார்க்க முடியும்.</string>
+    <string name="leaderboard_you_hidden">உங்கள் இடத்தை நீங்கள் மட்டுமே பார்க்க முடியும். மற்ற வீரர்கள் உங்களைப் பார்க்க முடியாது.</string>
+    <string name="leaderboard_you_none">SAI அதிகாரி உங்கள் முடிவுக்கு ஒப்புதல் அளித்த பிறகு நீங்கள் இங்கே தெரிவீர்கள்.</string>
+    <string name="leaderboard_change_visibility">என்னை யார் பார்க்கலாம் என்பதை மாற்று</string>
+    <string name="leaderboard_empty">இந்தத் தரவரிசையில் இன்னும் வீரர்கள் இல்லை.</string>
+    <string name="leaderboard_entry_spoken">இடம் %1$d, %2$s, %3$s, %4$s</string>
+    <string name="leaderboard_note">ஒப்புதல் பெற்ற முடிவுகள் மட்டுமே தரவரிசைப்படுத்தப்படும். வீரர்கள் முதல் பெயர் மற்றும் முதலெழுத்துடன் காட்டப்படுவார்கள்.</string>
+
+    <string name="settings_title">அமைப்புகள்</string>
+    <string name="settings_language">மொழி</string>
+    <string name="settings_privacy">தனியுரிமை</string>
+    <string name="settings_show_on_leaderboard">என்னைத் தரவரிசையில் காட்டு</string>
+    <string name="settings_visible_explainer">மற்ற வீரர்கள் உங்கள் முதல் பெயர், முதலெழுத்து, மாநிலம் மற்றும் ஒப்புதல் பெற்ற சிறந்த மதிப்பெண்ணைப் பார்க்க முடியும்.</string>
+    <string name="settings_hidden_explainer">நீங்கள் மறைக்கப்பட்டுள்ளீர்கள். மற்ற வீரர்கள் உங்களைப் பார்க்க முடியாது, ஆனால் உங்கள் இடத்தை நீங்கள் பார்க்கலாம்.</string>
+    <string name="settings_error_save">சேமிக்க முடியவில்லை. மீண்டும் முயற்சி செய்யவும்.</string>
+    <string name="settings_data_note">நீங்கள் இங்கே எதைத் தேர்ந்தெடுத்தாலும், உங்கள் காணொளிகளையும் புகைப்படத்தையும் SAI அதிகாரிகள் மட்டுமே பார்ப்பார்கள்.</string>
+    <string name="settings_sign_out">வெளியேறு</string>
+</resources>

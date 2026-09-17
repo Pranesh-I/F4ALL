@@ -52,7 +52,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import com.sai.sports.PoseLandmarkerHelper
+import com.sai.sports.R
+import com.sai.sports.ui.common.Labels
 import com.sai.sports.analyzer.MediaPipeMapper
 import com.sai.sports.analyzer.TestType
 import com.sai.sports.data.Attempt
@@ -70,7 +77,7 @@ import java.util.concurrent.Executors
 
 @Composable
 fun CaptureScreen(
-    testName: String,
+    testType: TestType,
     onBack: () -> Unit,
     onAttemptComplete: (String) -> Unit
 ) {
@@ -100,7 +107,7 @@ fun CaptureScreen(
 
     if (hasCameraPermission) {
         CameraPreview(
-            testName = testName,
+            testType = testType,
             onBack = onBack,
             onAttemptComplete = onAttemptComplete
         )
@@ -116,17 +123,13 @@ fun CaptureScreen(
 
 @Composable
 private fun CameraPreview(
-    testName: String,
+    testType: TestType,
     onBack: () -> Unit,
     onAttemptComplete: (String) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
-
-    val testType = remember(testName) {
-        TestType.fromDisplayName(testName) ?: TestType.SIT_UPS
-    }
 
     val profileStore = remember { AthleteProfileStore(context) }
     val attemptStore = remember { AttemptStore(context) }
@@ -418,13 +421,19 @@ private fun CameraPreview(
         ) {
 
             Text(
-                text = testName,
+                text = stringResource(Labels.testName(testType)),
                 color = Color.White,
-                style = MaterialTheme.typography.headlineSmall
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.semantics { heading() }
             )
 
             Text(
-                text = getInstructions(testName),
+                text = stringResource(
+                    when (testType) {
+                        TestType.VERTICAL_JUMP -> R.string.capture_hint_jump
+                        TestType.SIT_UPS -> R.string.capture_hint_situps
+                    }
+                ),
                 color = Color.White,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -443,7 +452,12 @@ private fun CameraPreview(
                     .align(Alignment.CenterEnd)
                     .padding(end = 20.dp)
                     .background(Color.Black.copy(alpha = 0.55f))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    // Announced as it changes, so an athlete who cannot watch
+                    // the screen mid-rep still hears the count.
+                    .semantics(mergeDescendants = true) {
+                        liveRegion = LiveRegionMode.Polite
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
@@ -457,14 +471,14 @@ private fun CameraPreview(
                 )
 
                 Text(
-                    text = testType.unit,
+                    text = stringResource(Labels.unit(testType.unit)),
                     color = Color.White,
                     style = MaterialTheme.typography.bodySmall
                 )
 
-                session.liveDetail?.let { detail ->
+                session.liveDetail?.let { hint ->
                     Text(
-                        text = detail,
+                        text = liveHintText(hint),
                         color = Color.White,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 6.dp)
@@ -486,6 +500,7 @@ private fun CameraPreview(
                     .align(Alignment.Center)
                     .background(Color.Black.copy(alpha = 0.55f))
                     .padding(horizontal = 40.dp, vertical = 20.dp)
+                    .semantics { liveRegion = LiveRegionMode.Assertive }
             )
         }
 
@@ -495,7 +510,7 @@ private fun CameraPreview(
         if (isRecording) {
 
             Text(
-                text = "● RECORDING",
+                text = stringResource(R.string.capture_recording),
                 color = Color.Red,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier
@@ -517,7 +532,7 @@ private fun CameraPreview(
 
             if (isFinishing) {
                 Text(
-                    text = "Scoring your attempt…",
+                    text = stringResource(R.string.capture_scoring),
                     color = Color.White
                 )
             }
@@ -539,14 +554,14 @@ private fun CameraPreview(
                     enabled = videoCapture != null &&
                         (testType != TestType.VERTICAL_JUMP || athleteHeightCm != null)
                 ) {
-                    Text("RECORD")
+                    Text(stringResource(R.string.capture_record))
                 }
             }
 
             if (isRecording) {
 
                 Button(onClick = { recording?.stop() }) {
-                    Text("STOP")
+                    Text(stringResource(R.string.capture_stop))
                 }
             }
 
@@ -559,7 +574,7 @@ private fun CameraPreview(
                     onBack()
                 }
             ) {
-                Text("Back")
+                Text(stringResource(R.string.action_back))
             }
         }
     }
@@ -599,19 +614,16 @@ private fun HeightEntryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Your height") },
+        title = { Text(stringResource(R.string.height_dialog_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
 
-                Text(
-                    "Jump height is measured against your standing height, " +
-                        "so we need it before your first jump."
-                )
+                Text(stringResource(R.string.height_dialog_body))
 
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
-                    label = { Text("Height in cm") },
+                    label = { Text(stringResource(R.string.height_dialog_label)) },
                     singleLine = true,
                     isError = input.isNotEmpty() && !isValid,
                     keyboardOptions = KeyboardOptions(
@@ -621,9 +633,11 @@ private fun HeightEntryDialog(
 
                 if (input.isNotEmpty() && !isValid) {
                     Text(
-                        text = "Enter a height between " +
-                            "${AthleteProfileStore.MIN_HEIGHT_CM.toInt()} and " +
-                            "${AthleteProfileStore.MAX_HEIGHT_CM.toInt()} cm",
+                        text = stringResource(
+                            R.string.height_dialog_invalid,
+                            AthleteProfileStore.MIN_HEIGHT_CM.toInt(),
+                            AthleteProfileStore.MAX_HEIGHT_CM.toInt()
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -635,12 +649,12 @@ private fun HeightEntryDialog(
                 onClick = { parsed?.let(onConfirm) },
                 enabled = isValid
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
@@ -700,20 +714,15 @@ private fun startRecording(
     onRecordingCreated(newRecording)
 }
 
-private fun getInstructions(testName: String): String {
-
-    return when (testName) {
-
-        "Vertical Jump" ->
-            "Stand side-on, full body in frame. Stay still for the countdown, then jump."
-
-        "Sit-ups" ->
-            "Lie down side-on to the camera with your whole body visible. " +
-                "Sit all the way up each rep."
-
-        else ->
-            "Position yourself so your full body is visible."
-    }
+@Composable
+private fun liveHintText(hint: LiveHint): String = when (hint) {
+    is LiveHint.TorsoAngle -> stringResource(R.string.live_torso_angle, hint.degrees.toInt())
+    LiveHint.StandStill -> stringResource(R.string.live_stand_still)
+    is LiveHint.Ready -> hint.displacementCm
+        ?.let { stringResource(R.string.live_ready_cm, it.toInt()) }
+        ?: stringResource(R.string.live_ready)
+    LiveHint.Airborne -> stringResource(R.string.live_airborne)
+    LiveHint.Failed -> stringResource(R.string.live_failed)
 }
 
 @Composable
@@ -733,16 +742,22 @@ private fun PermissionScreen(
         ) {
 
             Text(
-                text = "Camera Permission Required",
-                style = MaterialTheme.typography.headlineSmall
+                text = stringResource(R.string.camera_permission_title),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.semantics { heading() }
+            )
+
+            Text(
+                text = stringResource(R.string.camera_permission_body),
+                modifier = Modifier.padding(horizontal = 24.dp)
             )
 
             Button(onClick = onRequestPermission) {
-                Text("Allow Camera")
+                Text(stringResource(R.string.camera_permission_allow))
             }
 
             Button(onClick = onBack) {
-                Text("Back")
+                Text(stringResource(R.string.action_back))
             }
         }
     }

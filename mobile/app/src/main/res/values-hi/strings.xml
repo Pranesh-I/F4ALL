@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hindi. Written for this app, not produced by a certified translator: must be
+  reviewed by a native speaker (ideally a coach who works with young athletes)
+  before release. Format arguments must match values/strings.xml exactly.
+-->
+<resources>
+    <string name="app_name">SAI खेल प्रतिभा मूल्यांकन</string>
+
+    <string name="action_back">पीछे</string>
+    <string name="action_cancel">रद्द करें</string>
+    <string name="action_done">हो गया</string>
+    <string name="action_next">आगे</string>
+    <string name="action_ok">ठीक है</string>
+    <string name="action_pause">रोकें</string>
+    <string name="action_play">चलाएँ</string>
+    <string name="action_retry">फिर से भेजें</string>
+    <string name="action_save">सहेजें</string>
+    <string name="action_try_again">फिर से कोशिश करें</string>
+    <string name="loading">लोड हो रहा है…</string>
+
+    <string name="error_load">यह लोड नहीं हो सका। कृपया फिर से कोशिश करें।</string>
+    <string name="error_network">इंटरनेट नहीं है। नेटवर्क देखें और फिर से कोशिश करें।</string>
+    <string name="error_rate_limited">बहुत ज़्यादा कोशिशें हुईं। एक मिनट रुककर फिर से कोशिश करें।</string>
+    <string name="error_server">SAI के सर्वर में समस्या है। कृपया बाद में कोशिश करें।</string>
+    <string name="error_session_expired">आपका सत्र समाप्त हो गया है। कृपया फिर से साइन इन करें।</string>
+
+    <string name="test_sit_ups">सिट-अप</string>
+    <string name="test_vertical_jump">ऊँची छलांग</string>
+    <string name="test_unknown">टेस्ट</string>
+    <string name="unit_reps">बार</string>
+    <string name="unit_cm">सेमी</string>
+    <string name="unit_seconds">सेकंड</string>
+    <string name="unit_blank"></string>
+
+    <string name="gender_male">पुरुष</string>
+    <string name="gender_female">महिला</string>
+    <string name="gender_other">अन्य</string>
+    <string name="gender_all">सभी</string>
+
+    <string name="nav_badges">बैज</string>
+    <string name="nav_leaderboard">लीडरबोर्ड</string>
+    <string name="nav_settings">सेटिंग्स</string>
+
+    <string name="onboarding_step">चरण %1$d / %2$d</string>
+    <string name="onboarding_1_title">SAI को दिखाइए आप क्या कर सकते हैं</string>
+    <string name="onboarding_1_body">आप जहाँ भी हों, अपने फ़ोन से आधिकारिक फ़िटनेस टेस्ट रिकॉर्ड करें। किसी केंद्र तक जाने की ज़रूरत नहीं है।</string>
+    <string name="onboarding_2_title">फ़ोन का स्कोर सिर्फ़ शुरुआत है</string>
+    <string name="onboarding_2_body">आपका फ़ोन तुरंत एक स्कोर दिखाता है। फिर SAI आपका वीडियो जाँचता है, और SAI अधिकारी नतीजे को मंज़ूरी देते हैं। सिर्फ़ मंज़ूर नतीजा ही आधिकारिक होता है।</string>
+    <string name="onboarding_3_title">आपके वीडियो निजी रहते हैं</string>
+    <string name="onboarding_3_body">आपके टेस्ट वीडियो सिर्फ़ SAI अधिकारी देख सकते हैं। दूसरे खिलाड़ी इन्हें कभी नहीं देखते, और लीडरबोर्ड पर आपका नाम तभी दिखता है जब आप चुनें।</string>
+    <string name="onboarding_start">शुरू करें</string>
+
+    <string name="home_choose_test">टेस्ट चुनें</string>
+    <string name="home_sync">SAI को भेजे गए</string>
+    <string name="home_sync_waiting">भेजे जाने बाकी: %1$d</string>
+    <string name="home_profile">मेरी प्रोफ़ाइल और नतीजे</string>
+    <string name="home_provisional_note">फ़ोन पर दिखने वाले स्कोर अस्थायी हैं। आधिकारिक नतीजा SAI तय करता है।</string>
+
+    <string name="login_title">साइन इन करें</string>
+    <string name="login_body">पुष्टि के लिए हम आपके फ़ोन पर एक कोड भेजेंगे।</string>
+    <string name="login_phone_label">मोबाइल नंबर</string>
+    <string name="login_code_label">%1$d अंकों का कोड</string>
+    <string name="login_dev_code">टेस्ट सर्वर: आपका कोड %1$s है</string>
+    <string name="login_send_code">कोड भेजें</string>
+    <string name="login_verify">पुष्टि करें</string>
+    <string name="login_resend">कोड फिर से भेजें</string>
+    <string name="login_resend_in">फिर से भेजें (प्रतीक्षा: %1$d)</string>
+    <string name="login_change_number">नंबर बदलें</string>
+    <string name="login_error_phone">10 अंकों का मोबाइल नंबर डालें</string>
+    <string name="login_error_send">कोड नहीं भेजा जा सका। कृपया फिर से कोशिश करें।</string>
+    <string name="login_error_code_length">पूरा कोड डालें</string>
+    <string name="login_error_code_wrong">यह कोड गलत है या इसकी समय-सीमा खत्म हो गई है</string>
+
+    <string name="register_title">अपनी खिलाड़ी प्रोफ़ाइल बनाएँ</string>
+    <string name="register_name">पूरा नाम</string>
+    <string name="register_dob_choose">अपनी जन्म तिथि चुनें</string>
+    <string name="register_dob_value">जन्म तिथि: %1$s</string>
+    <string name="register_gender">लिंग</string>
+    <string name="register_region_choose">अपना राज्य या केंद्र शासित प्रदेश चुनें</string>
+    <string name="register_height">लंबाई (सेमी)</string>
+    <string name="register_weight">वज़न (किलो, वैकल्पिक)</string>
+    <string name="register_cohort_note">आपकी जन्म तिथि और लिंग से तय होता है कि आपकी तुलना किस आयु वर्ग से होगी। इन्हें बाद में ऐप में बदला नहीं जा सकता।</string>
+    <string name="register_submit">प्रोफ़ाइल बनाएँ</string>
+    <string name="register_error_name">अपना नाम डालें</string>
+    <string name="register_error_dob">अपनी जन्म तिथि चुनें</string>
+    <string name="register_error_dob_future">जन्म तिथि भविष्य की नहीं हो सकती</string>
+    <string name="register_error_age">%1$d से %2$d वर्ष के खिलाड़ी रजिस्टर कर सकते हैं</string>
+    <string name="register_error_gender">लिंग चुनें</string>
+    <string name="register_error_region">अपना राज्य या केंद्र शासित प्रदेश चुनें</string>
+    <string name="register_error_height">अपनी लंबाई सेमी में डालें</string>
+    <string name="register_error_height_range">लंबाई %1$d से %2$d सेमी के बीच होनी चाहिए</string>
+    <string name="register_error_weight">वज़न एक संख्या होनी चाहिए</string>
+    <string name="register_error_weight_range">वज़न %1$d से %2$d किलो के बीच होना चाहिए</string>
+    <string name="register_error_exists">इस फ़ोन नंबर की प्रोफ़ाइल पहले से है</string>
+    <string name="register_error_generic">प्रोफ़ाइल नहीं बन सकी। कृपया अपनी जानकारी जाँचें।</string>
+
+    <string name="photo_title">अपनी फ़ोटो जोड़ें</string>
+    <string name="photo_body">SAI इस फ़ोटो से पुष्टि करता है कि टेस्ट वीडियो में आप ही हैं। अच्छी रोशनी में कैमरे की ओर देखें, टोपी या काला चश्मा न पहनें।</string>
+    <string name="photo_privacy">आपकी फ़ोटो निजी रूप से रखी जाती है और सिर्फ़ आपके नतीजे जाँचने वाले SAI अधिकारी इसे देखते हैं।</string>
+    <string name="photo_take">फ़ोटो लें</string>
+    <string name="photo_skip">अभी छोड़ें</string>
+    <string name="photo_error_none">कोई फ़ोटो नहीं ली गई। फिर से कोशिश करें, या अभी छोड़ें।</string>
+    <string name="photo_error_unreadable">यह फ़ोटो पढ़ी नहीं जा सकी। कृपया फिर से कोशिश करें।</string>
+    <string name="photo_error_upload">फ़ोटो अपलोड नहीं हो सकी। कृपया फिर से कोशिश करें।</string>
+
+    <string name="instructions_setup">अपना फ़ोन सेट करें</string>
+    <string name="instructions_movement">टेस्ट कैसे करें</string>
+    <string name="instructions_start">मैं तैयार हूँ — शुरू करें</string>
+    <string name="diagram_setup">चित्र: फ़ोन स्थिर स्टैंड पर, खिलाड़ी से दो-तीन मीटर दूर, खिलाड़ी बगल से खड़ा है</string>
+    <string name="setup_step_distance">फ़ोन को 2 से 3 मीटर दूर, लगभग कमर की ऊँचाई पर रखें।</string>
+    <string name="setup_step_steady">फ़ोन को बिल्कुल स्थिर रखें। किसी चीज़ के सहारे टिकाएँ या किसी से स्थिर पकड़ने को कहें।</string>
+    <string name="setup_step_side_on">फ़ोन की ओर बगल से खड़े हों या लेटें, ताकि सिर से पैर तक पूरा शरीर दिखे।</string>
+    <string name="setup_step_light">रोशनी वाली जगह चुनें। पीछे खिड़की या धूप न हो।</string>
+    <string name="diagram_situp_down">शुरुआत: पीठ के बल लेटें, घुटने मुड़े हुए</string>
+    <string name="diagram_situp_up">ऊपर: पूरी तरह उठकर बैठें</string>
+    <string name="situp_step_lie">पीठ के बल लेटें, घुटने मोड़ें और पैर ज़मीन पर सपाट रखें।</string>
+    <string name="situp_step_up">पूरी तरह उठकर बैठें, जब तक छाती घुटनों के पास न आ जाए।</string>
+    <string name="situp_step_down">अगली बार से पहले पूरी तरह वापस लेटें।</string>
+    <string name="situp_step_repeat">समय खत्म होने तक जितने हो सकें उतने करें।</string>
+    <string name="situp_counts">सिट-अप तभी गिना जाता है जब आप पूरी तरह उठें और पूरी तरह वापस लेटें। आधे सिट-अप नहीं गिने जाते।</string>
+    <string name="diagram_jump_stand">शुरुआत: स्थिर खड़े रहें</string>
+    <string name="diagram_jump_peak">सीधे ऊपर कूदें</string>
+    <string name="jump_step_still">3-2-1 गिनती के दौरान बिल्कुल स्थिर खड़े रहें। इससे ऐप आपकी लंबाई नाप पाता है।</string>
+    <string name="jump_step_jump">जितना ऊँचा हो सके, सीधे ऊपर कूदें।</string>
+    <string name="jump_step_land">उसी जगह पर उतरें जहाँ से कूदे थे।</string>
+    <string name="jump_step_repeat">आप एक से ज़्यादा बार कूद सकते हैं। आपकी सबसे अच्छी छलांग गिनी जाएगी।</string>
+    <string name="jump_counts">टेस्ट के दौरान फ़ोन की ओर या उससे दूर कदम न बढ़ाएँ — माप गलत हो जाएगा और कोशिश नहीं गिनी जाएगी।</string>
+
+    <string name="capture_hint_situps">कैमरे की ओर बगल से लेटें, पूरा शरीर दिखे। हर बार पूरी तरह उठकर बैठें।</string>
+    <string name="capture_hint_jump">बगल से खड़े हों, पूरा शरीर दिखे। गिनती तक स्थिर रहें, फिर कूदें।</string>
+    <string name="capture_recording">● रिकॉर्ड हो रहा है</string>
+    <string name="capture_scoring">आपकी कोशिश जाँची जा रही है…</string>
+    <string name="capture_record">रिकॉर्ड</string>
+    <string name="capture_stop">रोकें</string>
+    <string name="live_torso_angle">शरीर का कोण %1$d°</string>
+    <string name="live_stand_still">स्थिर खड़े रहें…</string>
+    <string name="live_ready">तैयार</string>
+    <string name="live_ready_cm">तैयार — %1$d सेमी</string>
+    <string name="live_airborne">हवा में</string>
+    <string name="live_failed">कोशिश नहीं गिनी गई</string>
+    <string name="camera_permission_title">कैमरे की ज़रूरत है</string>
+    <string name="camera_permission_body">टेस्ट रिकॉर्ड करने के लिए ऐप को कैमरा चाहिए। वीडियो सिर्फ़ SAI को भेजा जाता है।</string>
+    <string name="camera_permission_allow">कैमरे की अनुमति दें</string>
+    <string name="height_dialog_title">आपकी लंबाई</string>
+    <string name="height_dialog_body">छलांग की ऊँचाई आपकी लंबाई के आधार पर नापी जाती है, इसलिए पहली छलांग से पहले यह चाहिए।</string>
+    <string name="height_dialog_label">लंबाई सेमी में</string>
+    <string name="height_dialog_invalid">%1$d से %2$d सेमी के बीच लंबाई डालें</string>
+
+    <string name="result_not_scored">कोशिश का स्कोर नहीं बना</string>
+    <string name="result_replay_title">ऐप ने क्या देखा</string>
+    <string name="result_replay_description">आपकी कोशिश के दौरान ऐप द्वारा देखी गई शरीर की स्थितियों का रीप्ले</string>
+    <string name="result_frame_counter">फ़्रेम %1$d / %2$d</string>
+    <string name="result_tracking_title">ट्रैकिंग की गुणवत्ता</string>
+    <string name="result_tracking_detail">%1$d%% — इस्तेमाल हुए फ़्रेम: %2$d, छोड़े गए: %3$d</string>
+    <string name="result_tracking_poor">ज़्यादातर फ़्रेम इस्तेमाल नहीं हो सके। थोड़ा पीछे जाएँ ताकि पूरा शरीर दिखे, और रोशनी वाली जगह चुनें।</string>
+    <string name="result_summary_title">क्या हुआ</string>
+    <string name="result_provisional_notice">यह आपके फ़ोन का अस्थायी स्कोर है। SAI के वीडियो जाँचने के बाद आपका आधिकारिक नतीजा तय होगा।</string>
+    <string name="summary_reps_counted">गिने गए सिट-अप: %1$d</string>
+    <string name="summary_partial_reps">नहीं गिने गए, पूरा उठकर नहीं बैठे: %1$d</string>
+    <string name="summary_too_fast_reps">नहीं गिने गए, बहुत तेज़ थे: %1$d</string>
+    <string name="summary_jumps_measured">नापी गई छलांगें: %1$d</string>
+    <string name="summary_jumps_rejected">नहीं गिनी गई छलांगें: %1$d</string>
+    <string name="summary_tracking_lost">कितनी बार शरीर दिखना बंद हुआ: %1$d</string>
+    <string name="invalid_generic">ऐप इस कोशिश का स्कोर नहीं बना सका। निर्देश देखें और फिर से कोशिश करें।</string>
+    <string name="invalid_no_pose">ऐप आपको नहीं देख सका। पक्का करें कि पूरा शरीर दिख रहा है।</string>
+    <string name="invalid_no_start">शुरुआती स्थिति नहीं दिखी। शुरू करने से पहले पूरी तरह पीछे लेटें।</string>
+    <string name="invalid_lost_track">छलांग के दौरान ऐप आपको नहीं देख पाया। पूरा शरीर दिखता रहे।</string>
+    <string name="invalid_no_landing">ठीक से उतरना नहीं दिखा। उसी जगह पर उतरें जहाँ से कूदे थे।</string>
+    <string name="invalid_no_reference">आपकी लंबाई नहीं नापी जा सकी। कूदने से पहले गिनती तक स्थिर खड़े रहें।</string>
+    <string name="invalid_stopped_mid_jump">छलांग के बीच रिकॉर्डिंग रुक गई। रोकें दबाने से पहले ज़मीन पर उतरें।</string>
+    <string name="invalid_no_jump">कोई छलांग नहीं दिखी।</string>
+    <string name="invalid_moved">टेस्ट के दौरान आप या फ़ोन हिल गए। दोनों को स्थिर रखकर फिर से कोशिश करें।</string>
+
+    <string name="sync_title">SAI को भेजे गए</string>
+    <string name="sync_none">अभी तक कोई टेस्ट रिकॉर्ड नहीं हुआ।</string>
+    <string name="sync_all_sent">आपके सभी टेस्ट SAI तक पहुँच गए हैं।</string>
+    <string name="sync_uploading_count">भेजे जा रहे हैं। बाकी: %1$d</string>
+    <string name="sync_waiting_count">इंटरनेट का इंतज़ार: %1$d</string>
+    <string name="sync_try_now">अभी कोशिश करें</string>
+    <string name="sync_empty">आपके रिकॉर्ड किए टेस्ट SAI तक पहुँचने तक यहाँ दिखेंगे।</string>
+    <string name="sync_see_result">SAI का नतीजा देखें</string>
+    <string name="sync_failed_hint">यह टेस्ट भेजा नहीं जा सका। नेटवर्क मिलने पर फिर से भेजें दबाएँ।</string>
+    <string name="sync_recorded">इस फ़ोन पर सहेजा गया</string>
+    <string name="sync_compressing">भेजने की तैयारी हो रही है…</string>
+    <string name="sync_compressed">भेजने के लिए तैयार</string>
+    <string name="sync_queued">इंटरनेट का इंतज़ार</string>
+    <string name="sync_uploading">SAI को भेजा जा रहा है…</string>
+    <string name="sync_synced">SAI को भेज दिया ✓</string>
+    <string name="sync_failed">भेजा नहीं जा सका</string>
+
+    <string name="profile_title">मेरी प्रोफ़ाइल</string>
+    <string name="profile_summary_line">%1$d वर्ष · %2$s · %3$s</string>
+    <string name="profile_height">लंबाई: %1$s सेमी</string>
+    <string name="profile_no_photo">कोई फ़ोटो नहीं है — SAI पुष्टि नहीं कर सकता कि टेस्ट वीडियो में आप ही हैं।</string>
+    <string name="profile_add_photo">फ़ोटो जोड़ें</string>
+    <string name="profile_bests">सबसे अच्छे स्कोर</string>
+    <string name="profile_bests_empty">SAI के टेस्ट जाँचने के बाद आपके सबसे अच्छे स्कोर यहाँ दिखेंगे।</string>
+    <string name="profile_results">सभी नतीजे</string>
+    <string name="profile_results_empty">SAI तक पहुँचने के बाद आपके टेस्ट यहाँ दिखेंगे।</string>
+    <string name="profile_open_result">नतीजा खोलें</string>
+    <string name="best_official">आधिकारिक</string>
+    <string name="best_not_approved">अभी मंज़ूर नहीं</string>
+
+    <string name="result_title">नतीजा</string>
+    <string name="score_official">आधिकारिक स्कोर</string>
+    <string name="score_server">SAI द्वारा नापा गया स्कोर (अभी आधिकारिक नहीं)</string>
+    <string name="score_provisional">आपके फ़ोन का स्कोर (अस्थायी)</string>
+    <string name="result_phone_counted">आपके फ़ोन ने %1$s गिने। SAI का नापा गया स्कोर ही मान्य है।</string>
+    <string name="status_processing">SAI जाँच रहा है</string>
+    <string name="status_verified">SAI ने जाँच लिया — अधिकारी की मंज़ूरी बाकी है</string>
+    <string name="status_flagged">SAI अधिकारी समीक्षा कर रहे हैं</string>
+    <string name="status_approved">SAI ने मंज़ूर किया</string>
+    <string name="status_rejected">स्वीकार नहीं किया गया</string>
+    <string name="status_resubmission">कृपया यह टेस्ट फिर से रिकॉर्ड करें</string>
+    <string name="status_unknown">स्थिति पता नहीं</string>
+    <string name="review_approved">SAI अधिकारी ने यह नतीजा मंज़ूर किया</string>
+    <string name="review_rejected">SAI अधिकारी ने यह नतीजा स्वीकार नहीं किया</string>
+    <string name="review_resubmission">SAI अधिकारी ने आपसे यह टेस्ट फिर से रिकॉर्ड करने को कहा है</string>
+    <string name="review_other">SAI अधिकारी ने यह नतीजा देखा</string>
+
+    <string name="benchmark_title">आपके आयु वर्ग से तुलना</string>
+    <string name="band_top_10" formatted="false">आपके आयु वर्ग में शीर्ष 10%</string>
+    <string name="band_top_25" formatted="false">आपके आयु वर्ग में शीर्ष 25%</string>
+    <string name="band_above_average">आपके आयु वर्ग के औसत से ऊपर</string>
+    <string name="band_below_average">अभ्यास जारी रखें — आप अपने आयु वर्ग के औसत की ओर बढ़ रहे हैं</string>
+    <string name="benchmark_percentile">लगभग पर्सेंटाइल %1$d</string>
+    <string name="benchmark_next_goal">अगला लक्ष्य: %1$s</string>
+    <string name="benchmark_group">वर्ग: %1$s, आयु %2$s</string>
+    <string name="benchmark_provisional">तुलना के ये आँकड़े अस्थायी हैं और अभी SAI के आधिकारिक मानक नहीं हैं। इन्हें सिर्फ़ मोटे अंदाज़े की तरह देखें।</string>
+    <string name="benchmark_not_verified">SAI के यह नतीजा जाँचने के बाद तुलना दिखेगी।</string>
+    <string name="benchmark_no_cohort">आपकी आयु और लिंग के लिए अभी कोई तुलना वर्ग नहीं है।</string>
+
+    <string name="badges_title">बैज</string>
+    <string name="badges_streak_current">लगातार हफ़्ते: %1$d</string>
+    <string name="badges_streak_longest">सबसे लंबा सिलसिला: %1$d</string>
+    <string name="badges_earned">मिल गया</string>
+    <string name="badges_progress">प्रगति: %1$d / %2$d</string>
+    <string name="badges_note">स्कोर वाले बैज सिर्फ़ SAI द्वारा जाँचे गए नतीजों से मिलते हैं। SAI जिस टेस्ट को स्वीकार नहीं करता, उसके बैज हट जाते हैं।</string>
+    <string name="badge_first_test">पहला टेस्ट</string>
+    <string name="badge_first_test_desc">अपना पहला टेस्ट रिकॉर्ड करके भेजें</string>
+    <string name="badge_first_verified">SAI द्वारा जाँचा गया</string>
+    <string name="badge_first_verified_desc">SAI से कोई नतीजा जँचवाएँ</string>
+    <string name="badge_personal_best">नया रिकॉर्ड</string>
+    <string name="badge_personal_best_desc">किसी भी टेस्ट में अपना सबसे अच्छा स्कोर तोड़ें</string>
+    <string name="badge_all_tests">हरफ़नमौला</string>
+    <string name="badge_all_tests_desc">हर टेस्ट में एक जाँचा हुआ नतीजा पाएँ</string>
+    <string name="badge_streak_2">दो हफ़्ते लगातार</string>
+    <string name="badge_streak_4">चार हफ़्ते लगातार</string>
+    <string name="badge_streak_8">आठ हफ़्ते लगातार</string>
+    <string name="badge_streak_desc">लगातार %1$d हफ़्तों तक हर हफ़्ते कम से कम एक टेस्ट रिकॉर्ड करें</string>
+    <string name="badge_unknown">बैज</string>
+
+    <string name="leaderboard_title">लीडरबोर्ड</string>
+    <string name="leaderboard_my_state">मेरा राज्य</string>
+    <string name="leaderboard_india">पूरा भारत</string>
+    <string name="leaderboard_cohort">%1$s, आयु %2$s · %3$s</string>
+    <string name="leaderboard_you_rank">आपका स्थान: %1$d (%2$s)</string>
+    <string name="leaderboard_you_visible">दूसरे खिलाड़ी आपको इस लीडरबोर्ड पर देख सकते हैं।</string>
+    <string name="leaderboard_you_hidden">आपका स्थान सिर्फ़ आप देख सकते हैं। दूसरे खिलाड़ी आपको नहीं देख सकते।</string>
+    <string name="leaderboard_you_none">SAI अधिकारी के आपका कोई नतीजा मंज़ूर करने के बाद आप यहाँ दिखेंगे।</string>
+    <string name="leaderboard_change_visibility">कौन मुझे देख सकता है, बदलें</string>
+    <string name="leaderboard_empty">इस लीडरबोर्ड पर अभी कोई खिलाड़ी नहीं है।</string>
+    <string name="leaderboard_entry_spoken">स्थान %1$d, %2$s, %3$s, %4$s</string>
+    <string name="leaderboard_note">सिर्फ़ मंज़ूर नतीजों की रैंकिंग होती है। खिलाड़ी पहले नाम और उपनाम के पहले अक्षर से दिखते हैं।</string>
+
+    <string name="settings_title">सेटिंग्स</string>
+    <string name="settings_language">भाषा</string>
+    <string name="settings_privacy">गोपनीयता</string>
+    <string name="settings_show_on_leaderboard">मुझे लीडरबोर्ड पर दिखाएँ</string>
+    <string name="settings_visible_explainer">दूसरे खिलाड़ी आपका पहला नाम, उपनाम का पहला अक्षर, राज्य और सबसे अच्छा मंज़ूर स्कोर देख सकते हैं।</string>
+    <string name="settings_hidden_explainer">आप छिपे हुए हैं। दूसरे खिलाड़ी आपको नहीं देख सकते, लेकिन आप अपना स्थान देख सकते हैं।</string>
+    <string name="settings_error_save">सहेजा नहीं जा सका। कृपया फिर से कोशिश करें।</string>
+    <string name="settings_data_note">आप यहाँ कुछ भी चुनें, आपके वीडियो और फ़ोटो सिर्फ़ SAI अधिकारी देखते हैं।</string>
+    <string name="settings_sign_out">साइन आउट करें</string>
+</resources>

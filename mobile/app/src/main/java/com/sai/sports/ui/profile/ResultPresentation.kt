@@ -1,58 +1,44 @@
 package com.sai.sports.ui.profile
 
-import java.util.Locale
+import androidx.annotation.StringRes
+import com.sai.sports.R
 
 /**
- * How server-side result states are described to an athlete.
+ * How result scores are presented to an athlete.
  *
- * The rule every label follows: a number is only called official once an
- * official has approved it. "Verified" means SAI's system re-measured the video
- * and agreed; it is not the final word, and the wording must never let an
- * athlete believe they are finished when they are not.
+ * The rule: a number is only called official once an official has approved it.
+ * "Verified" means SAI's system re-measured the video and agreed; it is not the
+ * final word, and the wording must never let an athlete believe they are done
+ * when they are not.
  */
 object ResultPresentation {
 
-    fun statusLabel(status: String): String = when (status) {
-        "processing" -> "Being checked by SAI"
-        "verified" -> "Checked by SAI — awaiting official approval"
-        "flagged" -> "Under review by an SAI official"
-        "approved" -> "Approved by SAI"
-        "rejected" -> "Not accepted"
-        "pending_sync" -> "Resubmission requested"
-        else -> "Status unknown"
-    }
-
-    /** The score to headline, and whether it may be called official. */
+    /** The score to headline, and the label that says what kind of score it is. */
     fun headline(
         provisional: Double?,
         server: Double?,
         final: Double?
-    ): Pair<Double?, String> = when {
-        final != null -> final to "Official score"
-        server != null -> server to "SAI measured score (not yet official)"
-        else -> provisional to "Your phone's score (provisional)"
+    ): Pair<Double?, Int> = when {
+        final != null -> final to R.string.score_official
+        server != null -> server to R.string.score_server
+        else -> provisional to R.string.score_provisional
     }
 
-    fun formatScore(value: Double?, unit: String): String {
+    @StringRes
+    fun officialLabel(official: Boolean): Int =
+        if (official) R.string.best_official else R.string.best_not_approved
+
+    /**
+     * Digits only, with no unit — the caller adds the translated unit.
+     * Always Latin digits via Locale.US, so a score reads the same in every
+     * language and matches what an official sees on the dashboard.
+     */
+    fun formatNumber(value: Double?): String {
         if (value == null) return "—"
-        val number = if (value % 1.0 == 0.0) {
+        return if (value % 1.0 == 0.0) {
             value.toLong().toString()
         } else {
-            String.format(Locale.US, "%.1f", value)
+            String.format(java.util.Locale.US, "%.1f", value)
         }
-        return "$number $unit"
-    }
-
-    fun testName(code: String): String = when (code) {
-        "SIT_UPS" -> "Sit-ups"
-        "VERTICAL_JUMP" -> "Vertical Jump"
-        else -> code.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
-    }
-
-    fun reviewLabel(action: String): String = when (action) {
-        "approved" -> "An official approved this result"
-        "rejected" -> "An official did not accept this result"
-        "requested_resubmission" -> "An official has asked you to record this test again"
-        else -> "An official reviewed this result"
     }
 }

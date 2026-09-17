@@ -6,6 +6,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Effect
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Presentation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
@@ -42,6 +43,10 @@ import kotlin.coroutines.resume
  * The cost is less control: no arbitrary filter graphs, and encoder behaviour
  * varies across vendors. Neither matters for "make this smaller at 480p".
  */
+// Transformer is Media3's supported transcoding API but still carries the
+// UnstableApi marker; the opt-in acknowledges that its surface may change
+// between Media3 releases, which the pinned version in libs.versions.toml covers.
+@androidx.annotation.OptIn(UnstableApi::class)
 class VideoCompressor(
     private val context: Context
 ) {

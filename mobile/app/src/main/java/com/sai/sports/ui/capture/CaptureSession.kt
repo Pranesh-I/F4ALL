@@ -33,7 +33,7 @@ class CaptureSession {
         private set
 
     /** Secondary live readout — torso angle or height above the standing reference. */
-    var liveDetail by mutableStateOf<String?>(null)
+    var liveDetail by mutableStateOf<LiveHint?>(null)
         private set
 
     var framesCaptured by mutableStateOf(0)
@@ -107,20 +107,16 @@ class CaptureSession {
         liveDetail = describe(currentAnalyzer)
     }
 
-    private fun describe(analyzer: TestAnalyzer): String? =
+    private fun describe(analyzer: TestAnalyzer): LiveHint? =
         when (analyzer) {
 
-            is SitUpAnalyzer -> analyzer.currentAngle()?.let { angle ->
-                "Torso ${"%.0f".format(angle)}°"
-            }
+            is SitUpAnalyzer -> analyzer.currentAngle()?.let { LiveHint.TorsoAngle(it) }
 
             is VerticalJumpAnalyzer -> when (analyzer.currentPhase()) {
-                VerticalJumpAnalyzer.Phase.CALIBRATING -> "Stand still…"
-                VerticalJumpAnalyzer.Phase.READY ->
-                    analyzer.currentDisplacementCm()?.let { "Ready — ${"%.0f".format(it)}cm" }
-                        ?: "Ready"
-                VerticalJumpAnalyzer.Phase.AIRBORNE -> "Airborne"
-                VerticalJumpAnalyzer.Phase.INVALID -> "Attempt failed"
+                VerticalJumpAnalyzer.Phase.CALIBRATING -> LiveHint.StandStill
+                VerticalJumpAnalyzer.Phase.READY -> LiveHint.Ready(analyzer.currentDisplacementCm())
+                VerticalJumpAnalyzer.Phase.AIRBORNE -> LiveHint.Airborne
+                VerticalJumpAnalyzer.Phase.INVALID -> LiveHint.Failed
             }
 
             else -> null
@@ -159,4 +155,16 @@ class CaptureSession {
         val result: AnalyzerResult,
         val frames: List<PoseFrame>
     )
+}
+
+/**
+ * What the athlete should know right now, as data rather than text, so the
+ * capture screen can say it in the athlete's language.
+ */
+sealed interface LiveHint {
+    data class TorsoAngle(val degrees: Double) : LiveHint
+    data object StandStill : LiveHint
+    data class Ready(val displacementCm: Double?) : LiveHint
+    data object Airborne : LiveHint
+    data object Failed : LiveHint
 }

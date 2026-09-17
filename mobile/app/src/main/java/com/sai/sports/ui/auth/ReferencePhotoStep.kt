@@ -28,7 +28,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.compose.ui.res.stringResource
+import com.sai.sports.R
 import com.sai.sports.api.ApiResult
+import com.sai.sports.ui.common.ErrorText
+import com.sai.sports.ui.common.Labels
+import com.sai.sports.ui.common.ScreenTitle
 import com.sai.sports.auth.AppServices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -56,13 +61,13 @@ fun ReferencePhotoStep(onDone: () -> Unit) {
     }
 
     var busy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
+    var message by remember { mutableStateOf<Int?>(null) }
 
     val takePicture = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { saved ->
         if (!saved) {
-            message = "No photo was taken. Try again, or skip for now."
+            message = R.string.photo_error_none
             return@rememberLauncherForActivityResult
         }
 
@@ -78,9 +83,9 @@ fun ReferencePhotoStep(onDone: () -> Unit) {
             }
             busy = false
             when (result) {
-                null -> message = "That photo could not be read. Please try again."
+                null -> message = R.string.photo_error_unreadable
                 is ApiResult.Success -> onDone()
-                is ApiResult.Failure -> message = result.message
+                is ApiResult.Failure -> message = Labels.failure(result.kind, R.string.photo_error_upload)
             }
         }
     }
@@ -91,30 +96,28 @@ fun ReferencePhotoStep(onDone: () -> Unit) {
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Add your photo", style = MaterialTheme.typography.headlineSmall)
+        ScreenTitle(stringResource(R.string.photo_title))
 
         Text(
-            "SAI uses this photo to confirm that the person in your test videos is " +
-                "you. Face the camera in good light, without a cap or sunglasses.",
+            stringResource(R.string.photo_body),
             style = MaterialTheme.typography.bodyMedium
         )
 
         Text(
-            "Your photo is stored privately and is only seen by SAI officials " +
-                "reviewing your results.",
+            stringResource(R.string.photo_privacy),
             style = MaterialTheme.typography.bodySmall
         )
 
-        message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        message?.let { ErrorText(stringResource(it)) }
 
         if (busy) {
             CircularProgressIndicator()
         } else {
             Button(onClick = { takePicture.launch(photoUri) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Take photo")
+                Text(stringResource(R.string.photo_take))
             }
             TextButton(onClick = onDone) {
-                Text("Skip for now")
+                Text(stringResource(R.string.photo_skip))
             }
         }
     }

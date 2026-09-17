@@ -1,5 +1,7 @@
 package com.sai.sports.ui.auth
 
+import androidx.annotation.StringRes
+import com.sai.sports.R
 import java.time.LocalDate
 import java.time.Period
 
@@ -8,18 +10,26 @@ import java.time.Period
  * about a typo before spending data on a request that will be refused.
  *
  * The server still validates everything; this is a courtesy, not a guard.
+ * Problems are string resources with arguments, so they read in the athlete's
+ * language.
  */
 object RegistrationRules {
 
     const val MIN_AGE_YEARS = 9
     const val MAX_AGE_YEARS = 40
 
-    val GENDERS = listOf("male" to "Male", "female" to "Female", "other" to "Other")
+    const val MIN_HEIGHT_CM = 100
+    const val MAX_HEIGHT_CM = 230
+    const val MIN_WEIGHT_KG = 15
+    const val MAX_WEIGHT_KG = 200
+
+    val GENDERS = listOf("male", "female", "other")
+
+    data class Problem(@StringRes val message: Int, val args: List<Any> = emptyList())
 
     fun ageOn(dateOfBirth: LocalDate, today: LocalDate = LocalDate.now()): Int =
         Period.between(dateOfBirth, today).years
 
-    /** Returns a message for the athlete, or null when everything is valid. */
     fun problem(
         name: String,
         dateOfBirth: LocalDate?,
@@ -28,27 +38,31 @@ object RegistrationRules {
         heightCm: String,
         weightKg: String,
         today: LocalDate = LocalDate.now()
-    ): String? {
-        if (name.isBlank()) return "Enter your name"
-        if (dateOfBirth == null) return "Choose your date of birth"
-        if (dateOfBirth.isAfter(today)) return "Date of birth cannot be in the future"
+    ): Problem? {
+        if (name.isBlank()) return Problem(R.string.register_error_name)
+        if (dateOfBirth == null) return Problem(R.string.register_error_dob)
+        if (dateOfBirth.isAfter(today)) return Problem(R.string.register_error_dob_future)
 
         val age = ageOn(dateOfBirth, today)
         if (age < MIN_AGE_YEARS || age > MAX_AGE_YEARS) {
-            return "Athletes aged $MIN_AGE_YEARS to $MAX_AGE_YEARS can register"
+            return Problem(R.string.register_error_age, listOf(MIN_AGE_YEARS, MAX_AGE_YEARS))
         }
 
-        if (gender == null) return "Choose a gender"
-        if (region == null) return "Choose your state or union territory"
+        if (gender == null) return Problem(R.string.register_error_gender)
+        if (region == null) return Problem(R.string.register_error_region)
 
-        // Height is required, not optional: vertical jump cannot be measured
-        // without it, and asking later means a jump test that cannot be scored.
-        val height = heightCm.toDoubleOrNull() ?: return "Enter your height in cm"
-        if (height < 100 || height > 230) return "Height should be between 100 and 230 cm"
+        // Required, not optional: vertical jump cannot be measured without it,
+        // and asking later means a jump test that cannot be scored.
+        val height = heightCm.toDoubleOrNull() ?: return Problem(R.string.register_error_height)
+        if (height < MIN_HEIGHT_CM || height > MAX_HEIGHT_CM) {
+            return Problem(R.string.register_error_height_range, listOf(MIN_HEIGHT_CM, MAX_HEIGHT_CM))
+        }
 
         if (weightKg.isNotBlank()) {
-            val weight = weightKg.toDoubleOrNull() ?: return "Weight must be a number"
-            if (weight < 15 || weight > 200) return "Weight should be between 15 and 200 kg"
+            val weight = weightKg.toDoubleOrNull() ?: return Problem(R.string.register_error_weight)
+            if (weight < MIN_WEIGHT_KG || weight > MAX_WEIGHT_KG) {
+                return Problem(R.string.register_error_weight_range, listOf(MIN_WEIGHT_KG, MAX_WEIGHT_KG))
+            }
         }
 
         return null

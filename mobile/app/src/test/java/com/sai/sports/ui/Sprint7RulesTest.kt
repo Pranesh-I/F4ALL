@@ -1,13 +1,12 @@
 package com.sai.sports.ui
 
+import com.sai.sports.R
 import com.sai.sports.ui.auth.LoginRules
 import com.sai.sports.ui.auth.PhotoPreparation
 import com.sai.sports.ui.auth.RegistrationRules
 import com.sai.sports.ui.profile.ResultPresentation
-import com.sai.sports.ui.profile.ordinal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,27 +39,30 @@ class Sprint7RulesTest {
     }
 
     @Test
-    fun `each missing field is reported`() {
-        assertNotNull(problem(name = " "))
-        assertNotNull(problem(dob = null))
-        assertNotNull(problem(gender = null))
-        assertNotNull(problem(region = null))
-        assertNotNull(problem(height = ""))
+    fun `each missing field is reported with its own message`() {
+        assertEquals(R.string.register_error_name, problem(name = " ")?.message)
+        assertEquals(R.string.register_error_dob, problem(dob = null)?.message)
+        assertEquals(R.string.register_error_gender, problem(gender = null)?.message)
+        assertEquals(R.string.register_error_region, problem(region = null)?.message)
+        assertEquals(R.string.register_error_height, problem(height = "")?.message)
     }
 
     @Test
-    fun `age limits match the server`() {
-        assertNotNull(problem(dob = today.minusYears(8)))
+    fun `age limits match the server and carry their bounds`() {
+        val tooYoung = problem(dob = today.minusYears(8))
+        assertEquals(R.string.register_error_age, tooYoung?.message)
+        assertEquals(listOf<Any>(9, 40), tooYoung?.args)
+
         assertNull(problem(dob = today.minusYears(9)))
         assertNull(problem(dob = today.minusYears(40)))
-        assertNotNull(problem(dob = today.minusYears(41)))
-        assertNotNull(problem(dob = today.plusDays(1)))
+        assertEquals(R.string.register_error_age, problem(dob = today.minusYears(41))?.message)
+        assertEquals(R.string.register_error_dob_future, problem(dob = today.plusDays(1))?.message)
     }
 
     @Test
     fun `height is required because jumps cannot be measured without it`() {
-        assertNotNull(problem(height = "abc"))
-        assertNotNull(problem(height = "20"))
+        assertEquals(R.string.register_error_height, problem(height = "abc")?.message)
+        assertEquals(R.string.register_error_height_range, problem(height = "20")?.message)
         assertNull(problem(height = "172.5"))
     }
 
@@ -68,43 +70,26 @@ class Sprint7RulesTest {
     fun `weight is optional but must be sensible when given`() {
         assertNull(problem(weight = ""))
         assertNull(problem(weight = "55"))
-        assertNotNull(problem(weight = "5"))
+        assertEquals(R.string.register_error_weight_range, problem(weight = "5")?.message)
     }
 
     @Test
     fun `a machine score is never labelled official`() {
-        assertEquals("Official score", ResultPresentation.headline(30.0, 28.0, 28.0).second)
-        assertTrue(ResultPresentation.headline(30.0, 28.0, null).second.contains("not yet official"))
-        assertTrue(ResultPresentation.headline(30.0, null, null).second.contains("provisional"))
-        assertEquals(28.0, ResultPresentation.headline(30.0, 28.0, null).first)
+        assertEquals(28.0 to R.string.score_official, ResultPresentation.headline(30.0, 28.0, 28.0))
+        assertEquals(28.0 to R.string.score_server, ResultPresentation.headline(30.0, 28.0, null))
+        assertEquals(30.0 to R.string.score_provisional, ResultPresentation.headline(30.0, null, null))
     }
 
     @Test
-    fun `verified is described as awaiting approval`() {
-        assertTrue(ResultPresentation.statusLabel("verified").contains("awaiting official approval"))
-    }
-
-    @Test
-    fun `scores format without spurious decimals`() {
-        assertEquals("24 reps", ResultPresentation.formatScore(24.0, "reps"))
-        assertEquals("41.5 cm", ResultPresentation.formatScore(41.5, "cm"))
-        assertEquals("—", ResultPresentation.formatScore(null, "cm"))
-    }
-
-    @Test
-    fun `ordinals are correct including the teens`() {
-        assertEquals("51st", ordinal(51))
-        assertEquals("62nd", ordinal(62))
-        assertEquals("73rd", ordinal(73))
-        assertEquals("11th", ordinal(11))
-        assertEquals("12th", ordinal(12))
-        assertEquals("90th", ordinal(90))
+    fun `numbers use the same digits in every language`() {
+        assertEquals("24", ResultPresentation.formatNumber(24.0))
+        assertEquals("41.5", ResultPresentation.formatNumber(41.5))
+        assertEquals("—", ResultPresentation.formatNumber(null))
     }
 
     @Test
     fun `photos are subsampled but never below the target size`() {
         assertEquals(1, PhotoPreparation.sampleSizeFor(800, 600, 1024))
-        assertEquals(2, PhotoPreparation.sampleSizeFor(4000, 3000, 1024))
         // 4000 / 4 = 1000 would fall below the target, so stop at 2.
         assertEquals(2, PhotoPreparation.sampleSizeFor(4000, 3000, 1024))
         // 8192 / 8 = 1024 still meets the target exactly.

@@ -3,7 +3,7 @@ package com.sai.sports.ui.auth
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -33,14 +33,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.sai.sports.R
+import com.sai.sports.api.ApiFailure
 import com.sai.sports.api.ApiResult
 import com.sai.sports.api.Registration
 import com.sai.sports.auth.AppServices
 import com.sai.sports.data.AthleteProfileStore
 import com.sai.sports.data.Regions
+import com.sai.sports.i18n.LanguageStore
 import com.sai.sports.sync.SyncScheduler
+import com.sai.sports.ui.common.ErrorText
+import com.sai.sports.ui.common.Labels
+import com.sai.sports.ui.common.ScreenTitle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -52,9 +59,9 @@ import java.time.ZoneOffset
  * Creates the athlete's profile, then asks for a registration photo.
  *
  * Date of birth and gender cannot be edited afterwards — they choose the
- * benchmark cohort — so the screen says so before the athlete commits.
+ * comparison group — so the screen says so before the athlete commits.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun RegistrationScreen(
     onRegistered: () -> Unit
@@ -76,7 +83,7 @@ fun RegistrationScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var regionMenuOpen by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var problem by remember { mutableStateOf<RegistrationRules.Problem?>(null) }
 
     val dateOfBirth = dobEpochDay?.let(LocalDate::ofEpochDay)
 
@@ -86,8 +93,8 @@ fun RegistrationScreen(
     }
 
     fun submit() {
-        error = RegistrationRules.problem(name, dateOfBirth, gender, region, height, weight)
-        if (error != null) return
+        problem = RegistrationRules.problem(name, dateOfBirth, gender, region, height, weight)
+        if (problem != null) return
 
         busy = true
         scope.launch {
@@ -112,6 +119,9 @@ fun RegistrationScreen(
                         // it, and it cannot upload or submit anything.
                         session.store(result.value.tokens)
                         result.value.profile.heightCm?.let(profileStore::setHeightCm)
+                        LanguageStore.current(context)?.let {
+                            api.updatePreferences(preferredLanguage = it.tag)
+                        }
                     }
                     SyncScheduler.syncNow(context)
                     busy = false
@@ -119,7 +129,12 @@ fun RegistrationScreen(
                 }
                 is ApiResult.Failure -> {
                     busy = false
-                    error = result.message
+                    problem = RegistrationRules.Problem(
+                        when (result.kind) {
+                            ApiFailure.CONFLICT -> R.string.register_error_exists
+                            else -> Labels.failure(result.kind, R.string.register_error_generic)
+                        }
+                    )
                 }
             }
         }
@@ -140,10 +155,12 @@ fun RegistrationScreen(
                             .toEpochDay()
                     }
                     showDatePicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.action_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             }
         ) {
             DatePicker(state = pickerState)
@@ -157,34 +174,37 @@ fun RegistrationScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("Create your athlete profile", style = MaterialTheme.typography.headlineSmall)
+        ScreenTitle(stringResource(R.string.register_title))
 
         OutlinedTextField(
             value = name,
             onValueChange = { name = it.take(150) },
-            label = { Text("Full name") },
+            label = { Text(stringResource(R.string.register_name)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
 
         OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
-            Text(dateOfBirth?.let { "Date of birth: $it" } ?: "Choose date of birth")
+            Text(
+                dateOfBirth?.let { stringResource(R.string.register_dob_value, it.toString()) }
+                    ?: stringResource(R.string.register_dob_choose)
+            )
         }
 
-        Text("Gender", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            RegistrationRules.GENDERS.forEach { (value, label) ->
+        Text(stringResource(R.string.register_gender), style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            RegistrationRules.GENDERS.forEach { value ->
                 FilterChip(
                     selected = gender == value,
                     onClick = { gender = value },
-                    label = { Text(label) }
+                    label = { Text(stringResource(Labels.gender(value))) }
                 )
             }
         }
 
         Box {
             OutlinedButton(onClick = { regionMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(region ?: "Choose state / union territory")
+                Text(region ?: stringResource(R.string.register_region_choose))
             }
             DropdownMenu(expanded = regionMenuOpen, onDismissRequest = { regionMenuOpen = false }) {
                 Regions.ALL.forEach { option ->
@@ -202,7 +222,7 @@ fun RegistrationScreen(
         OutlinedTextField(
             value = height,
             onValueChange = { height = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
-            label = { Text("Height (cm)") },
+            label = { Text(stringResource(R.string.register_height)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth()
@@ -211,25 +231,23 @@ fun RegistrationScreen(
         OutlinedTextField(
             value = weight,
             onValueChange = { weight = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
-            label = { Text("Weight (kg, optional)") },
+            label = { Text(stringResource(R.string.register_weight)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth()
         )
 
-        Text(
-            "Your date of birth and gender decide which age group your results " +
-                "are compared with, and cannot be changed later in the app.",
-            style = MaterialTheme.typography.bodySmall
-        )
+        Text(stringResource(R.string.register_cohort_note), style = MaterialTheme.typography.bodySmall)
 
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        problem?.let {
+            ErrorText(stringResource(it.message, *it.args.toTypedArray()))
+        }
 
         if (busy) {
             CircularProgressIndicator()
         } else {
             Button(onClick = ::submit, modifier = Modifier.fillMaxWidth()) {
-                Text("Create profile")
+                Text(stringResource(R.string.register_submit))
             }
         }
     }

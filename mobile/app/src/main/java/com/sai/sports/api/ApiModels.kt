@@ -67,7 +67,10 @@ data class AthleteProfile(
     val region: String,
     val heightCm: Double?,
     val weightKg: Double?,
-    val hasReferencePhoto: Boolean
+    val hasReferencePhoto: Boolean,
+    /** Hidden from other athletes unless they switched this on. */
+    val leaderboardOptIn: Boolean = false,
+    val preferredLanguage: String = "en"
 )
 
 data class Registered(
@@ -129,4 +132,43 @@ data class ServerResult(
     val benchmark: Benchmark?,
     val benchmarkUnavailable: String?,
     val review: ReviewNote?
+)
+
+data class Badge(
+    /** Stable code, translated on the phone — never display text from the server. */
+    val code: String,
+    val earned: Boolean,
+    val progress: Int,
+    val target: Int
+)
+
+data class BadgeSummary(
+    val badges: List<Badge>,
+    val currentStreakWeeks: Int,
+    val longestStreakWeeks: Int
+)
+
+data class LeaderboardEntry(
+    val rank: Int,
+    /** First name and last initial only. */
+    val displayName: String,
+    val region: String,
+    val score: Double,
+    val isYou: Boolean
+)
+
+data class YourStanding(
+    val rank: Int,
+    val score: Double,
+    val visibleToOthers: Boolean
+)
+
+data class Leaderboard(
+    val testType: String,
+    val unit: String,
+    val region: String?,
+    val cohort: String,
+    val entries: List<LeaderboardEntry>,
+    val you: YourStanding?,
+    val totalRanked: Int
 )

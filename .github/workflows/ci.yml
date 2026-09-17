@@ -117,6 +117,12 @@ jobs:
         working-directory: mobile
         run: ./gradlew :app:assembleDebug --no-daemon
 
+      # Includes the string-format and translation checks that stop a
+      # mistranslated placeholder crashing the app in one language.
+      - name: Android lint
+        working-directory: mobile
+        run: ./gradlew :app:lintDebug --no-daemon
+
   parity:
     name: Mobile/server scoring parity
     runs-on: ubuntu-latest

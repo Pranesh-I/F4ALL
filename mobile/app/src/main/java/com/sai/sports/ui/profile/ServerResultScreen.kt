@@ -2,7 +2,6 @@ package com.sai.sports.ui.profile
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,9 +11,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,15 +19,20 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.sai.sports.R
 import com.sai.sports.api.ApiResult
 import com.sai.sports.api.Benchmark
 import com.sai.sports.api.ServerResult
 import com.sai.sports.auth.AppServices
+import com.sai.sports.ui.common.Labels
+import com.sai.sports.ui.common.LoadFailed
+import com.sai.sports.ui.common.SectionTitle
+import com.sai.sports.ui.common.TitleBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -38,9 +40,7 @@ import kotlinx.coroutines.withContext
  * One result as SAI holds it, with the athlete's standing in their age group.
  *
  * The benchmark is only shown for a score SAI has measured itself. A phone's own
- * number is never ranked, because telling an athlete they placed in the top 25%
- * on an unverified measurement is exactly the confusion this system exists to
- * prevent.
+ * number is never ranked.
  */
 @Composable
 fun ServerResultScreen(
@@ -51,14 +51,14 @@ fun ServerResultScreen(
     val api = remember { AppServices.api(context) }
 
     var result by remember { mutableStateOf<ServerResult?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<Int?>(null) }
     var reload by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(resultId, reload) {
         error = null
         when (val response = withContext(Dispatchers.IO) { api.result(resultId) }) {
             is ApiResult.Success -> result = response.value
-            is ApiResult.Failure -> error = response.message
+            is ApiResult.Failure -> error = Labels.failure(response.kind, R.string.error_load)
         }
     }
 
@@ -69,43 +69,40 @@ fun ServerResultScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Result", style = MaterialTheme.typography.headlineSmall)
-            TextButton(onClick = onBack) { Text("Back") }
-        }
+        TitleBar(stringResource(R.string.result_title), onBack)
 
         val current = result
+        val failure = error
 
         when {
-            current == null && error == null -> CircularProgressIndicator()
+            current == null && failure == null -> CircularProgressIndicator()
 
-            current == null -> {
-                Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
-                OutlinedButton(onClick = { reload += 1 }) { Text("Try again") }
-            }
+            current == null -> LoadFailed(stringResource(failure!!)) { reload += 1 }
 
             else -> {
                 val (score, label) = ResultPresentation.headline(
                     current.provisionalScore, current.serverScore, current.finalScore
                 )
+                val unit = stringResource(Labels.unit(current.unit))
 
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(ResultPresentation.testName(current.testType), style = MaterialTheme.typography.titleLarge)
-                        Text(ResultPresentation.formatScore(score, current.unit), style = MaterialTheme.typography.displaySmall)
-                        Text(label, style = MaterialTheme.typography.bodySmall)
-                        Text(ResultPresentation.statusLabel(current.status), fontWeight = FontWeight.SemiBold)
+                        SectionTitle(stringResource(Labels.testName(current.testType)))
+                        Text(
+                            "${ResultPresentation.formatNumber(score)} $unit",
+                            style = MaterialTheme.typography.displaySmall
+                        )
+                        Text(stringResource(label), style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(Labels.resultStatus(current.status)), fontWeight = FontWeight.SemiBold)
 
                         if (current.serverScore != null && current.provisionalScore != null &&
                             current.serverScore != current.provisionalScore
                         ) {
                             Text(
-                                "Your phone counted ${ResultPresentation.formatScore(current.provisionalScore, current.unit)}. " +
-                                    "SAI's measurement is the one that counts.",
+                                stringResource(
+                                    R.string.result_phone_counted,
+                                    "${ResultPresentation.formatNumber(current.provisionalScore)} $unit"
+                                ),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -115,16 +112,26 @@ fun ServerResultScreen(
                 current.review?.let { review ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(ResultPresentation.reviewLabel(review.action), fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(Labels.reviewAction(review.action)), fontWeight = FontWeight.SemiBold)
+                            // The official's own words, in whatever language they wrote.
                             review.notes?.takeIf { it.isNotBlank() }?.let { Text("\"$it\"") }
                         }
                     }
                 }
 
-                current.benchmark?.let { BenchmarkCard(it) }
+                current.benchmark?.let { BenchmarkCard(it, unit) }
 
-                current.benchmarkUnavailable?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall)
+                if (current.benchmark == null && current.benchmarkUnavailable != null) {
+                    Text(
+                        stringResource(
+                            if (current.serverScore == null && current.finalScore == null) {
+                                R.string.benchmark_not_verified
+                            } else {
+                                R.string.benchmark_no_cohort
+                            }
+                        ),
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }
@@ -132,21 +139,25 @@ fun ServerResultScreen(
 }
 
 @Composable
-private fun BenchmarkCard(benchmark: Benchmark) {
+private fun BenchmarkCard(benchmark: Benchmark, unit: String) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Compared with your age group", style = MaterialTheme.typography.titleMedium)
-            Text(benchmark.label, fontWeight = FontWeight.SemiBold)
+            SectionTitle(stringResource(R.string.benchmark_title))
+            Text(stringResource(Labels.benchmarkBand(benchmark.band)), fontWeight = FontWeight.SemiBold)
 
             benchmark.percentile?.let {
-                Text("Around the ${ordinal(it)} percentile")
+                Text(stringResource(R.string.benchmark_percentile, it))
             }
 
             benchmark.nextTarget?.let {
-                Text("Next goal: ${ResultPresentation.formatScore(it, benchmark.unit)}")
+                Text(stringResource(R.string.benchmark_next_goal, "${ResultPresentation.formatNumber(it)} $unit"))
             }
 
-            Text("Group: ${benchmark.cohort}", style = MaterialTheme.typography.bodySmall)
+            val (gender, ages) = Labels.parseCohort(benchmark.cohort)
+            Text(
+                stringResource(R.string.benchmark_group, stringResource(Labels.gender(gender)), ages),
+                style = MaterialTheme.typography.bodySmall
+            )
 
             if (benchmark.provisional) {
                 // Shown every time, not dismissible. These norms are
@@ -158,8 +169,7 @@ private fun BenchmarkCard(benchmark: Benchmark) {
                     )
                 ) {
                     Text(
-                        "These comparison figures are provisional and are not SAI's " +
-                            "official standards yet. Use them as a rough guide only.",
+                        stringResource(R.string.benchmark_provisional),
                         modifier = Modifier.padding(12.dp),
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -167,14 +177,4 @@ private fun BenchmarkCard(benchmark: Benchmark) {
             }
         }
     }
-}
-
-internal fun ordinal(value: Int): String {
-    val suffix = if (value % 100 in 11..13) "th" else when (value % 10) {
-        1 -> "st"
-        2 -> "nd"
-        3 -> "rd"
-        else -> "th"
-    }
-    return "$value$suffix"
 }

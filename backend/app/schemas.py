@@ -341,6 +341,8 @@ class AthleteProfileUpdate(BaseModel):
     region: str | None = Field(default=None, min_length=1, max_length=100)
     height_cm: float | None = Field(default=None, gt=50, lt=260)
     weight_kg: float | None = Field(default=None, gt=10, lt=250)
+    leaderboard_opt_in: bool | None = None
+    preferred_language: str | None = Field(default=None, max_length=8)
 
 
 class AthleteProfileResponse(BaseModel):
@@ -354,6 +356,8 @@ class AthleteProfileResponse(BaseModel):
     height_cm: float | None
     weight_kg: float | None
     has_reference_photo: bool
+    leaderboard_opt_in: bool = False
+    preferred_language: str = "en"
 
 
 class PersonalBest(BaseModel):
@@ -410,6 +414,56 @@ class AthleteSummaryResponse(BaseModel):
     personal_bests: list[PersonalBest] = Field(default_factory=list)
     history: list[TestHistoryItem] = Field(default_factory=list)
     total_tests: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Sprint 9: badges and athlete leaderboards
+# ---------------------------------------------------------------------------
+
+
+class BadgeResponse(BaseModel):
+    # Stable code; the app translates it. Titles are not sent from the server
+    # because the athlete may be reading in Hindi, Tamil or Bengali.
+    code: str
+    earned: bool
+    earned_at: datetime | None = None
+    progress: int = 0
+    target: int = 1
+
+
+class BadgesResponse(BaseModel):
+    badges: list[BadgeResponse]
+    current_streak_weeks: int
+    longest_streak_weeks: int
+
+
+class AthleteLeaderboardEntry(BaseModel):
+    rank: int
+    # First name and last initial only. Most athletes are minors; a full name,
+    # age and region together identify a child.
+    display_name: str
+    region: str
+    score: float
+    is_you: bool = False
+
+
+class YourStanding(BaseModel):
+    rank: int
+    score: float
+    # Whether other athletes can see this entry. The athlete always sees their
+    # own position; opting in only controls whether anyone else does.
+    visible_to_others: bool
+
+
+class AthleteLeaderboardResponse(BaseModel):
+    test_type: str
+    unit: str
+    scope: str
+    region: str | None
+    cohort: str
+    entries: list[AthleteLeaderboardEntry]
+    you: YourStanding | None = None
+    total_ranked: int
 
 
 ReviewDetailResponse.model_rebuild()

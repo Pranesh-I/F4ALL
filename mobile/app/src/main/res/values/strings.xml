@@ -1,3 +1,300 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  English (default). Every string here must exist in values-hi, values-ta and
+  values-bn with the same format arguments; TranslationCompletenessTest fails the
+  build otherwise.
+
+  Counts are phrased as "Label: 3" rather than "3 test(s)" on purpose. Plural
+  rules differ between these languages, and a neutral form reads correctly in
+  all of them.
+-->
 <resources>
     <string name="app_name">SAI Sports Talent Assessment</string>
+
+    <!-- Common actions -->
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_done">Done</string>
+    <string name="action_next">Next</string>
+    <string name="action_ok">OK</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_play">Play</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_save">Save</string>
+    <string name="action_try_again">Try again</string>
+    <string name="loading">Loading…</string>
+
+    <!-- Errors -->
+    <string name="error_load">Could not load this. Please try again.</string>
+    <string name="error_network">No connection. Check your signal and try again.</string>
+    <string name="error_rate_limited">Too many attempts. Please wait a minute and try again.</string>
+    <string name="error_server">SAI\'s server is having a problem. Please try again later.</string>
+    <string name="error_session_expired">Your session has ended. Please sign in again.</string>
+
+    <!-- Tests and units -->
+    <string name="test_sit_ups">Sit-ups</string>
+    <string name="test_vertical_jump">Vertical jump</string>
+    <string name="test_unknown">Test</string>
+    <string name="unit_reps">reps</string>
+    <string name="unit_cm">cm</string>
+    <string name="unit_seconds">seconds</string>
+    <string name="unit_blank"></string>
+
+    <!-- Genders -->
+    <string name="gender_male">Male</string>
+    <string name="gender_female">Female</string>
+    <string name="gender_other">Other</string>
+    <string name="gender_all">All</string>
+
+    <!-- Navigation -->
+    <string name="nav_badges">Badges</string>
+    <string name="nav_leaderboard">Leaderboard</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_step">Step %1$d of %2$d</string>
+    <string name="onboarding_1_title">Show SAI what you can do</string>
+    <string name="onboarding_1_body">Record official fitness tests with your phone, wherever you are. You do not need to travel to a centre.</string>
+    <string name="onboarding_2_title">Your phone\'s score is only the start</string>
+    <string name="onboarding_2_body">Your phone shows a score straight away. SAI then checks your video, and an SAI official approves the result. Only an approved result is official.</string>
+    <string name="onboarding_3_title">Your videos stay private</string>
+    <string name="onboarding_3_body">Only SAI officials can watch your test videos. Other athletes never see them, and your name appears on leaderboards only if you choose.</string>
+    <string name="onboarding_start">Get started</string>
+
+    <!-- Home -->
+    <string name="home_choose_test">Choose a test</string>
+    <string name="home_sync">Sent to SAI</string>
+    <string name="home_sync_waiting">Waiting to send: %1$d</string>
+    <string name="home_profile">My profile and results</string>
+    <string name="home_provisional_note">Scores on your phone are provisional. SAI confirms the official result.</string>
+
+    <!-- Login -->
+    <string name="login_title">Sign in</string>
+    <string name="login_body">We will send a code to your phone to confirm it is you.</string>
+    <string name="login_phone_label">Mobile number</string>
+    <string name="login_code_label">%1$d-digit code</string>
+    <string name="login_dev_code">Test server: your code is %1$s</string>
+    <string name="login_send_code">Send code</string>
+    <string name="login_verify">Verify</string>
+    <string name="login_resend">Send the code again</string>
+    <string name="login_resend_in">Send again (wait: %1$d)</string>
+    <string name="login_change_number">Change number</string>
+    <string name="login_error_phone">Enter a 10-digit mobile number</string>
+    <string name="login_error_send">Could not send the code. Please try again.</string>
+    <string name="login_error_code_length">Enter the full code</string>
+    <string name="login_error_code_wrong">That code is wrong or has expired</string>
+
+    <!-- Registration -->
+    <string name="register_title">Create your athlete profile</string>
+    <string name="register_name">Full name</string>
+    <string name="register_dob_choose">Choose your date of birth</string>
+    <string name="register_dob_value">Date of birth: %1$s</string>
+    <string name="register_gender">Gender</string>
+    <string name="register_region_choose">Choose your state or union territory</string>
+    <string name="register_height">Height (cm)</string>
+    <string name="register_weight">Weight (kg, optional)</string>
+    <string name="register_cohort_note">Your date of birth and gender decide which age group you are compared with, and cannot be changed later in the app.</string>
+    <string name="register_submit">Create profile</string>
+    <string name="register_error_name">Enter your name</string>
+    <string name="register_error_dob">Choose your date of birth</string>
+    <string name="register_error_dob_future">Date of birth cannot be in the future</string>
+    <string name="register_error_age">Athletes aged %1$d to %2$d can register</string>
+    <string name="register_error_gender">Choose a gender</string>
+    <string name="register_error_region">Choose your state or union territory</string>
+    <string name="register_error_height">Enter your height in cm</string>
+    <string name="register_error_height_range">Height should be between %1$d and %2$d cm</string>
+    <string name="register_error_weight">Weight must be a number</string>
+    <string name="register_error_weight_range">Weight should be between %1$d and %2$d kg</string>
+    <string name="register_error_exists">This phone number already has a profile</string>
+    <string name="register_error_generic">Could not create your profile. Please check your details.</string>
+
+    <!-- Registration photo -->
+    <string name="photo_title">Add your photo</string>
+    <string name="photo_body">SAI uses this photo to confirm that the person in your test videos is you. Face the camera in good light, without a cap or sunglasses.</string>
+    <string name="photo_privacy">Your photo is stored privately and is only seen by SAI officials checking your results.</string>
+    <string name="photo_take">Take photo</string>
+    <string name="photo_skip">Skip for now</string>
+    <string name="photo_error_none">No photo was taken. Try again, or skip for now.</string>
+    <string name="photo_error_unreadable">That photo could not be read. Please try again.</string>
+    <string name="photo_error_upload">Could not upload your photo. Please try again.</string>
+
+    <!-- Instructions -->
+    <string name="instructions_setup">Set up your phone</string>
+    <string name="instructions_movement">How to do the test</string>
+    <string name="instructions_start">I am ready — start</string>
+    <string name="diagram_setup">Diagram: phone on a steady stand, two to three metres away from the athlete, who is side-on to it</string>
+    <string name="setup_step_distance">Place the phone 2 to 3 metres away, at about waist height.</string>
+    <string name="setup_step_steady">Keep the phone completely still. Lean it on something or ask someone to hold it steady.</string>
+    <string name="setup_step_side_on">Stand or lie side-on to the phone, with your whole body visible from head to feet.</string>
+    <string name="setup_step_light">Use a bright place. Avoid standing with a window or the sun behind you.</string>
+    <string name="diagram_situp_down">Start: lie back, knees bent</string>
+    <string name="diagram_situp_up">Top: sit all the way up</string>
+    <string name="situp_step_lie">Lie on your back with your knees bent and feet flat on the ground.</string>
+    <string name="situp_step_up">Sit all the way up until your chest is close to your knees.</string>
+    <string name="situp_step_down">Lie all the way back down before the next one.</string>
+    <string name="situp_step_repeat">Do as many as you can until the time ends.</string>
+    <string name="situp_counts">A sit-up counts only if you sit all the way up and lie all the way back. Half sit-ups are not counted.</string>
+    <string name="diagram_jump_stand">Start: stand still</string>
+    <string name="diagram_jump_peak">Jump straight up</string>
+    <string name="jump_step_still">Stand completely still during the 3-2-1 countdown. This lets the app measure your height.</string>
+    <string name="jump_step_jump">Jump straight up as high as you can.</string>
+    <string name="jump_step_land">Land on the same spot where you started.</string>
+    <string name="jump_step_repeat">You may jump more than once. Your best jump counts.</string>
+    <string name="jump_counts">Do not step towards or away from the phone during the test — the measurement will be wrong and the attempt will not count.</string>
+
+    <!-- Capture -->
+    <string name="capture_hint_situps">Lie down side-on to the camera with your whole body visible. Sit all the way up each time.</string>
+    <string name="capture_hint_jump">Stand side-on, whole body in view. Stay still for the countdown, then jump.</string>
+    <string name="capture_recording">● Recording</string>
+    <string name="capture_scoring">Checking your attempt…</string>
+    <string name="capture_record">Record</string>
+    <string name="capture_stop">Stop</string>
+    <string name="live_torso_angle">Body angle %1$d°</string>
+    <string name="live_stand_still">Stand still…</string>
+    <string name="live_ready">Ready</string>
+    <string name="live_ready_cm">Ready — %1$d cm</string>
+    <string name="live_airborne">In the air</string>
+    <string name="live_failed">Attempt not counted</string>
+    <string name="camera_permission_title">Camera needed</string>
+    <string name="camera_permission_body">The app needs your camera to record the test. The video is sent only to SAI.</string>
+    <string name="camera_permission_allow">Allow camera</string>
+    <string name="height_dialog_title">Your height</string>
+    <string name="height_dialog_body">Jump height is measured against your standing height, so we need it before your first jump.</string>
+    <string name="height_dialog_label">Height in cm</string>
+    <string name="height_dialog_invalid">Enter a height between %1$d and %2$d cm</string>
+
+    <!-- Results on the phone -->
+    <string name="result_not_scored">Attempt not scored</string>
+    <string name="result_replay_title">What the app saw</string>
+    <string name="result_replay_description">Replay of the body positions the app tracked during your attempt</string>
+    <string name="result_frame_counter">Frame %1$d of %2$d</string>
+    <string name="result_tracking_title">Tracking quality</string>
+    <string name="result_tracking_detail">%1$d%% — frames used: %2$d, skipped: %3$d</string>
+    <string name="result_tracking_poor">Most frames could not be used. Move further back so your whole body is in view, and use a bright place.</string>
+    <string name="result_summary_title">What happened</string>
+    <string name="result_provisional_notice">This is a provisional score from your phone. Your official result is confirmed after SAI checks the video.</string>
+    <string name="summary_reps_counted">Sit-ups counted: %1$d</string>
+    <string name="summary_partial_reps">Not counted, did not sit all the way up: %1$d</string>
+    <string name="summary_too_fast_reps">Not counted, too fast to be real: %1$d</string>
+    <string name="summary_jumps_measured">Jumps measured: %1$d</string>
+    <string name="summary_jumps_rejected">Jumps not counted: %1$d</string>
+    <string name="summary_tracking_lost">Times your body went out of view: %1$d</string>
+    <string name="invalid_generic">The app could not score this attempt. Check the instructions and try again.</string>
+    <string name="invalid_no_pose">The app could not see you. Make sure your whole body is in view.</string>
+    <string name="invalid_no_start">The start position was not seen. Lie all the way back before starting.</string>
+    <string name="invalid_lost_track">The app lost sight of you during the jump. Keep your whole body in view.</string>
+    <string name="invalid_no_landing">No clean landing was seen. Land on the spot where you started.</string>
+    <string name="invalid_no_reference">Could not measure your standing height. Stand still for the countdown before jumping.</string>
+    <string name="invalid_stopped_mid_jump">Recording stopped during a jump. Land before pressing Stop.</string>
+    <string name="invalid_no_jump">No jump was seen.</string>
+    <string name="invalid_moved">You or the phone moved during the test. Keep both still and try again.</string>
+
+    <!-- Sync -->
+    <string name="sync_title">Sent to SAI</string>
+    <string name="sync_none">No tests recorded yet.</string>
+    <string name="sync_all_sent">All your tests have reached SAI.</string>
+    <string name="sync_uploading_count">Sending now. Left to send: %1$d</string>
+    <string name="sync_waiting_count">Waiting for a connection: %1$d</string>
+    <string name="sync_try_now">Try now</string>
+    <string name="sync_empty">Tests you record appear here until SAI has them.</string>
+    <string name="sync_see_result">See SAI result</string>
+    <string name="sync_failed_hint">This test could not be sent. Tap Retry when you have signal.</string>
+    <string name="sync_recorded">Saved on this phone</string>
+    <string name="sync_compressing">Preparing to send…</string>
+    <string name="sync_compressed">Ready to send</string>
+    <string name="sync_queued">Waiting for a connection</string>
+    <string name="sync_uploading">Sending to SAI…</string>
+    <string name="sync_synced">Sent to SAI ✓</string>
+    <string name="sync_failed">Could not send</string>
+
+    <!-- Profile -->
+    <string name="profile_title">My profile</string>
+    <string name="profile_summary_line">%1$d years · %2$s · %3$s</string>
+    <string name="profile_height">Height: %1$s cm</string>
+    <string name="profile_no_photo">No photo on file — SAI cannot confirm it is you in your test videos.</string>
+    <string name="profile_add_photo">Add photo</string>
+    <string name="profile_bests">Personal bests</string>
+    <string name="profile_bests_empty">Your best scores appear here once SAI has checked a test.</string>
+    <string name="profile_results">All results</string>
+    <string name="profile_results_empty">Tests you record appear here after they reach SAI.</string>
+    <string name="profile_open_result">Open result</string>
+    <string name="best_official">Official</string>
+    <string name="best_not_approved">Not yet approved</string>
+
+    <!-- Server result -->
+    <string name="result_title">Result</string>
+    <string name="score_official">Official score</string>
+    <string name="score_server">Score measured by SAI (not yet official)</string>
+    <string name="score_provisional">Your phone\'s score (provisional)</string>
+    <string name="result_phone_counted">Your phone counted %1$s. The score measured by SAI is the one that counts.</string>
+    <string name="status_processing">Being checked by SAI</string>
+    <string name="status_verified">Checked by SAI — waiting for official approval</string>
+    <string name="status_flagged">Being reviewed by an SAI official</string>
+    <string name="status_approved">Approved by SAI</string>
+    <string name="status_rejected">Not accepted</string>
+    <string name="status_resubmission">Please record this test again</string>
+    <string name="status_unknown">Status unknown</string>
+    <string name="review_approved">An SAI official approved this result</string>
+    <string name="review_rejected">An SAI official did not accept this result</string>
+    <string name="review_resubmission">An SAI official has asked you to record this test again</string>
+    <string name="review_other">An SAI official reviewed this result</string>
+
+    <!-- Benchmarks -->
+    <string name="benchmark_title">Compared with your age group</string>
+    <string name="band_top_10" formatted="false">Top 10% for your age group</string>
+    <string name="band_top_25" formatted="false">Top 25% for your age group</string>
+    <string name="band_above_average">Above average for your age group</string>
+    <string name="band_below_average">Keep training — you are building towards the average for your age group</string>
+    <string name="benchmark_percentile">Around percentile %1$d</string>
+    <string name="benchmark_next_goal">Next goal: %1$s</string>
+    <string name="benchmark_group">Group: %1$s, age %2$s</string>
+    <string name="benchmark_provisional">These comparison figures are provisional and are not SAI\'s official standards yet. Use them only as a rough guide.</string>
+    <string name="benchmark_not_verified">Your comparison appears after SAI checks this result.</string>
+    <string name="benchmark_no_cohort">There is no comparison group for your age and gender yet.</string>
+
+    <!-- Badges -->
+    <string name="badges_title">Badges</string>
+    <string name="badges_streak_current">Weeks in a row: %1$d</string>
+    <string name="badges_streak_longest">Your longest run: %1$d</string>
+    <string name="badges_earned">Earned</string>
+    <string name="badges_progress">Progress: %1$d of %2$d</string>
+    <string name="badges_note">Badges for scores count only results SAI has checked. A test SAI does not accept removes its badges.</string>
+    <string name="badge_first_test">First test</string>
+    <string name="badge_first_test_desc">Record and send your first test</string>
+    <string name="badge_first_verified">Checked by SAI</string>
+    <string name="badge_first_verified_desc">Have a result checked by SAI</string>
+    <string name="badge_personal_best">Personal best</string>
+    <string name="badge_personal_best_desc">Beat your own best score in any test</string>
+    <string name="badge_all_tests">All-rounder</string>
+    <string name="badge_all_tests_desc">Have a checked result in every test</string>
+    <string name="badge_streak_2">Two-week streak</string>
+    <string name="badge_streak_4">Four-week streak</string>
+    <string name="badge_streak_8">Eight-week streak</string>
+    <string name="badge_streak_desc">Record at least one test every week for %1$d weeks in a row</string>
+    <string name="badge_unknown">Badge</string>
+
+    <!-- Leaderboard -->
+    <string name="leaderboard_title">Leaderboard</string>
+    <string name="leaderboard_my_state">My state</string>
+    <string name="leaderboard_india">All of India</string>
+    <string name="leaderboard_cohort">%1$s, age %2$s · %3$s</string>
+    <string name="leaderboard_you_rank">Your position: %1$d (%2$s)</string>
+    <string name="leaderboard_you_visible">Other athletes can see you on this leaderboard.</string>
+    <string name="leaderboard_you_hidden">Only you can see your position. Other athletes cannot see you.</string>
+    <string name="leaderboard_you_none">You will appear here once an SAI official approves one of your results.</string>
+    <string name="leaderboard_change_visibility">Change who can see me</string>
+    <string name="leaderboard_empty">No athletes on this leaderboard yet.</string>
+    <string name="leaderboard_entry_spoken">Position %1$d, %2$s, %3$s, %4$s</string>
+    <string name="leaderboard_note">Only approved results are ranked. Athletes are shown by first name and initial.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_show_on_leaderboard">Show me on leaderboards</string>
+    <string name="settings_visible_explainer">Other athletes can see your first name, initial, state and best approved score.</string>
+    <string name="settings_hidden_explainer">You are hidden. Other athletes cannot see you, but you can still see your own position.</string>
+    <string name="settings_error_save">Could not save. Please try again.</string>
+    <string name="settings_data_note">Your videos and photo are seen only by SAI officials, whatever you choose here.</string>
+    <string name="settings_sign_out">Sign out</string>
 </resources>

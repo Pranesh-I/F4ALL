@@ -25,7 +25,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.sai.sports.analyzer.TestType
+import androidx.compose.ui.res.stringResource
+import com.sai.sports.R
+import com.sai.sports.ui.common.Labels
+import com.sai.sports.ui.common.ScreenTitle
 import com.sai.sports.data.SyncRepository
 import com.sai.sports.data.local.TestAttemptEntity
 import com.sai.sports.sync.SyncScheduler
@@ -75,13 +78,10 @@ fun SyncStatusScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
 
-            Text(
-                text = "Sync status",
-                style = MaterialTheme.typography.headlineSmall
-            )
+            ScreenTitle(stringResource(R.string.sync_title), modifier = Modifier.weight(1f))
 
             TextButton(onClick = onBack) {
-                Text("Back")
+                Text(stringResource(R.string.action_back))
             }
         }
 
@@ -89,10 +89,10 @@ fun SyncStatusScreen(
 
         Text(
             text = when {
-                attempts.isEmpty() -> "No tests recorded yet."
-                pending == 0 -> "All tests have reached SAI."
-                isSyncing -> "Uploading… $pending test(s) remaining."
-                else -> "$pending test(s) waiting for a connection."
+                attempts.isEmpty() -> stringResource(R.string.sync_none)
+                pending == 0 -> stringResource(R.string.sync_all_sent)
+                isSyncing -> stringResource(R.string.sync_uploading_count, pending)
+                else -> stringResource(R.string.sync_waiting_count, pending)
             },
             style = MaterialTheme.typography.bodyMedium
         )
@@ -101,7 +101,7 @@ fun SyncStatusScreen(
             OutlinedButton(
                 onClick = { SyncScheduler.syncNow(context) }
             ) {
-                Text("Try now")
+                Text(stringResource(R.string.sync_try_now))
             }
         }
 
@@ -111,7 +111,7 @@ fun SyncStatusScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Recorded tests will appear here until SAI has them.",
+                    text = stringResource(R.string.sync_empty),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -161,13 +161,13 @@ private fun AttemptRow(
             ) {
 
                 Text(
-                    text = displayName(attempt.testType),
+                    text = stringResource(Labels.testName(attempt.testType)),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
 
                 Text(
-                    text = "${formatScore(attempt)} ${attempt.scoreUnit}",
+                    text = "${formatScore(attempt)} ${stringResource(Labels.unit(attempt.scoreUnit))}",
                     style = MaterialTheme.typography.titleSmall
                 )
             }
@@ -178,7 +178,7 @@ private fun AttemptRow(
             )
 
             Text(
-                text = statusLabel(attempt.syncStatus),
+                text = stringResource(Labels.syncStatus(attempt.syncStatus)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = when (attempt.syncStatus) {
                     SyncStatus.SYNCED -> MaterialTheme.colorScheme.primary
@@ -198,7 +198,7 @@ private fun AttemptRow(
             // checks. Before that there is nothing on the server to show.
             attempt.resultId?.let { resultId ->
                 TextButton(onClick = { onViewResult(resultId) }) {
-                    Text("See SAI result")
+                    Text(stringResource(R.string.sync_see_result))
                 }
             }
 
@@ -207,44 +207,23 @@ private fun AttemptRow(
             // look broken.
             if (attempt.syncStatus == SyncStatus.FAILED) {
 
-                attempt.lastError?.let { error ->
+                // The stored error is an English diagnostic for developers;
+                // the athlete gets a plain instruction in their language.
+                attempt.lastError?.let {
                     Text(
-                        text = error,
+                        text = stringResource(R.string.sync_failed_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
                 }
 
                 OutlinedButton(onClick = onRetry) {
-                    Text("Retry")
+                    Text(stringResource(R.string.action_retry))
                 }
             }
         }
     }
 }
-
-/**
- * Plain-language status.
- *
- * Deliberately avoids "synced", "queued", and every other word that means
- * something precise to us and nothing to a first-time smartphone user. SYNCED
- * says the recording was *sent*, not that the result is final — the score is
- * still provisional until SAI verifies it.
- */
-private fun statusLabel(status: SyncStatus): String =
-    when (status) {
-        SyncStatus.RECORDED -> "Saved on this phone"
-        SyncStatus.COMPRESSING -> "Preparing for upload…"
-        SyncStatus.COMPRESSED -> "Ready to send"
-        SyncStatus.QUEUED -> "Waiting for a connection"
-        SyncStatus.UPLOADING -> "Sending to SAI…"
-        SyncStatus.SYNCED -> "Sent to SAI ✓"
-        SyncStatus.FAILED -> "Could not send"
-    }
-
-private fun displayName(testTypeName: String): String =
-    runCatching { TestType.valueOf(testTypeName).displayName }
-        .getOrDefault(testTypeName)
 
 private fun formatScore(attempt: TestAttemptEntity): String =
     if (attempt.scoreUnit == "reps") attempt.provisionalScore.toInt().toString()

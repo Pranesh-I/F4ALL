@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sit-up start position: lying back, knees bent, feet flat. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M8,92 L112,92 M14,80 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 M26,82 L62,84 M62,84 L80,62 L96,86 M36,82 L52,76" />
+</vector>

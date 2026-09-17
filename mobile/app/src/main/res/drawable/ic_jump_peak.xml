@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vertical jump: at the top of the jump, arms up, landing on the same spot. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M20,100 L100,100 M53,12 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 M60,19 L60,52 M60,52 L52,82 M60,52 L68,82 M60,28 L46,10 M60,28 L74,10 M24,92 L24,62 M18,70 L24,62 L30,70" />
+</vector>

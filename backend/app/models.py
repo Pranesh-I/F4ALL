@@ -154,6 +154,20 @@ class Athlete(TimestampMixin, Base):
     # Captured once at registration; Sprint 6 compares test-video faces to it.
     reference_face_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Off unless the athlete turns it on. Most athletes are minors, and a public
+    # ranking with their name on it is not something to opt them into by default.
+    # Officials see every approved result regardless; this governs only what
+    # other athletes can see.
+    leaderboard_opt_in: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+
+    # BCP-47 language the athlete chose in the app. Kept server-side so anything
+    # sent to them later (SMS, notifications) can use the same language.
+    preferred_language: Mapped[str] = mapped_column(
+        String(8), nullable=False, default="en"
+    )
+
     results: Mapped[list[TestResult]] = relationship(back_populates="athlete")
 
     __table_args__ = (

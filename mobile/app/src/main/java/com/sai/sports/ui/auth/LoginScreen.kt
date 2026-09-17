@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -23,11 +25,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.sai.sports.R
+import com.sai.sports.api.ApiFailure
 import com.sai.sports.api.ApiResult
 import com.sai.sports.auth.AppServices
+import com.sai.sports.i18n.LanguageStore
 import com.sai.sports.sync.SyncScheduler
+import com.sai.sports.ui.common.ErrorText
+import com.sai.sports.ui.common.Labels
+import com.sai.sports.ui.common.ScreenTitle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -53,8 +62,8 @@ fun LoginScreen(
     var code by rememberSaveable { mutableStateOf("") }
     var codeSent by rememberSaveable { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var hint by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<Int?>(null) }
+    var developmentCode by remember { mutableStateOf<String?>(null) }
     var resendIn by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(resendIn) {
@@ -67,7 +76,7 @@ fun LoginScreen(
     fun sendCode() {
         val digits = phone.filter { it.isDigit() }
         if (!LoginRules.isPlausiblePhone(digits)) {
-            error = "Enter a 10-digit mobile number"
+            error = R.string.login_error_phone
             return
         }
         busy = true
@@ -79,12 +88,10 @@ fun LoginScreen(
                 is ApiResult.Success -> {
                     codeSent = true
                     resendIn = LoginRules.RESEND_SECONDS
-                    hint = result.value.developmentCode?.let {
-                        "Development server: your code is $it"
-                    }
+                    developmentCode = result.value.developmentCode
                 }
                 is ApiResult.Failure -> {
-                    error = result.message
+                    error = Labels.failure(result.kind, R.string.login_error_send)
                     result.retryAfterSeconds?.let { resendIn = it }
                 }
             }
@@ -93,7 +100,7 @@ fun LoginScreen(
 
     fun verify() {
         if (code.length != LoginRules.CODE_LENGTH) {
-            error = "Enter the ${LoginRules.CODE_LENGTH}-digit code"
+            error = R.string.login_error_code_length
             return
         }
         busy = true
@@ -108,10 +115,20 @@ fun LoginScreen(
                     if (result.value.registered) {
                         // Anything recorded before signing in can go now.
                         SyncScheduler.syncNow(context)
+                        // Remember the language chosen during onboarding on the
+                        // account too. Best effort; the phone's choice stands.
+                        LanguageStore.current(context)?.let { language ->
+                            launch(Dispatchers.IO) {
+                                api.updatePreferences(preferredLanguage = language.tag)
+                            }
+                        }
                     }
                     onLoggedIn(result.value.registered)
                 }
-                is ApiResult.Failure -> error = result.message
+                is ApiResult.Failure -> error = when (result.kind) {
+                    ApiFailure.INVALID -> R.string.login_error_code_wrong
+                    else -> Labels.failure(result.kind, R.string.login_error_code_wrong)
+                }
             }
         }
     }
@@ -119,20 +136,18 @@ fun LoginScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Sign in", style = MaterialTheme.typography.headlineSmall)
+        ScreenTitle(stringResource(R.string.login_title))
 
-        Text(
-            "We'll send a code to your phone to confirm it's you.",
-            style = MaterialTheme.typography.bodyMedium
-        )
+        Text(stringResource(R.string.login_body), style = MaterialTheme.typography.bodyMedium)
 
         OutlinedTextField(
             value = phone,
             onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' || c == ' ' }.take(16) },
-            label = { Text("Mobile number") },
+            label = { Text(stringResource(R.string.login_phone_label)) },
             enabled = !codeSent && !busy,
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -143,7 +158,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = code,
                 onValueChange = { code = it.filter(Char::isDigit).take(LoginRules.CODE_LENGTH) },
-                label = { Text("${LoginRules.CODE_LENGTH}-digit code") },
+                label = { Text(stringResource(R.string.login_code_label, LoginRules.CODE_LENGTH)) },
                 enabled = !busy,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
@@ -151,34 +166,37 @@ fun LoginScreen(
             )
         }
 
-        hint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-
-        error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error)
+        developmentCode?.let {
+            Text(stringResource(R.string.login_dev_code, it), style = MaterialTheme.typography.bodySmall)
         }
+
+        error?.let { ErrorText(stringResource(it)) }
 
         if (busy) {
             CircularProgressIndicator()
         } else if (!codeSent) {
             Button(onClick = ::sendCode, modifier = Modifier.fillMaxWidth()) {
-                Text("Send code")
+                Text(stringResource(R.string.login_send_code))
             }
         } else {
             Button(onClick = ::verify, modifier = Modifier.fillMaxWidth()) {
-                Text("Verify")
+                Text(stringResource(R.string.login_verify))
             }
 
             TextButton(onClick = ::sendCode, enabled = resendIn == 0) {
-                Text(if (resendIn > 0) "Resend code in ${resendIn}s" else "Resend code")
+                Text(
+                    if (resendIn > 0) stringResource(R.string.login_resend_in, resendIn)
+                    else stringResource(R.string.login_resend)
+                )
             }
 
             TextButton(onClick = {
                 codeSent = false
                 code = ""
-                hint = null
+                developmentCode = null
                 error = null
             }) {
-                Text("Change number")
+                Text(stringResource(R.string.login_change_number))
             }
         }
     }

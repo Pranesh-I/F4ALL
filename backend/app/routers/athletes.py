@@ -27,18 +27,25 @@ from ..database import get_db
 from ..models import Athlete, Gender, Test, TestResult, TestResultStatus
 from ..regions import canonical_region
 from ..schemas import (
+    AthleteLeaderboardEntry,
+    AthleteLeaderboardResponse,
     AthleteProfileResponse,
     AthleteProfileUpdate,
     AthleteRegistrationRequest,
     AthleteSummaryResponse,
+    BadgeResponse,
+    BadgesResponse,
     MessageResponse,
     PersonalBest,
     RegistrationResponse,
     TestHistoryItem,
     TokenResponse,
+    YourStanding,
 )
 from ..security import phone_subject, registration_claim, require_athlete
 from ..services import tokens as token_service
+from ..services.athlete_leaderboard import build_board, display_name
+from ..services.badges import ResultFact, compute_badges
 from ..services.benchmarks import age_on
 from ..storage import get_storage
 
@@ -51,6 +58,9 @@ router = APIRouter(prefix="/api/athletes", tags=["Athletes"])
 # selection rule.
 MIN_AGE_YEARS = 9
 MAX_AGE_YEARS = 40
+
+# Languages the app ships translations for.
+SUPPORTED_LANGUAGES = ("en", "hi", "ta", "bn")
 
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
 ALLOWED_PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -148,6 +158,15 @@ def update_my_profile(
         athlete.height_cm = payload.height_cm
     if payload.weight_kg is not None:
         athlete.weight_kg = payload.weight_kg
+    if payload.leaderboard_opt_in is not None:
+        athlete.leaderboard_opt_in = payload.leaderboard_opt_in
+    if payload.preferred_language is not None:
+        if payload.preferred_language not in SUPPORTED_LANGUAGES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Language must be one of: {', '.join(SUPPORTED_LANGUAGES)}",
+            )
+        athlete.preferred_language = payload.preferred_language
 
     db.add(athlete)
     db.commit()
@@ -332,6 +351,8 @@ def _profile(athlete: Athlete, age: int) -> AthleteProfileResponse:
         height_cm=_as_float(athlete.height_cm),
         weight_kg=_as_float(athlete.weight_kg),
         has_reference_photo=bool(athlete.reference_face_key),
+        leaderboard_opt_in=bool(athlete.leaderboard_opt_in),
+        preferred_language=athlete.preferred_language or "en",
     )
 
 
@@ -341,3 +362,105 @@ def _value(value) -> str:
 
 def _as_float(value) -> float | None:
     return float(value) if value is not None else None
+
+
+@router.get("/me/badges", response_model=BadgesResponse)
+def my_badges(
+    db: Session = Depends(get_db),
+    athlete: Athlete = Depends(require_athlete),
+):
+    """Badges, computed from results on every request. See `services/badges.py`."""
+    rows = db.execute(
+        select(TestResult, Test)
+        .join(Test, Test.id == TestResult.test_id)
+        .where(TestResult.athlete_id == athlete.id)
+    ).all()
+
+    facts = [
+        ResultFact(
+            test_code=test.code,
+            status=_value(result.status),
+            created_at=result.created_at,
+            trusted_score=_trusted_score(result),
+            trusted_at=result.verified_at,
+            higher_is_better=test.higher_is_better,
+        )
+        for result, test in rows
+    ]
+    battery = {code for code in db.execute(select(Test.code)).scalars()}
+
+    summary = compute_badges(facts, battery=battery)
+    return BadgesResponse(
+        badges=[
+            BadgeResponse(
+                code=badge.code,
+                earned=badge.earned,
+                earned_at=badge.earned_at,
+                progress=badge.progress,
+                target=badge.target,
+            )
+            for badge in summary.badges
+        ],
+        current_streak_weeks=summary.current_streak_weeks,
+        longest_streak_weeks=summary.longest_streak_weeks,
+    )
+
+
+@router.get("/leaderboard/{test_type}", response_model=AthleteLeaderboardResponse)
+def athlete_leaderboard(
+    test_type: str,
+    scope: str = "region",
+    db: Session = Depends(get_db),
+    athlete: Athlete = Depends(require_athlete),
+):
+    """Top athletes in the caller's age band and gender, by region or nationally."""
+    if scope not in ("region", "national"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="scope must be 'region' or 'national'",
+        )
+
+    test = db.execute(
+        select(Test).where(Test.code == test_type.upper())
+    ).scalar_one_or_none()
+    if test is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown test")
+
+    region = athlete.region if scope == "region" else None
+    board = build_board(db, viewer=athlete, test=test, region=region)
+
+    return AthleteLeaderboardResponse(
+        test_type=test.code,
+        unit=test.unit,
+        scope=scope,
+        region=region,
+        cohort=board.cohort,
+        entries=[
+            AthleteLeaderboardEntry(
+                rank=index + 1,
+                display_name=display_name(item.name),
+                region=item.region,
+                score=item.score,
+                is_you=item.athlete_id == athlete.id,
+            )
+            for index, item in enumerate(board.entries)
+        ],
+        you=(
+            YourStanding(
+                rank=board.you[0],
+                score=board.you[1].score,
+                visible_to_others=board.you[1].opted_in,
+            )
+            if board.you is not None
+            else None
+        ),
+        total_ranked=board.total_ranked,
+    )
+
+
+def _trusted_score(result: TestResult) -> float | None:
+    if _value(result.status) == TestResultStatus.approved.value:
+        return _as_float(result.final_score)
+    if _value(result.status) == TestResultStatus.verified.value:
+        return _as_float(result.server_score)
+    return None

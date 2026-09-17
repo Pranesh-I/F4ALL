@@ -98,6 +98,66 @@ class F4allApi(
         ) { }
     }
 
+    /** Only the fields given are changed. */
+    fun updatePreferences(
+        leaderboardOptIn: Boolean? = null,
+        preferredLanguage: String? = null
+    ): ApiResult<AthleteProfile> {
+        val body = JSONObject()
+            .putOpt("leaderboard_opt_in", leaderboardOptIn)
+            .putOpt("preferred_language", preferredLanguage)
+        return execute(
+            request("/api/athletes/me", auth = true)
+                .patch(body.toString().toRequestBody(JSON.toMediaType()))
+                .build(),
+            ::athleteProfile
+        )
+    }
+
+    fun badges(): ApiResult<BadgeSummary> =
+        get("/api/athletes/me/badges") { json ->
+            BadgeSummary(
+                badges = json.getJSONArray("badges").objects().map {
+                    Badge(
+                        code = it.getString("code"),
+                        earned = it.getBoolean("earned"),
+                        progress = it.optInt("progress", 0),
+                        target = it.optInt("target", 1)
+                    )
+                },
+                currentStreakWeeks = json.getInt("current_streak_weeks"),
+                longestStreakWeeks = json.getInt("longest_streak_weeks")
+            )
+        }
+
+    /** [scope] is "region" (the athlete's own state) or "national". */
+    fun leaderboard(testType: String, scope: String): ApiResult<Leaderboard> =
+        get("/api/athletes/leaderboard/$testType?scope=$scope") { json ->
+            Leaderboard(
+                testType = json.getString("test_type"),
+                unit = json.getString("unit"),
+                region = json.optStringOrNull("region"),
+                cohort = json.getString("cohort"),
+                entries = json.getJSONArray("entries").objects().map {
+                    LeaderboardEntry(
+                        rank = it.getInt("rank"),
+                        displayName = it.getString("display_name"),
+                        region = it.getString("region"),
+                        score = it.getDouble("score"),
+                        isYou = it.optBoolean("is_you", false)
+                    )
+                },
+                you = json.optJSONObject("you")?.let {
+                    YourStanding(
+                        rank = it.getInt("rank"),
+                        score = it.getDouble("score"),
+                        visibleToOthers = it.getBoolean("visible_to_others")
+                    )
+                },
+                totalRanked = json.optInt("total_ranked", 0)
+            )
+        }
+
     fun summary(): ApiResult<AthleteSummary> =
         get("/api/athletes/me/summary") { json ->
             AthleteSummary(
@@ -240,7 +300,9 @@ class F4allApi(
         region = json.getString("region"),
         heightCm = json.optDoubleOrNull("height_cm"),
         weightKg = json.optDoubleOrNull("weight_kg"),
-        hasReferencePhoto = json.optBoolean("has_reference_photo", false)
+        hasReferencePhoto = json.optBoolean("has_reference_photo", false),
+        leaderboardOptIn = json.optBoolean("leaderboard_opt_in", false),
+        preferredLanguage = json.optString("preferred_language", "en")
     )
 
     private fun benchmark(json: JSONObject) = Benchmark(

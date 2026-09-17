@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Setup: phone held steady at waist height, 2 to 3 metres away, athlete side-on. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M4,100 L116,100 M10,40 L26,40 L26,70 L10,70 Z M18,70 L10,98 M18,70 L26,98 M18,70 L18,98 M34,55 L40,55 M48,55 L54,55 M62,55 L68,55 M76,55 L82,55 M94,30 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 M100,36 L100,66 M100,66 L94,98 M100,66 L106,98 M100,44 L92,58 M100,44 L108,58" />
+</vector>

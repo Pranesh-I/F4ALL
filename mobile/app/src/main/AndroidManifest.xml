@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="true" />
 
     <!-- Sprint 4: uploading queued tests to SAI. ACCESS_NETWORK_STATE backs
          WorkManager's connectivity constraint. -->
@@ -21,7 +22,6 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.SAISportsTalentAssessment"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

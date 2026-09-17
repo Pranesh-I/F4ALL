@@ -604,6 +604,8 @@ paths:
                 region: {type: string}
                 height_cm: {type: number}
                 weight_kg: {type: number}
+                leaderboard_opt_in: {type: boolean}
+                preferred_language: {type: string, enum: [en, hi, ta, bn]}
       responses:
         "200":
           description: Updated profile
@@ -712,6 +714,38 @@ paths:
       security: [{bearerAuth: []}]
       responses:
         "200": {description: Counts, scoped to the official's region}
+
+  # -------------------------------------------------------------------------
+  # Sprint 9: badges, athlete leaderboard, preferences
+  # -------------------------------------------------------------------------
+
+  /api/athletes/me/badges:
+    get:
+      tags: [Athletes]
+      summary: Progress badges, computed from results on every request
+      description: >
+        Returned as stable codes (first_test, first_verified, personal_best,
+        all_tests, streak_N_weeks) that the app translates. Score badges count
+        only verified or approved results; a rejected result removes its badges.
+      security: [{bearerAuth: []}]
+      responses:
+        "200": {description: Badges with progress, and current and longest weekly streaks}
+
+  /api/athletes/leaderboard/{test_type}:
+    get:
+      tags: [Athletes]
+      summary: Leaderboard for the caller's age band and gender
+      description: >
+        Approved results only, best per athlete, athletes who opted in only,
+        shown as first name and last initial. The caller's own standing is
+        always returned in `you`, whether or not they opted in.
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: test_type, in: path, required: true, schema: {type: string}}
+        - {name: scope, in: query, schema: {type: string, enum: [region, national], default: region}}
+      responses:
+        "200": {description: Entries and the caller's standing}
+        "404": {description: Unknown test}
 
 components:
 
@@ -1174,3 +1208,5 @@ components:
         height_cm: {type: number, nullable: true}
         weight_kg: {type: number, nullable: true}
         has_reference_photo: {type: boolean}
+        leaderboard_opt_in: {type: boolean, description: Visible to other athletes; false by default}
+        preferred_language: {type: string, enum: [en, hi, ta, bn]}

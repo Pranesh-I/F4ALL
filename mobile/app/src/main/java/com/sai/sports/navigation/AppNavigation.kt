@@ -9,11 +9,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.sai.sports.analyzer.TestType
 import com.sai.sports.auth.AppServices
 import com.sai.sports.ui.auth.LoginScreen
 import com.sai.sports.ui.auth.RegistrationScreen
 import com.sai.sports.ui.capture.CaptureScreen
+import com.sai.sports.ui.engage.BadgesScreen
+import com.sai.sports.ui.engage.LeaderboardScreen
+import com.sai.sports.ui.engage.SettingsScreen
 import com.sai.sports.ui.home.HomeScreen
+import com.sai.sports.ui.instructions.InstructionsScreen
+import com.sai.sports.ui.onboarding.OnboardingScreen
+import com.sai.sports.ui.onboarding.OnboardingStore
 import com.sai.sports.ui.profile.ProfileScreen
 import com.sai.sports.ui.profile.ServerResultScreen
 import com.sai.sports.ui.results.ResultsScreen
@@ -30,6 +37,7 @@ fun AppNavigation() {
     val startDestination = remember {
         val session = AppServices.session(context)
         when {
+            !OnboardingStore.isComplete(context) -> ROUTE_ONBOARDING
             !session.isLoggedIn -> ROUTE_LOGIN
             !session.isRegistered -> ROUTE_REGISTER
             else -> ROUTE_HOME
@@ -40,6 +48,21 @@ fun AppNavigation() {
         navController = navController,
         startDestination = startDestination
     ) {
+
+        composable(ROUTE_ONBOARDING) {
+            OnboardingScreen(
+                onFinished = {
+                    val session = AppServices.session(context)
+                    navController.replaceStackWith(
+                        when {
+                            !session.isLoggedIn -> ROUTE_LOGIN
+                            !session.isRegistered -> ROUTE_REGISTER
+                            else -> ROUTE_HOME
+                        }
+                    )
+                }
+            )
+        }
 
         composable(ROUTE_LOGIN) {
             LoginScreen(
@@ -58,42 +81,34 @@ fun AppNavigation() {
         }
 
         composable(ROUTE_HOME) {
-
             HomeScreen(
-                onTestSelected = { testName ->
-                    navController.navigate(
-                        "capture/${testName.replace(" ", "_")}"
-                    )
-                },
-                onSyncStatus = {
-                    navController.navigate(ROUTE_SYNC)
-                },
-                onProfile = {
-                    navController.navigate(ROUTE_PROFILE)
-                }
+                onTestSelected = { type -> navController.navigate("instructions/${type.name}") },
+                onSyncStatus = { navController.navigate(ROUTE_SYNC) },
+                onProfile = { navController.navigate(ROUTE_PROFILE) },
+                onLeaderboard = { navController.navigate(ROUTE_LEADERBOARD) },
+                onSettings = { navController.navigate(ROUTE_SETTINGS) }
             )
         }
 
         composable(
-            route = "capture/{testName}",
-            arguments = listOf(
-                navArgument("testName") {
-                    type = NavType.StringType
-                }
-            )
+            route = "instructions/{testType}",
+            arguments = listOf(navArgument("testType") { type = NavType.StringType })
         ) { backStackEntry ->
+            val testType = testTypeFrom(backStackEntry.arguments?.getString("testType"))
+            InstructionsScreen(
+                testType = testType,
+                onBack = { navController.popBackStack() },
+                onStart = { navController.navigate("capture/${testType.name}") }
+            )
+        }
 
-            val testName = backStackEntry
-                .arguments
-                ?.getString("testName")
-                ?.replace("_", " ")
-                ?: "Test"
-
+        composable(
+            route = "capture/{testType}",
+            arguments = listOf(navArgument("testType") { type = NavType.StringType })
+        ) { backStackEntry ->
             CaptureScreen(
-                testName = testName,
-                onBack = {
-                    navController.popBackStack()
-                },
+                testType = testTypeFrom(backStackEntry.arguments?.getString("testType")),
+                onBack = { navController.popBackStack() },
                 onAttemptComplete = { attemptId ->
                     // Capture stays on the stack so "Try again" on the results
                     // screen is just a pop back to a re-armed capture screen.
@@ -104,56 +119,53 @@ fun AppNavigation() {
 
         composable(
             route = "results/{attemptId}",
-            arguments = listOf(
-                navArgument("attemptId") {
-                    type = NavType.StringType
-                }
-            )
+            arguments = listOf(navArgument("attemptId") { type = NavType.StringType })
         ) { backStackEntry ->
-
-            val attemptId = backStackEntry
-                .arguments
-                ?.getString("attemptId")
-                ?: ""
-
             ResultsScreen(
-                attemptId = attemptId,
-                onRetry = {
-                    navController.popBackStack()
-                },
-                onDone = {
-                    navController.popBackStack(
-                        route = ROUTE_HOME,
-                        inclusive = false
-                    )
-                }
+                attemptId = backStackEntry.arguments?.getString("attemptId") ?: "",
+                onRetry = { navController.popBackStack() },
+                onDone = { navController.popBackStack(route = ROUTE_HOME, inclusive = false) }
             )
         }
 
         composable(ROUTE_SYNC) {
             SyncStatusScreen(
                 onBack = { navController.popBackStack() },
-                onResultSelected = { resultId ->
-                    navController.navigate("server-result/$resultId")
-                }
+                onResultSelected = { resultId -> navController.navigate("server-result/$resultId") }
             )
         }
 
         composable(ROUTE_PROFILE) {
             ProfileScreen(
                 onBack = { navController.popBackStack() },
-                onResultSelected = { resultId ->
-                    navController.navigate("server-result/$resultId")
-                },
+                onResultSelected = { resultId -> navController.navigate("server-result/$resultId") },
+                onBadges = { navController.navigate(ROUTE_BADGES) },
+                onLeaderboard = { navController.navigate(ROUTE_LEADERBOARD) },
+                onSettings = { navController.navigate(ROUTE_SETTINGS) }
+            )
+        }
+
+        composable(ROUTE_BADGES) {
+            BadgesScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(ROUTE_LEADERBOARD) {
+            LeaderboardScreen(
+                onBack = { navController.popBackStack() },
+                onSettings = { navController.navigate(ROUTE_SETTINGS) }
+            )
+        }
+
+        composable(ROUTE_SETTINGS) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
                 onLoggedOut = { navController.replaceStackWith(ROUTE_LOGIN) }
             )
         }
 
         composable(
             route = "server-result/{resultId}",
-            arguments = listOf(
-                navArgument("resultId") { type = NavType.StringType }
-            )
+            arguments = listOf(navArgument("resultId") { type = NavType.StringType })
         ) { backStackEntry ->
             ServerResultScreen(
                 resultId = backStackEntry.arguments?.getString("resultId").orEmpty(),
@@ -162,6 +174,10 @@ fun AppNavigation() {
         }
     }
 }
+
+/** Routes carry the stable enum name, never a display name that is now translated. */
+private fun testTypeFrom(value: String?): TestType =
+    runCatching { TestType.valueOf(value.orEmpty()) }.getOrDefault(TestType.SIT_UPS)
 
 /**
  * Navigate to [route] with nothing behind it.
@@ -177,8 +193,12 @@ private fun NavHostController.replaceStackWith(route: String) {
     }
 }
 
+private const val ROUTE_ONBOARDING = "onboarding"
 private const val ROUTE_LOGIN = "login"
 private const val ROUTE_REGISTER = "register"
 private const val ROUTE_HOME = "home"
 private const val ROUTE_SYNC = "sync"
 private const val ROUTE_PROFILE = "profile"
+private const val ROUTE_BADGES = "badges"
+private const val ROUTE_LEADERBOARD = "leaderboard"
+private const val ROUTE_SETTINGS = "settings"

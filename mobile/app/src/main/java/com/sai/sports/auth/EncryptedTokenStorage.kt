@@ -20,6 +20,7 @@ import androidx.security.crypto.MasterKey
  * and a crash on first launch after a phone upgrade.
  */
 @Suppress("DEPRECATION") // security-crypto is deprecated upstream but still the supported path here.
+@android.annotation.SuppressLint("ApplySharedPref") // commit() is deliberate; see save().
 class EncryptedTokenStorage(context: Context) : TokenStorage {
 
     private val appContext = context.applicationContext
