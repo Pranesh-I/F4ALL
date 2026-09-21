@@ -11,7 +11,7 @@ services:
 
     ports:
       # 5433 on the host so an existing local Postgres is not shadowed.
-      - "5433:5432"
+      - "5434:5432"
 
     volumes:
       - f4all_postgres_data:/var/lib/postgresql/data
@@ -29,7 +29,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "6379:6379"
+      - "6380:6379"
 
     # Verification jobs are re-queued from the database by
     # `python -m app.cli reverify-pending`, so the broker is a cache rather than

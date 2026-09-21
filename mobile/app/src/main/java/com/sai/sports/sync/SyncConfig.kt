@@ -20,11 +20,18 @@ object SyncConfig {
     private const val KEY_BASE_URL = "base_url"
 
     /**
-     * The Android emulator's alias for the host machine's loopback. A physical
-     * test device needs the developer's LAN address instead, set via
-     * [setBaseUrl].
+     * Emulator uses 10.0.2.2 to reach host localhost.
+     * Physical devices over USB use 127.0.0.1 (paired with `adb reverse tcp:8000 tcp:8000`).
      */
-    const val DEFAULT_BASE_URL = "http://10.0.2.2:8000"
+    private val isEmulator: Boolean
+        get() = android.os.Build.FINGERPRINT.startsWith("generic")
+            || android.os.Build.MODEL.contains("google_sdk")
+            || android.os.Build.MODEL.contains("Emulator")
+            || android.os.Build.HARDWARE.contains("goldfish")
+            || android.os.Build.HARDWARE.contains("ranchu")
+
+    val DEFAULT_BASE_URL: String
+        get() = if (isEmulator) "http://10.0.2.2:8000" else "http://127.0.0.1:8000"
 
     fun baseUrl(context: Context): String =
         context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
