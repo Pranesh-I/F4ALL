@@ -21,9 +21,10 @@ class Sprint7RulesTest {
         dob: LocalDate? = LocalDate.of(2010, 5, 1),
         gender: String? = "female",
         region: String? = "Kerala",
+        city: String = "Kochi",
         height: String = "160",
         weight: String = ""
-    ) = RegistrationRules.problem(name, dob, gender, region, height, weight, today)
+    ) = RegistrationRules.problem(name, dob, gender, region, city, height, weight, today)
 
     @Test
     fun `phone numbers accept ten digits or the country code form`() {
@@ -44,6 +45,7 @@ class Sprint7RulesTest {
         assertEquals(R.string.register_error_dob, problem(dob = null)?.message)
         assertEquals(R.string.register_error_gender, problem(gender = null)?.message)
         assertEquals(R.string.register_error_region, problem(region = null)?.message)
+        assertEquals(R.string.register_error_city, problem(city = " ")?.message)
         assertEquals(R.string.register_error_height, problem(height = "")?.message)
     }
 

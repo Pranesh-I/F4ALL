@@ -93,6 +93,15 @@ class SubmitTestRequest(BaseModel):
     provisional_score: float
     video_id: uuid.UUID | None = None
 
+    # The assessment session this official attempt was made for, and when the
+    # phone recorded it. The recording, not the upload, must fall inside the
+    # session: phones record offline and send days later.
+    session_id: uuid.UUID | None = None
+    recorded_at_ms: int | None = Field(default=None, gt=0)
+
+    # The photo check the athlete took before recording an official test.
+    identity_check_id: uuid.UUID | None = None
+
     # Vertical jump cannot be re-scored server-side without the athlete's
     # standing height. Until Sprint 7 stores it on the profile, the client
     # sends it with the submission; the server prefers the profile value when
@@ -229,6 +238,9 @@ class ReviewDetailResponse(BaseModel):
     # Short-lived signed URL; null when no photo is on file.
     reference_photo_url: str | None = None
     face_verification: FaceVerificationResponse | None = None
+    # The photo check before recording: match | no_match | no_face |
+    # unavailable, or None when none was taken.
+    identity_check: str | None = None
     has_pose_sequence: bool = False
     benchmark: BenchmarkComparisonResponse | None = None
     review_history: list[ReviewHistoryItem] = Field(default_factory=list)
@@ -320,13 +332,32 @@ class LogoutRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class ConsentGrant(BaseModel):
+    # The version of the consent wording the app showed.
+    version: str = Field(min_length=1, max_length=20)
+    # "self", or "guardian" — required for athletes under 18.
+    given_by: str
+    guardian_name: str | None = Field(default=None, max_length=150)
+
+
+class ConsentRequest(ConsentGrant):
+    purpose: str
+
+
 class AthleteRegistrationRequest(BaseModel):
     name: str = Field(min_length=1, max_length=150)
     dob: date
     gender: str
+    # State or union territory.
     region: str = Field(min_length=1, max_length=100)
+    city: str = Field(min_length=1, max_length=100)
+    place: str | None = Field(default=None, max_length=100)
     height_cm: float | None = Field(default=None, gt=50, lt=260)
     weight_kg: float | None = Field(default=None, gt=10, lt=250)
+    achievements: str | None = Field(default=None, max_length=1000)
+    # Consent to hold the profile. Face-photo consent is separate and given
+    # when the photo is taken.
+    consent: ConsentGrant
 
 
 class RegistrationResponse(BaseModel):
@@ -339,6 +370,10 @@ class RegistrationResponse(BaseModel):
 class AthleteProfileUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=150)
     region: str | None = Field(default=None, min_length=1, max_length=100)
+    city: str | None = Field(default=None, min_length=1, max_length=100)
+    # Empty string clears the optional ones.
+    place: str | None = Field(default=None, max_length=100)
+    achievements: str | None = Field(default=None, max_length=1000)
     height_cm: float | None = Field(default=None, gt=50, lt=260)
     weight_kg: float | None = Field(default=None, gt=10, lt=250)
     leaderboard_opt_in: bool | None = None
@@ -358,6 +393,22 @@ class AthleteProfileResponse(BaseModel):
     has_reference_photo: bool
     leaderboard_opt_in: bool = False
     preferred_language: str = "en"
+    city: str | None = None
+    place: str | None = None
+    achievements: str | None = None
+    # Purposes with a consent in force: "registration", "face_verification".
+    consents: list[str] = []
+    # What is still needed before official tests: any of "city",
+    # "registration_consent", "face_consent", "photo". Empty when complete.
+    missing: list[str] = []
+
+
+class IdentityCheckResponse(BaseModel):
+    check_id: uuid.UUID
+    # match | no_match | no_face | unavailable
+    outcome: str
+    # Checks left this hour, so the app can say how many retakes remain.
+    remaining_this_hour: int
 
 
 class PersonalBest(BaseModel):
@@ -467,3 +518,113 @@ class AthleteLeaderboardResponse(BaseModel):
 
 
 ReviewDetailResponse.model_rebuild()
+
+
+# ---------------------------------------------------------------------------
+# Practice (private to the athlete; never an official result)
+# ---------------------------------------------------------------------------
+
+# A generous ceiling on one attempt's trace. A long set produces a few hundred
+# events; this stops one request from storing megabytes.
+MAX_PRACTICE_EVENTS = 2000
+
+
+class PracticeEvent(BaseModel):
+    timestamp_ms: int = Field(ge=0)
+    label: str = Field(min_length=1, max_length=64)
+    detail: str = Field(default="", max_length=200)
+
+
+class PracticeAttemptIn(BaseModel):
+    test_type: str = Field(min_length=1, max_length=50)
+    score: float = Field(ge=0, le=10_000, allow_inf_nan=False)
+    unit: str = Field(min_length=1, max_length=20)
+    status: str = Field(pattern="^(COMPLETE|INVALID)$")
+    confidence: float = Field(default=0, ge=0, le=1, allow_inf_nan=False)
+    invalid_reason: str | None = Field(default=None, max_length=300)
+    recorded_at_ms: int = Field(gt=0)
+    events: list[PracticeEvent] = Field(
+        default_factory=list, max_length=MAX_PRACTICE_EVENTS
+    )
+
+
+class PracticeAttemptOut(PracticeAttemptIn):
+    client_attempt_id: str
+
+
+class PracticeHistoryResponse(BaseModel):
+    attempts: list[PracticeAttemptOut] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Assessment sessions
+# ---------------------------------------------------------------------------
+
+
+class SessionTestStatus(BaseModel):
+    test_type: str
+    unit: str
+    # A live official submission already exists; the athlete may not submit again.
+    submitted: bool
+    # Status of the athlete's latest result for this test in this session, if
+    # any. "pending_sync" means an official asked for a resubmission.
+    result_status: str | None = None
+
+
+class ActiveSessionResponse(BaseModel):
+    session_id: uuid.UUID
+    name: str
+    description: str | None
+    rules: str | None
+    starts_at: datetime
+    ends_at: datetime
+    tests: list[SessionTestStatus]
+
+
+class ActiveSessionsResponse(BaseModel):
+    # The phone compares session windows against this, not its own clock.
+    server_time: datetime
+    sessions: list[ActiveSessionResponse] = Field(default_factory=list)
+
+
+class AssessmentSessionCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+    description: str | None = Field(default=None, max_length=2000)
+    rules: str | None = Field(default=None, max_length=4000)
+    starts_at: datetime
+    ends_at: datetime
+    # Created switched off unless asked: a session appears to athletes only
+    # when someone deliberately opens it.
+    enabled: bool = False
+    allowed_tests: list[str] = Field(min_length=1, max_length=20)
+    region: str | None = Field(default=None, max_length=100)
+
+
+class AssessmentSessionUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=150)
+    description: str | None = Field(default=None, max_length=2000)
+    rules: str | None = Field(default=None, max_length=4000)
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    enabled: bool | None = None
+    allowed_tests: list[str] | None = Field(default=None, min_length=1, max_length=20)
+    region: str | None = Field(default=None, max_length=100)
+    # Explicit, because "region": null in a patch is otherwise ambiguous with
+    # "not provided".
+    clear_region: bool = False
+
+
+class AssessmentSessionResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: str | None
+    rules: str | None
+    starts_at: datetime
+    ends_at: datetime
+    enabled: bool
+    allowed_tests: list[str]
+    region: str | None
+    status: str
+    submission_count: int
+    created_at: datetime
+    updated_at: datetime

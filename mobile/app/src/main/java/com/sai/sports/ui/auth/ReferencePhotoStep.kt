@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +34,7 @@ import androidx.core.content.FileProvider
 import androidx.compose.ui.res.stringResource
 import com.sai.sports.R
 import com.sai.sports.api.ApiResult
+import com.sai.sports.api.ConsentPurpose
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
 import com.sai.sports.ui.common.ScreenTitle
@@ -44,12 +48,22 @@ import java.io.File
 /**
  * The registration photo SAI compares test videos against.
  *
- * Skippable. A camera that will not cooperate must not stop an athlete from
- * registering; without a photo the identity check reports "not checked", which
- * is honest, rather than blocking them outright.
+ * Consent to face verification comes first: the photo exists only to be
+ * compared against, and nothing is sent until the athlete — or, for a minor,
+ * their guardian — has agreed to that.
+ *
+ * Skippable when [onSkip] is given. A camera that will not cooperate must not
+ * stop an athlete from registering or practising; official tests ask for the
+ * photo again, since they need it.
  */
 @Composable
-fun ReferencePhotoStep(onDone: () -> Unit) {
+fun ReferencePhotoStep(
+    minor: Boolean,
+    faceConsentGiven: Boolean,
+    initialGuardianName: String = "",
+    onDone: () -> Unit,
+    onSkip: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val api = remember { AppServices.api(context) }
@@ -62,6 +76,9 @@ fun ReferencePhotoStep(onDone: () -> Unit) {
 
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<Int?>(null) }
+    var consented by rememberSaveable { mutableStateOf(faceConsentGiven) }
+    var agreed by rememberSaveable { mutableStateOf(faceConsentGiven) }
+    var guardianName by rememberSaveable { mutableStateOf(initialGuardianName) }
 
     val takePicture = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
@@ -90,9 +107,36 @@ fun ReferencePhotoStep(onDone: () -> Unit) {
         }
     }
 
+    fun takePhoto() {
+        if (consented) {
+            takePicture.launch(photoUri)
+            return
+        }
+        val grant = ConsentRules.grant(agreed, minor, guardianName).getOrElse { missing ->
+            message = (missing as ConsentRules.ConsentMissing).messageRes
+            return
+        }
+        busy = true
+        message = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                api.giveConsent(ConsentPurpose.FACE_VERIFICATION, grant)
+            }
+            busy = false
+            when (result) {
+                is ApiResult.Success -> {
+                    consented = true
+                    takePicture.launch(photoUri)
+                }
+                is ApiResult.Failure -> message = Labels.failure(result.kind, R.string.photo_error_upload)
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -108,16 +152,30 @@ fun ReferencePhotoStep(onDone: () -> Unit) {
             style = MaterialTheme.typography.bodySmall
         )
 
+        if (!consented) {
+            ConsentCard(
+                title = R.string.consent_face_title,
+                points = FACE_CONSENT_POINTS,
+                minor = minor,
+                agreed = agreed,
+                onAgreedChange = { agreed = it },
+                guardianName = guardianName,
+                onGuardianNameChange = { guardianName = it }
+            )
+        }
+
         message?.let { ErrorText(stringResource(it)) }
 
         if (busy) {
             CircularProgressIndicator()
         } else {
-            Button(onClick = { takePicture.launch(photoUri) }, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = ::takePhoto, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.photo_take))
             }
-            TextButton(onClick = onDone) {
-                Text(stringResource(R.string.photo_skip))
+            onSkip?.let { skip ->
+                TextButton(onClick = skip) {
+                    Text(stringResource(R.string.photo_skip))
+                }
             }
         }
     }

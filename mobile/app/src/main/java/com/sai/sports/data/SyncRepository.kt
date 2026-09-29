@@ -4,8 +4,10 @@ import android.content.Context
 import android.util.Log
 import com.sai.sports.analyzer.AttemptStatus
 import com.sai.sports.data.local.F4allDatabase
+import com.sai.sports.data.local.SessionAttemptRow
 import com.sai.sports.data.local.TestAttemptDao
 import com.sai.sports.data.local.TestAttemptEntity
+import com.sai.sports.sync.RetryPolicy
 import com.sai.sports.sync.SyncStatus
 import kotlinx.coroutines.flow.Flow
 import java.io.File
@@ -29,13 +31,29 @@ class SyncRepository(
     private val attemptStore: AttemptStore = AttemptStore(context)
 ) {
 
-    fun observeAttempts(): Flow<List<TestAttemptEntity>> = dao.observeAll()
+    /*
+     * Everything that lists or drains the queue takes the athlete it is for.
+     * The queue on a shared phone holds several athletes' tests, and each must
+     * only ever see — and upload as — their own.
+     */
 
-    fun observePendingCount(): Flow<Int> = dao.observePendingCount()
+    fun observeAttempts(athleteId: String): Flow<List<TestAttemptEntity>> = dao.observeAll(athleteId)
+
+    fun observePendingCount(athleteId: String): Flow<Int> =
+        dao.observePendingCount(athleteId, RetryPolicy.MAX_ATTEMPTS)
+
+    suspend fun claimUnowned(athleteId: String): Int = dao.claimUnowned(athleteId)
+
+    /** This athlete's queued and sent official session attempts. */
+    fun observeSessionAttempts(athleteId: String): Flow<List<SessionAttemptRow>> =
+        dao.observeSessionAttempts(athleteId)
+
+    suspend fun sessionAttempts(athleteId: String, sessionId: String): List<SessionAttemptRow> =
+        dao.sessionAttempts(athleteId, sessionId)
 
     suspend fun find(id: String): TestAttemptEntity? = dao.findById(id)
 
-    suspend fun workQueue(): List<TestAttemptEntity> = dao.findWorkQueue()
+    suspend fun workQueue(athleteId: String): List<TestAttemptEntity> = dao.findWorkQueue(athleteId)
 
     /**
      * Registers a freshly recorded attempt in the queue.
@@ -44,10 +62,15 @@ class SyncRepository(
      * not score wastes the athlete's data on a video an official would reject
      * anyway — they are better told to retry immediately, while they are still
      * standing there.
+     *
+     * Practice attempts are never enqueued, whoever asks. The queue is the
+     * only road to an official submission, so refusing here — rather than
+     * trusting every caller to check — is what guarantees practice stays
+     * practice.
      */
-    suspend fun enqueue(attempt: Attempt): Boolean {
+    suspend fun enqueue(attempt: Attempt, identity: IdentityPass? = null): Boolean {
 
-        if (attempt.result.status != AttemptStatus.COMPLETE) {
+        if (!UploadEligibility.isUploadable(attempt)) {
             return false
         }
 
@@ -67,7 +90,12 @@ class SyncRepository(
                 scoreUnit = attempt.result.unit,
                 syncStatus = SyncStatus.RECORDED,
                 sourceVideoPath = relativePath(sourceVideo),
-                sourceSizeBytes = sourceVideo.length()
+                sourceSizeBytes = sourceVideo.length(),
+                athleteId = attempt.athleteId,
+                sessionId = attempt.sessionId,
+                // Only an official attempt carries the photo check.
+                identityCheckId = identity?.checkId.takeIf { attempt.sessionId != null },
+                identityPhotoPath = identity?.photoPath.takeIf { attempt.sessionId != null }
             )
         )
 
@@ -125,7 +153,33 @@ class SyncRepository(
         )
     }
 
-    suspend fun unsubmitted(): List<TestAttemptEntity> = dao.findUnsubmitted()
+    suspend fun unsubmitted(athleteId: String): List<TestAttemptEntity> = dao.findUnsubmitted(athleteId)
+
+    /**
+     * Records what the pending photo at [photoPath] became — a server check, or
+     * nothing when it could not be checked — and deletes the photo.
+     */
+    suspend fun resolveIdentityPhoto(photoPath: String, checkId: String?) {
+        dao.resolveIdentityPhoto(photoPath, checkId)
+        File(context.filesDir, photoPath).delete()
+    }
+
+    fun identityPhotoFile(photoPath: String): File = File(context.filesDir, photoPath)
+
+    /**
+     * Deletes photos no queued attempt is waiting on — taken for a test the
+     * athlete then did not record. They are faces; they do not linger.
+     */
+    suspend fun deleteOrphanIdentityPhotos(olderThanMs: Long, nowMs: Long = System.currentTimeMillis()) {
+        val directory = File(context.filesDir, IdentityPhotos.DIRECTORY)
+        val waiting = dao.pendingIdentityPhotos().toSet()
+        directory.listFiles()?.forEach { file ->
+            val relative = "${IdentityPhotos.DIRECTORY}/${file.name}"
+            if (relative !in waiting && nowMs - file.lastModified() > olderThanMs) {
+                file.delete()
+            }
+        }
+    }
 
     suspend fun recordResultId(id: String, resultId: String) =
         dao.updateResultId(id, resultId)
@@ -142,6 +196,21 @@ class SyncRepository(
             current.copy(
                 attemptCount = current.attemptCount + 1,
                 lastError = error,
+                lastAttemptAtMs = System.currentTimeMillis()
+            )
+        )
+    }
+
+    /**
+     * SAI refused the submission. Recorded as final — the attempt budget is
+     * spent — so the worker stops asking and the sync screen shows the reason.
+     */
+    suspend fun recordSubmissionRefused(id: String, reason: String) {
+        val current = dao.findById(id) ?: return
+        dao.update(
+            current.copy(
+                attemptCount = RetryPolicy.MAX_ATTEMPTS,
+                lastError = reason,
                 lastAttemptAtMs = System.currentTimeMillis()
             )
         )

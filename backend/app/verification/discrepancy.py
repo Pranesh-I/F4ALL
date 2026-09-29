@@ -44,7 +44,7 @@ class DiscrepancyOutcome:
 
 
 def tolerance_for(test_type: TestType, settings) -> float:
-    if test_type is TestType.SIT_UPS:
+    if test_type.counts_reps:
         return settings.discrepancy_tolerance_reps
     return settings.discrepancy_tolerance_cm
 

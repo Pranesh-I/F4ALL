@@ -82,6 +82,26 @@ def test_python_scorer_matches_kotlin(case: dict[str, str]) -> None:
         f"server said {result.status.value} ({result.invalid_reason})"
     )
 
+    fault_codes = [
+        code
+        for event in result.events
+        if event.label in ("rep_rejected_form", "form_warning")
+        for code in event.detail.split(",")
+    ]
+
+    expected_events = case.get("expected_events") or ""
+    for pair in filter(None, expected_events.split(";")):
+        label, expected_count = pair.split("=")
+        if label.startswith("issue."):
+            actual_count = fault_codes.count(label.removeprefix("issue."))
+        else:
+            actual_count = sum(1 for event in result.events if event.label == label)
+        assert actual_count == int(expected_count), (
+            f"{case['sequence']}: mobile recorded {expected_count} x {label}, "
+            f"server recorded {actual_count}. Same score or not, the two "
+            f"implementations disagree about why reps were refused."
+        )
+
     if result.status is AttemptStatus.COMPLETE:
         assert result.score == pytest.approx(
             expected_score, abs=SCORE_TOLERANCE
@@ -109,7 +129,19 @@ def test_fixture_set_covers_the_awkward_cases() -> None:
     assert any(case["expected_status"] == "INVALID" for case in CASES)
 
     tests_covered = {case["test"] for case in CASES}
-    assert tests_covered == {"SIT_UPS", "VERTICAL_JUMP"}
+    assert tests_covered == {test_type.value for test_type in TestType}
+
+    # Every rep-rule rejection path has at least one fixture that exercises it.
+    pairs = [
+        pair
+        for case in CASES
+        for pair in (case.get("expected_events") or "").split(";")
+        if pair
+    ]
+    for label in ("rep_rejected_form", "rep_rejected_wrong_arm", "form_warning"):
+        assert any(
+            pair.startswith(f"{label}=") and not pair.endswith("=0") for pair in pairs
+        ), f"No parity fixture exercises {label}"
 
 
 def test_thresholds_match_the_mobile_implementation() -> None:
@@ -150,6 +182,34 @@ def test_thresholds_match_the_mobile_implementation() -> None:
         "JUMP_MAX_FLIGHT_MS": thresholds.JUMP_MAX_FLIGHT_MS,
         "JUMP_MIN_PLAUSIBLE_CM": thresholds.JUMP_MIN_PLAUSIBLE_CM,
         "JUMP_MAX_PLAUSIBLE_CM": thresholds.JUMP_MAX_PLAUSIBLE_CM,
+        "REP_START_HOLD_FRAMES": thresholds.REP_START_HOLD_FRAMES,
+        "FORM_FAULT_MIN_FRAMES": thresholds.FORM_FAULT_MIN_FRAMES,
+        "SQUAT_EXTENDED_ANGLE": thresholds.SQUAT_EXTENDED_ANGLE,
+        "SQUAT_DEPTH_ANGLE": thresholds.SQUAT_DEPTH_ANGLE,
+        "SQUAT_PARTIAL_ANGLE": thresholds.SQUAT_PARTIAL_ANGLE,
+        "SQUAT_MIN_REP_DURATION_MS": thresholds.SQUAT_MIN_REP_DURATION_MS,
+        "SQUAT_MAX_TORSO_LEAN_DEG": thresholds.SQUAT_MAX_TORSO_LEAN_DEG,
+        "PUSHUP_EXTENDED_ANGLE": thresholds.PUSHUP_EXTENDED_ANGLE,
+        "PUSHUP_DEPTH_ANGLE": thresholds.PUSHUP_DEPTH_ANGLE,
+        "PUSHUP_PARTIAL_ANGLE": thresholds.PUSHUP_PARTIAL_ANGLE,
+        "PUSHUP_MIN_REP_DURATION_MS": thresholds.PUSHUP_MIN_REP_DURATION_MS,
+        "PUSHUP_MIN_BODY_LINE_ANGLE": thresholds.PUSHUP_MIN_BODY_LINE_ANGLE,
+        "PUSHUP_MAX_BODY_TILT_DEG": thresholds.PUSHUP_MAX_BODY_TILT_DEG,
+        "CURL_EXTENDED_ANGLE": thresholds.CURL_EXTENDED_ANGLE,
+        "CURL_DEPTH_ANGLE": thresholds.CURL_DEPTH_ANGLE,
+        "CURL_PARTIAL_ANGLE": thresholds.CURL_PARTIAL_ANGLE,
+        "CURL_MIN_REP_DURATION_MS": thresholds.CURL_MIN_REP_DURATION_MS,
+        "CURL_MAX_ELBOW_FLARE_DEG": thresholds.CURL_MAX_ELBOW_FLARE_DEG,
+        "LUNGE_EXTENDED_ANGLE": thresholds.LUNGE_EXTENDED_ANGLE,
+        "LUNGE_DEPTH_ANGLE": thresholds.LUNGE_DEPTH_ANGLE,
+        "LUNGE_PARTIAL_ANGLE": thresholds.LUNGE_PARTIAL_ANGLE,
+        "LUNGE_MIN_REP_DURATION_MS": thresholds.LUNGE_MIN_REP_DURATION_MS,
+        "LUNGE_MIN_STANCE_RATIO": thresholds.LUNGE_MIN_STANCE_RATIO,
+        "LUNGE_MAX_KNEE_TRAVEL_RATIO": thresholds.LUNGE_MAX_KNEE_TRAVEL_RATIO,
+        "LUNGE_MAX_TORSO_LEAN_DEG": thresholds.LUNGE_MAX_TORSO_LEAN_DEG,
+        "SQUAT_MAX_KNEE_TRAVEL_RATIO": thresholds.SQUAT_MAX_KNEE_TRAVEL_RATIO,
+        "FOOT_MAX_SHIFT_RATIO": thresholds.FOOT_MAX_SHIFT_RATIO,
+        "CURL_MAX_BODY_SWAY_RATIO": thresholds.CURL_MAX_BODY_SWAY_RATIO,
     }
 
     import re

@@ -1,6 +1,7 @@
 """Server-side re-verification scorers.
 
-Ports of ``SitUpAnalyzer.kt`` and ``VerticalJumpAnalyzer.kt``. The state
+Ports of ``SitUpAnalyzer.kt`` and ``VerticalJumpAnalyzer.kt``; the squat,
+push-up, bicep curl and lunge ports live in ``rep_exercises.py``. The state
 machines, thresholds and rejection rules are intentionally identical — the
 server's job is to reach the same answer independently, not a different one.
 
@@ -34,12 +35,20 @@ class TestType(str, Enum):
     # Stops pytest trying to collect this as a test class.
     __test__ = False
 
-    SIT_UPS = "SIT_UPS"
+    SQUATS = "SQUATS"
+    PUSH_UPS = "PUSH_UPS"
+    BICEP_CURLS = "BICEP_CURLS"
+    LUNGES = "LUNGES"
     VERTICAL_JUMP = "VERTICAL_JUMP"
+    SIT_UPS = "SIT_UPS"
 
     @property
     def unit(self) -> str:
-        return "reps" if self is TestType.SIT_UPS else "cm"
+        return "cm" if self is TestType.VERTICAL_JUMP else "reps"
+
+    @property
+    def counts_reps(self) -> bool:
+        return self.unit == "reps"
 
 
 class AttemptStatus(str, Enum):
@@ -675,6 +684,17 @@ def analyze_sequence(analyzer, frames: Sequence[PoseFrame]) -> AnalyzerResult:
 
 
 def build_analyzer(test_type: TestType, athlete_height_cm: float | None):
+    # Imported here: rep_exercises builds on this module's result types.
+    from . import rep_exercises
+
+    rep_analyzers = {
+        TestType.SQUATS: rep_exercises.SquatAnalyzer,
+        TestType.PUSH_UPS: rep_exercises.PushUpAnalyzer,
+        TestType.BICEP_CURLS: rep_exercises.BicepCurlAnalyzer,
+        TestType.LUNGES: rep_exercises.LungeAnalyzer,
+    }
+    if test_type in rep_analyzers:
+        return rep_analyzers[test_type]()
     if test_type is TestType.SIT_UPS:
         return SitUpAnalyzer()
     if athlete_height_cm is None:

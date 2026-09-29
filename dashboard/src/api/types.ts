@@ -95,6 +95,8 @@ export interface ReviewDetail {
     similarity_score: number | null;
     verified_at: string | null;
   } | null;
+  /** The photo check the athlete took before recording; null when none was taken. */
+  identity_check?: IdentityCheckOutcome | null;
   has_pose_sequence: boolean;
   benchmark: Benchmark | null;
   review_history: {
@@ -142,3 +144,34 @@ export interface ReviewQueuePage {
   items: ReviewItem[];
   total: number;
 }
+
+export type SessionStatus = "disabled" | "scheduled" | "active" | "ended";
+
+export interface AssessmentSession {
+  id: string;
+  name: string;
+  description: string | null;
+  rules: string | null;
+  starts_at: string;
+  ends_at: string;
+  enabled: boolean;
+  allowed_tests: string[];
+  region: string | null;
+  status: SessionStatus;
+  submission_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewAssessmentSession {
+  name: string;
+  description?: string | null;
+  rules?: string | null;
+  starts_at: string;
+  ends_at: string;
+  enabled: boolean;
+  allowed_tests: string[];
+  region?: string | null;
+}
+
+export type IdentityCheckOutcome = "match" | "no_match" | "no_face" | "unavailable";

@@ -103,7 +103,35 @@ data class TestAttemptEntity(
      * never be verified.
      */
     @ColumnInfo(name = "result_id")
-    val resultId: String? = null
+    val resultId: String? = null,
+
+    /**
+     * The athlete who recorded this attempt, and the only one it may be
+     * uploaded as.
+     *
+     * Without it, a phone shared between two athletes would upload one
+     * athlete's queued tests under whoever signed in next — an official result
+     * credited to the wrong person. Null only for rows queued before this
+     * column existed; [TestAttemptDao.claimUnowned] assigns those.
+     */
+    @ColumnInfo(name = "athlete_id")
+    val athleteId: String? = null,
+
+    /** The assessment session this official attempt was recorded for, if any. */
+    @ColumnInfo(name = "session_id")
+    val sessionId: String? = null,
+
+    /** The server's photo check taken before this official attempt. */
+    @ColumnInfo(name = "identity_check_id")
+    val identityCheckId: String? = null,
+
+    /**
+     * A photo taken before this attempt with no signal, relative to filesDir.
+     * Sent for checking before the attempt is submitted, then deleted; several
+     * attempts from one sitting may share it.
+     */
+    @ColumnInfo(name = "identity_photo_path")
+    val identityPhotoPath: String? = null
 ) {
 
     /** Upload progress 0.0..1.0 for the sync screen. */

@@ -127,11 +127,135 @@ object AnalyzerThresholds {
     const val JUMP_MAX_PLAUSIBLE_CM = 120.0
 
     // ---------------------------------------------------------------
+    // Angle-driven rep exercises (squat, push-up, bicep curl, lunge)
+    // ---------------------------------------------------------------
+
+    /**
+     * Consecutive frames the athlete must hold the start position before reps
+     * can count. Stops the counter arming on a single frame of the athlete
+     * walking into position.
+     */
+    const val REP_START_HOLD_FRAMES = 5
+
+    /**
+     * A form fault must persist this many consecutive frames inside a rep to be
+     * recorded. One frame of a mis-placed hip is the pose model, not the athlete.
+     */
+    const val FORM_FAULT_MIN_FRAMES = 3
+
+    /**
+     * Each exercise uses the same three-band machine as sit-ups, on a joint
+     * angle that is wide at the start position and closes at the bottom:
+     *
+     *   EXTENDED: at or above this the athlete is at the start/top position.
+     *   DEPTH:    at or below this the rep went deep enough to count.
+     *   PARTIAL:  a rep that turned back after passing this but never reached
+     *             DEPTH is recorded as a rejected partial rep.
+     *
+     * Rep duration floors are deliberately low, for the same reason as
+     * [SITUP_MIN_REP_DURATION_MS]: they delete reps silently, so an over-strict
+     * value punishes the fastest honest athletes.
+     */
+
+    /** Squat: hip-knee-ankle angle, filmed side-on. ~90 deg is thighs parallel. */
+    const val SQUAT_EXTENDED_ANGLE = 160.0
+    const val SQUAT_DEPTH_ANGLE = 100.0
+    const val SQUAT_PARTIAL_ANGLE = 135.0
+    const val SQUAT_MIN_REP_DURATION_MS = 400L
+
+    /**
+     * Torso angle from vertical above which the athlete is folding forward
+     * rather than sitting down. A warning, not a rejection: long-legged
+     * athletes lean more at depth and the rep is still a squat.
+     */
+    const val SQUAT_MAX_TORSO_LEAN_DEG = 55.0
+
+    /**
+     * How far the knee may travel past the ankle at depth, as a fraction of
+     * shin length. Knees do go forward in a good squat, so this is generous
+     * and a warning only — it catches the athlete tipping onto their toes.
+     */
+    const val SQUAT_MAX_KNEE_TRAVEL_RATIO = 0.5
+
+    /**
+     * How far the near ankle may slide during one rep, as a fraction of leg
+     * length, before the feet count as having moved. Shuffling the feet
+     * mid-squat is an unstable base, not a different exercise: a warning.
+     */
+    const val FOOT_MAX_SHIFT_RATIO = 0.25
+
+    /** Push-up: shoulder-elbow-wrist angle, filmed side-on. */
+    const val PUSHUP_EXTENDED_ANGLE = 150.0
+    const val PUSHUP_DEPTH_ANGLE = 95.0
+    const val PUSHUP_PARTIAL_ANGLE = 125.0
+    const val PUSHUP_MIN_REP_DURATION_MS = 300L
+
+    /**
+     * Shoulder-hip-ankle angle below which the body is no longer a straight
+     * line — hips sagging or piked. A rep done that way is not a push-up.
+     */
+    const val PUSHUP_MIN_BODY_LINE_ANGLE = 155.0
+
+    /**
+     * Shoulder-to-ankle line's angle from horizontal above which the athlete is
+     * not in a plank at all. This is what stops an athlete standing up and
+     * bending their arms from scoring push-ups.
+     */
+    const val PUSHUP_MAX_BODY_TILT_DEG = 40.0
+
+    /** Bicep curl: shoulder-elbow-wrist angle, filmed facing the camera. */
+    const val CURL_EXTENDED_ANGLE = 150.0
+    const val CURL_DEPTH_ANGLE = 60.0
+    const val CURL_PARTIAL_ANGLE = 100.0
+    const val CURL_MIN_REP_DURATION_MS = 300L
+
+    /**
+     * Hip-shoulder-elbow angle above which the elbow has left the side of the
+     * body. The biceps are no longer doing the work — it is a raise or a swing.
+     */
+    const val CURL_MAX_ELBOW_FLARE_DEG = 35.0
+
+    /**
+     * How far the shoulders may travel during a curl, as a fraction of
+     * shoulder width, before the athlete is swinging the weight up with their
+     * body. A warning: the arm still did a curl, just with help.
+     */
+    const val CURL_MAX_BODY_SWAY_RATIO = 0.25
+
+    /** Lunge: mean of both knee angles, filmed side-on. */
+    const val LUNGE_EXTENDED_ANGLE = 160.0
+    const val LUNGE_DEPTH_ANGLE = 110.0
+    const val LUNGE_PARTIAL_ANGLE = 140.0
+    const val LUNGE_MIN_REP_DURATION_MS = 400L
+
+    /**
+     * Horizontal ankle separation, as a fraction of leg length, below which the
+     * feet are together — a squat, not a lunge. Checked only once the knees
+     * are bent past [LUNGE_PARTIAL_ANGLE], so stepping into the lunge is fine.
+     */
+    const val LUNGE_MIN_STANCE_RATIO = 0.5
+
+    /**
+     * How far the front knee may travel past the front ankle, as a fraction of
+     * shin length, before it is flagged. A warning only.
+     */
+    const val LUNGE_MAX_KNEE_TRAVEL_RATIO = 0.35
+
+    /**
+     * Torso angle from vertical, at depth, above which the athlete is folding
+     * over the front leg. A lunge is done upright; a warning only.
+     */
+    const val LUNGE_MAX_TORSO_LEAN_DEG = 30.0
+
+    // ---------------------------------------------------------------
     // Accuracy targets (Sprint 3 Definition of Done)
     // ---------------------------------------------------------------
 
     /** Sit-up count must land within this many reps of manual ground truth. */
     const val TARGET_SITUP_TOLERANCE_REPS = 1
+
+    /** Squat, push-up, curl and lunge counts: same tolerance as sit-ups. */
+    const val TARGET_REP_TOLERANCE_REPS = 1
 
     /** Jump height must land within this many cm of manual ground truth. */
     const val TARGET_JUMP_TOLERANCE_CM = 3.0

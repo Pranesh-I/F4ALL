@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -24,24 +25,34 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sai.sports.R
 import com.sai.sports.analyzer.TestType
+import com.sai.sports.auth.AppServices
 import com.sai.sports.data.SyncRepository
+import com.sai.sports.sync.NetworkMonitor
 import com.sai.sports.ui.common.Labels
 import com.sai.sports.ui.common.ScreenTitle
 import com.sai.sports.ui.common.SectionTitle
+import kotlinx.coroutines.flow.flowOf
 
 @Composable
 fun HomeScreen(
-    onTestSelected: (TestType) -> Unit,
+    onSessionTest: (sessionId: String, TestType) -> Unit,
+    onPractice: () -> Unit,
     onSyncStatus: () -> Unit,
     onProfile: () -> Unit,
     onLeaderboard: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onCompleteProfile: () -> Unit
 ) {
     val context = LocalContext.current
     val repository = remember { SyncRepository(context) }
 
-    val pendingCount by repository.observePendingCount()
-        .collectAsStateWithLifecycle(initialValue = 0)
+    // This athlete's waiting tests, not everyone who has used the phone.
+    val athleteId = remember { AppServices.session(context).current()?.athleteId }
+    val pendingCount by remember(athleteId) {
+        athleteId?.let(repository::observePendingCount) ?: flowOf(0)
+    }.collectAsStateWithLifecycle(initialValue = 0)
+    val online by remember { NetworkMonitor.observeOnline(context) }
+        .collectAsStateWithLifecycle(initialValue = true)
 
     Column(
         modifier = Modifier
@@ -55,13 +66,26 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        SectionTitle(stringResource(R.string.home_choose_test))
-
-        TestType.entries.forEach { type ->
-            Button(onClick = { onTestSelected(type) }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(Labels.testName(type)))
-            }
+        /*
+         * Practice comes first and looks different from the official tests: an
+         * athlete who only wants to train must never submit an official
+         * attempt by accident.
+         */
+        FilledTonalButton(onClick = onPractice, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.home_practice))
         }
+        Text(
+            stringResource(R.string.home_practice_note),
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Official tests need a complete profile; say so before the session does.
+        ProfileCompletionBanner(athleteId = athleteId, onCompleteProfile = onCompleteProfile)
+
+        // Official tests only exist inside a session SAI has opened.
+        SessionsSection(athleteId = athleteId, onSessionTest = onSessionTest)
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -75,6 +99,12 @@ fun HomeScreen(
             Text(
                 if (pendingCount > 0) stringResource(R.string.home_sync_waiting, pendingCount)
                 else stringResource(R.string.home_sync)
+            )
+        }
+        if (pendingCount > 0 && !online) {
+            Text(
+                stringResource(R.string.home_sync_offline),
+                style = MaterialTheme.typography.bodySmall
             )
         }
 

@@ -64,7 +64,25 @@ The report is written to `mobile/app/build/reports/validation/sprint3-accuracy.c
 per-sequence expected vs. actual, error, and tracking quality.
 
 With no data present the test **skips**. Once sequences exist it **enforces** the targets
-in `AnalyzerThresholds`: ±1 rep for sit-ups, ±3 cm for vertical jump.
+in `AnalyzerThresholds`: ±1 rep for sit-ups, squats, push-ups, bicep curls and lunges;
+±3 cm for vertical jump.
+
+## Camera set-up per test
+
+Record each test the way its in-app instructions say — the analyzers assume it:
+
+| Test | Camera | What must be visible |
+|---|---|---|
+| Squats | Side-on | Shoulder, hip, knee, ankle on the near side |
+| Push-ups | Side-on | Shoulder, elbow, wrist, hip, ankle on the near side |
+| Bicep curls | Facing | Both shoulders, elbows, wrists and hips |
+| Lunges | Side-on | Both hips, knees and ankles |
+| Vertical jump | Side-on | Nose, both hips, both ankles |
+| Sit-ups | Side-on | Shoulders, hips, knees on both sides |
+
+For the rep tests, deliberately include some bad reps in the reference set — half squats,
+sagging push-ups, swung curls, feet-together "lunges" — and count only the reps that meet
+the standard. The ground truth is the count a strict human judge would give.
 
 ## What "done" looks like
 

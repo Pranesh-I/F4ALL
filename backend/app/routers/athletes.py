@@ -24,7 +24,14 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
 from ..database import get_db
-from ..models import Athlete, Gender, Test, TestResult, TestResultStatus
+from ..models import (
+    Athlete,
+    ConsentPurpose,
+    Gender,
+    Test,
+    TestResult,
+    TestResultStatus,
+)
 from ..regions import canonical_region
 from ..schemas import (
     AthleteLeaderboardEntry,
@@ -35,6 +42,7 @@ from ..schemas import (
     AthleteSummaryResponse,
     BadgeResponse,
     BadgesResponse,
+    ConsentRequest,
     MessageResponse,
     PersonalBest,
     RegistrationResponse,
@@ -43,6 +51,8 @@ from ..schemas import (
     YourStanding,
 )
 from ..security import phone_subject, registration_claim, require_athlete
+from ..services import consents as consent_service
+from ..services import identity_crypto
 from ..services import tokens as token_service
 from ..services.athlete_leaderboard import build_board, display_name
 from ..services.badges import ResultFact, compute_badges
@@ -95,6 +105,7 @@ def register(
     age = _validated_age(payload.dob)
     gender = _validated_gender(payload.gender)
     region = _validated_region(payload.region)
+    city = _required_text(payload.city, "City")
 
     athlete = Athlete(
         id=uuid.uuid4(),
@@ -102,11 +113,31 @@ def register(
         dob=payload.dob,
         gender=gender,
         region=region,
+        city=city,
+        place=_optional_text(payload.place),
+        achievements=_optional_text(payload.achievements),
         phone=phone,
         height_cm=payload.height_cm,
         weight_kg=payload.weight_kg,
     )
     db.add(athlete)
+    db.flush()
+
+    # No profile without consent to hold it — and for a minor, a guardian's.
+    try:
+        consent_service.grant(
+            db,
+            athlete,
+            ConsentPurpose.registration,
+            version=payload.consent.version,
+            given_by=payload.consent.given_by,
+            guardian_name=payload.consent.guardian_name,
+        )
+    except consent_service.ConsentProblem as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     db.commit()
 
     logger.info("Registered athlete %s in %s", athlete.id, athlete.region)
@@ -120,7 +151,7 @@ def register(
     )
 
     return RegistrationResponse(
-        profile=_profile(athlete, age),
+        profile=_profile(db, athlete, age),
         tokens=TokenResponse(
             access_token=pair.access_token,
             refresh_token=pair.refresh_token,
@@ -132,8 +163,11 @@ def register(
 
 
 @router.get("/me", response_model=AthleteProfileResponse)
-def my_profile(athlete: Athlete = Depends(require_athlete)):
-    return _profile(athlete, age_on(athlete.dob))
+def my_profile(
+    db: Session = Depends(get_db),
+    athlete: Athlete = Depends(require_athlete),
+):
+    return _profile(db, athlete, age_on(athlete.dob))
 
 
 @router.patch("/me", response_model=AthleteProfileResponse)
@@ -154,6 +188,12 @@ def update_my_profile(
         athlete.name = payload.name.strip()
     if payload.region is not None:
         athlete.region = _validated_region(payload.region)
+    if payload.city is not None:
+        athlete.city = _required_text(payload.city, "City")
+    if payload.place is not None:
+        athlete.place = _optional_text(payload.place)
+    if payload.achievements is not None:
+        athlete.achievements = _optional_text(payload.achievements)
     if payload.height_cm is not None:
         athlete.height_cm = payload.height_cm
     if payload.weight_kg is not None:
@@ -171,7 +211,7 @@ def update_my_profile(
     db.add(athlete)
     db.commit()
 
-    return _profile(athlete, age_on(athlete.dob))
+    return _profile(db, athlete, age_on(athlete.dob))
 
 
 @router.post("/me/photo", response_model=MessageResponse)
@@ -183,10 +223,20 @@ async def upload_reference_photo(
 ):
     """Store the registration photo Sprint 6's identity check compares against.
 
-    Kept in the same private, signed-URL-only storage as the videos. This is a
-    photograph of a child's face held by a government platform; there is no
+    Kept in the same private, signed-URL-only storage as the videos, and
+    encrypted before it gets there (see `services/identity_crypto.py`). This is
+    a photograph of a child's face held by a government platform; there is no
     version of this that belongs on a public URL.
+
+    Refused without consent to face verification: the photo exists only to be
+    compared against, and that comparison is what the athlete consents to.
     """
+    if not consent_service.has(db, athlete.id, ConsentPurpose.face_verification):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Consent to face verification is needed before a photo is stored",
+        )
+
     if file.content_type not in ALLOWED_PHOTO_TYPES:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -207,8 +257,7 @@ async def upload_reference_photo(
         )
 
     storage = get_storage(settings)
-    key = f"reference-faces/{athlete.id}/{uuid.uuid4().hex}.jpg"
-    storage.store_bytes(key, content, content_type=file.content_type)
+    key = identity_crypto.store_photo(storage, settings, athlete.id, content)
 
     previous = athlete.reference_face_key
     athlete.reference_face_key = key
@@ -225,6 +274,76 @@ async def upload_reference_photo(
             logger.warning("Could not delete superseded photo %s", previous)
 
     return MessageResponse(message="Registration photo saved")
+
+
+@router.post("/me/consents", response_model=AthleteProfileResponse)
+def give_consent(
+    payload: ConsentRequest,
+    db: Session = Depends(get_db),
+    athlete: Athlete = Depends(require_athlete),
+):
+    """Record a consent — for athletes registered before consent was asked,
+    and for face verification, which is asked with the photo."""
+    try:
+        purpose = consent_service.parse_purpose(payload.purpose)
+        consent_service.grant(
+            db,
+            athlete,
+            purpose,
+            version=payload.version,
+            given_by=payload.given_by,
+            guardian_name=payload.guardian_name,
+        )
+    except consent_service.ConsentProblem as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    db.commit()
+    return _profile(db, athlete, age_on(athlete.dob))
+
+
+@router.delete("/me/consents/{purpose}", response_model=AthleteProfileResponse)
+def withdraw_consent(
+    purpose: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    athlete: Athlete = Depends(require_athlete),
+):
+    """Withdraw consent to face verification, which deletes the photo.
+
+    Official tests need the identity check, so they are unavailable until the
+    athlete consents and adds a photo again; practice is unaffected. Consent to
+    hold the profile itself is not withdrawn here — that is deleting the
+    account, which needs SAI.
+    """
+    try:
+        parsed = consent_service.parse_purpose(purpose)
+    except consent_service.ConsentProblem as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
+
+    if parsed is not ConsentPurpose.face_verification:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Only consent to face verification can be withdrawn in the app",
+        )
+
+    consent_service.withdraw(db, athlete.id, parsed)
+
+    photo = athlete.reference_face_key
+    athlete.reference_face_key = None
+    db.add(athlete)
+    db.commit()
+
+    if photo:
+        try:
+            get_storage(settings).delete(photo)
+        except Exception:
+            # The key is already gone from the profile, so nothing reads it;
+            # the orphan is logged for the operator to remove.
+            logger.error("Could not delete withdrawn photo %s", photo)
+
+    return _profile(db, athlete, age_on(athlete.dob))
 
 
 @router.get("/me/summary", response_model=AthleteSummaryResponse)
@@ -255,7 +374,7 @@ def my_summary(
     ]
 
     return AthleteSummaryResponse(
-        profile=_profile(athlete, age_on(athlete.dob)),
+        profile=_profile(db, athlete, age_on(athlete.dob)),
         personal_bests=_personal_bests(rows),
         history=history,
         total_tests=len(history),
@@ -328,6 +447,20 @@ def _validated_region(value: str) -> str:
     return region
 
 
+def _required_text(value: str, label: str) -> str:
+    cleaned = value.strip()
+    if not cleaned:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{label} cannot be blank",
+        )
+    return cleaned
+
+
+def _optional_text(value: str | None) -> str | None:
+    return (value or "").strip() or None
+
+
 def _validated_gender(value: str) -> Gender:
     try:
         return Gender(value.lower())
@@ -339,7 +472,8 @@ def _validated_gender(value: str) -> Gender:
         ) from exc
 
 
-def _profile(athlete: Athlete, age: int) -> AthleteProfileResponse:
+def _profile(db: Session, athlete: Athlete, age: int) -> AthleteProfileResponse:
+    purposes = set(consent_service.active(db, athlete.id))
     return AthleteProfileResponse(
         athlete_id=athlete.id,
         name=athlete.name,
@@ -353,6 +487,11 @@ def _profile(athlete: Athlete, age: int) -> AthleteProfileResponse:
         has_reference_photo=bool(athlete.reference_face_key),
         leaderboard_opt_in=bool(athlete.leaderboard_opt_in),
         preferred_language=athlete.preferred_language or "en",
+        city=athlete.city,
+        place=athlete.place,
+        achievements=athlete.achievements,
+        consents=sorted(purpose.value for purpose in purposes),
+        missing=consent_service.missing_for_official_tests(athlete, purposes),
     )
 
 

@@ -3,8 +3,10 @@ package com.sai.sports.ui.common
 import androidx.annotation.StringRes
 import com.sai.sports.R
 import com.sai.sports.analyzer.AnalyzerEvent
+import com.sai.sports.analyzer.FormIssue
 import com.sai.sports.analyzer.TestType
 import com.sai.sports.api.ApiFailure
+import com.sai.sports.coach.CoachCue
 import com.sai.sports.sync.SyncStatus
 
 /**
@@ -19,8 +21,47 @@ object Labels {
 
     @StringRes
     fun testName(type: TestType): Int = when (type) {
+        TestType.SQUATS -> R.string.test_squats
+        TestType.PUSH_UPS -> R.string.test_push_ups
+        TestType.BICEP_CURLS -> R.string.test_bicep_curls
+        TestType.LUNGES -> R.string.test_lunges
         TestType.SIT_UPS -> R.string.test_sit_ups
         TestType.VERTICAL_JUMP -> R.string.test_vertical_jump
+    }
+
+    /**
+     * What a coaching cue says, on screen and aloud. [CoachCue.Counted]'s
+     * string takes the count as its argument. Depth advice names the movement,
+     * because "go deeper" means something different for a curl and a squat.
+     */
+    @StringRes
+    fun cue(cue: CoachCue, testType: TestType): Int = when (cue) {
+        is CoachCue.Counted -> R.string.cue_good_rep
+        is CoachCue.Fault -> formIssue(cue.issue)
+        CoachCue.GoDeeper -> when (testType) {
+            TestType.SQUATS -> R.string.cue_depth_squat
+            TestType.PUSH_UPS -> R.string.cue_depth_pushup
+            TestType.BICEP_CURLS -> R.string.cue_depth_curl
+            TestType.LUNGES -> R.string.cue_depth_lunge
+            TestType.SIT_UPS -> R.string.cue_depth_situp
+            TestType.VERTICAL_JUMP -> R.string.cue_depth_generic
+        }
+        CoachCue.TooFast -> R.string.cue_too_fast
+        CoachCue.WrongArm -> R.string.cue_wrong_arm
+        CoachCue.StartPosition -> R.string.cue_start_position
+    }
+
+    @StringRes
+    fun formIssue(issue: FormIssue): Int = when (issue) {
+        FormIssue.TORSO_LEAN -> R.string.cue_torso_lean
+        FormIssue.HIPS_SAGGING -> R.string.cue_hips_sagging
+        FormIssue.HIPS_PIKED -> R.string.cue_hips_piked
+        FormIssue.NOT_IN_PLANK -> R.string.cue_not_in_plank
+        FormIssue.ELBOW_FLARE -> R.string.cue_elbow_flare
+        FormIssue.STANCE_TOO_NARROW -> R.string.cue_stance_too_narrow
+        FormIssue.KNEE_PAST_TOES -> R.string.cue_knee_past_toes
+        FormIssue.FEET_MOVED -> R.string.cue_feet_moved
+        FormIssue.BODY_SWING -> R.string.cue_body_swing
     }
 
     @StringRes
@@ -129,6 +170,11 @@ object Labels {
 
     val INVALID_REASONS: Map<String, Int> = linkedMapOf(
         "No usable pose data" to R.string.invalid_no_pose,
+        // The specific start-position reasons must precede the sit-up one:
+        // lookup takes the first matching prefix.
+        "Start position never detected — stand tall" to R.string.invalid_no_start_standing,
+        "Start position never detected — hold a straight-arm plank" to R.string.invalid_no_start_plank,
+        "Start position never detected — stand facing" to R.string.invalid_no_start_curl,
         "Start position never detected" to R.string.invalid_no_start,
         "Lost track of you mid-jump" to R.string.invalid_lost_track,
         "No clean landing detected" to R.string.invalid_no_landing,
@@ -145,7 +191,10 @@ object Labels {
         val tooFastReps: Int,
         val jumpsMeasured: Int,
         val jumpsRejected: Int,
-        val trackingLost: Int
+        val trackingLost: Int,
+        val formRejectedReps: Int = 0,
+        val formWarnings: Int = 0,
+        val wrongArmReps: Int = 0
     )
 
     fun summarise(events: List<AnalyzerEvent>): AttemptSummary {
@@ -156,7 +205,10 @@ object Labels {
             tooFastReps = count("rep_rejected_too_fast"),
             jumpsMeasured = count("jump_measured"),
             jumpsRejected = count("jump_rejected"),
-            trackingLost = count("tracking_lost")
+            trackingLost = count("tracking_lost"),
+            formRejectedReps = count("rep_rejected_form"),
+            formWarnings = count("form_warning"),
+            wrongArmReps = count("rep_rejected_wrong_arm")
         )
     }
 

@@ -12,6 +12,7 @@ import {
   flagTimestampMs,
   formatDateTime,
   formatScore,
+  identityCheckLabel,
   scoreDifference,
   testName,
 } from "../lib/format";
@@ -230,6 +231,9 @@ function Identity({ result }: { result: ReviewDetail }) {
               The identity check did not run for this submission — this is not a pass.
             </p>
           )}
+          <p>
+            Photo check before the test: <strong>{identityCheckLabel(result.identity_check)}</strong>
+          </p>
         </div>
       </div>
     </Panel>

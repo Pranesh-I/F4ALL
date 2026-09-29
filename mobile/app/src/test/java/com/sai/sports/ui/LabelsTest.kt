@@ -19,15 +19,25 @@ class LabelsTest {
         // Read the analyzers' own source, so a reason added there without a
         // translation here fails the build instead of reaching an athlete in
         // English.
-        val sources = listOf("SitUpAnalyzer.kt", "VerticalJumpAnalyzer.kt").map {
+        val sources = listOf(
+            "SitUpAnalyzer.kt",
+            "VerticalJumpAnalyzer.kt",
+            "RepExerciseAnalyzer.kt",
+            "SquatAnalyzer.kt",
+            "PushUpAnalyzer.kt",
+            "BicepCurlAnalyzer.kt",
+            "LungeAnalyzer.kt"
+        ).map {
             File("src/main/java/com/sai/sports/analyzer/$it").readText()
         }
         val reasons = sources.flatMap { source ->
-            Regex("""reason = "([^"]+)"""").findAll(source).map { it.groupValues[1] } +
+            // `reason = "..."`, and the rep analyzers' `noStartReason = "..."`
+            // which is split across two lines.
+            Regex("""[rR]eason\s*=\s*"([^"]+)"""").findAll(source).map { it.groupValues[1] } +
                 Regex("""fail\(\s*[a-zA-Z.]+,\s*"([^"]+)"""").findAll(source).map { it.groupValues[1] }
         }
 
-        assertTrue("Expected to find analyzer reasons", reasons.size >= 8)
+        assertTrue("Expected to find analyzer reasons", reasons.size >= 13)
         reasons.forEach { reason ->
             assertNotEquals(
                 "No translation for analyzer reason: $reason",
@@ -35,6 +45,27 @@ class LabelsTest {
                 Labels.invalidReason(reason)
             )
         }
+    }
+
+    @Test
+    fun `each rep test's missing start position gets its own advice`() {
+        assertEquals(
+            R.string.invalid_no_start_standing,
+            Labels.invalidReason("Start position never detected — stand tall, side-on to the camera, before starting")
+        )
+        assertEquals(
+            R.string.invalid_no_start_plank,
+            Labels.invalidReason("Start position never detected — hold a straight-arm plank, side-on to the camera")
+        )
+        assertEquals(
+            R.string.invalid_no_start_curl,
+            Labels.invalidReason("Start position never detected — stand facing the camera with your arms straight")
+        )
+        // The sit-up reason still reaches the sit-up advice.
+        assertEquals(
+            R.string.invalid_no_start,
+            Labels.invalidReason("Start position never detected — lie back fully before starting")
+        )
     }
 
     @Test
@@ -69,8 +100,10 @@ class LabelsTest {
 
     @Test
     fun `attempt events are summarised as counts`() {
-        val events = listOf("rep_counted", "rep_counted", "rep_rejected_partial", "side_locked", "tracking_lost")
-            .map { AnalyzerEvent(0, it) }
+        val events = listOf(
+            "rep_counted", "rep_counted", "rep_rejected_partial", "side_locked", "tracking_lost",
+            "rep_rejected_form", "form_warning", "rep_rejected_wrong_arm", "rep_rejected_wrong_arm"
+        ).map { AnalyzerEvent(0, it) }
 
         val summary = Labels.summarise(events)
 
@@ -78,6 +111,9 @@ class LabelsTest {
         assertEquals(1, summary.partialReps)
         assertEquals(1, summary.trackingLost)
         assertEquals(0, summary.jumpsMeasured)
+        assertEquals(1, summary.formRejectedReps)
+        assertEquals(1, summary.formWarnings)
+        assertEquals(2, summary.wrongArmReps)
     }
 
     @Test

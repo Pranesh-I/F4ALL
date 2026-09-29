@@ -67,6 +67,34 @@ object SyncScheduler {
         )
     }
 
+    /**
+     * The athlete asked to send now, or signal just came back.
+     *
+     * [syncNow] keeps a job that is already waiting, which is right after a
+     * recording but wrong here: after a few failures on a weak link that job
+     * can be sitting in hours of backoff, and "Send now" would silently do
+     * nothing. This replaces its own job instead, so it runs as soon as there
+     * is a network. The drain lock stops it overlapping any other sync.
+     */
+    fun sendNow(context: Context) {
+
+        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                RetryPolicy.INITIAL_DELAY_MS,
+                TimeUnit.MILLISECONDS
+            )
+            .addTag(SyncWorker.WORK_NAME)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            SEND_NOW_WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
     /** Called once at app startup. */
     fun ensurePeriodicSync(context: Context) {
 
@@ -81,6 +109,8 @@ object SyncScheduler {
                 TimeUnit.MILLISECONDS
             )
             .addTag(PERIODIC_WORK_NAME)
+            // So the sync screen shows "sending" during a periodic run too.
+            .addTag(SyncWorker.WORK_NAME)
             .build()
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -97,6 +127,7 @@ object SyncScheduler {
             .map { infos -> infos.any { it.state == WorkInfo.State.RUNNING } }
 
     private const val PERIODIC_WORK_NAME = "f4all-sync-periodic"
+    private const val SEND_NOW_WORK_NAME = "f4all-sync-now"
 
     /**
      * The floor WorkManager allows for periodic work is 15 minutes. Chosen

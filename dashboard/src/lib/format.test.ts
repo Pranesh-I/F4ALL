@@ -1,4 +1,11 @@
-import { flagReason, flagTimestampMs, formatScore, scoreDifference, testName } from "./format";
+import {
+  flagReason,
+  flagTimestampMs,
+  formatScore,
+  identityCheckLabel,
+  scoreDifference,
+  testName,
+} from "./format";
 
 describe("format", () => {
   it("formats scores without spurious decimals", () => {
@@ -25,6 +32,7 @@ describe("format", () => {
       "framerate_implausible",
       "face_mismatch",
       "face_not_found",
+      "identity_unconfirmed",
       "score_discrepancy",
       "server_could_not_score",
       "low_tracking_quality",
@@ -43,5 +51,11 @@ describe("format", () => {
   it("names tests", () => {
     expect(testName("SIT_UPS")).toBe("Sit-ups");
     expect(testName("SHUTTLE_RUN")).toBe("shuttle run");
+  });
+  it("never presents a missing photo check as a pass", () => {
+    expect(identityCheckLabel("match")).toBe("matched the registration photo");
+    expect(identityCheckLabel(null)).toBe("not taken");
+    expect(identityCheckLabel(undefined)).toBe("not taken");
+    expect(identityCheckLabel("no_match")).toContain("did not clearly match");
   });
 });

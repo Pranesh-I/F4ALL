@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -30,24 +31,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import com.sai.sports.R
 import com.sai.sports.analyzer.AnalyzerResult
 import com.sai.sports.analyzer.AttemptStatus
 import com.sai.sports.analyzer.PoseFrame
+import com.sai.sports.analyzer.TestType
+import com.sai.sports.coach.FormSummary
 import com.sai.sports.data.Attempt
+import com.sai.sports.data.AttemptMode
 import com.sai.sports.data.AttemptStore
+import com.sai.sports.data.PracticeComparison
+import com.sai.sports.data.PracticeStats
 import com.sai.sports.ui.capture.PoseOverlayView
 import com.sai.sports.ui.common.Labels
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 /**
  * Shows the provisional score for a completed attempt, with a skeleton replay.
@@ -60,7 +69,12 @@ import kotlinx.coroutines.withContext
 fun ResultsScreen(
     attemptId: String,
     onRetry: () -> Unit,
-    onDone: () -> Unit
+    onDone: () -> Unit,
+    /**
+     * True when opened from history to look back at an old attempt, rather
+     * than straight after recording it: there is nothing to "try again".
+     */
+    reviewing: Boolean = false
 ) {
 
     val context = LocalContext.current
@@ -74,7 +88,16 @@ fun ResultsScreen(
             } else {
                 LoadedAttempt(
                     attempt = attempt,
-                    frames = store.loadSequence(attemptId)
+                    frames = store.loadSequence(attemptId),
+                    // Compared only with the same athlete's own practice.
+                    comparison = if (attempt.mode == AttemptMode.PRACTICE) {
+                        PracticeStats.compare(
+                            attempt,
+                            store.listAttempts().filter { it.athleteId == attempt.athleteId }
+                        )
+                    } else {
+                        null
+                    }
                 )
             }
         }
@@ -100,7 +123,13 @@ fun ResultsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
+        if (current.attempt.mode == AttemptMode.PRACTICE) {
+            PracticeLabel()
+        }
+
         ScoreCard(current.attempt.result)
+
+        current.comparison?.let { PracticeProgressCard(it, current.attempt) }
 
         if (current.frames.isNotEmpty()) {
             SkeletonReplay(
@@ -108,6 +137,17 @@ fun ResultsScreen(
                 imageWidth = current.attempt.imageWidth,
                 imageHeight = current.attempt.imageHeight
             )
+        } else if (current.attempt.mode == AttemptMode.PRACTICE) {
+            // Practice from the athlete's other phone: the result came with
+            // their account, the skeleton did not.
+            Text(
+                text = stringResource(R.string.practice_no_replay),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
+        FormSummary.from(current.attempt.result.events)?.let { summary ->
+            FormCard(summary, current.attempt.testType)
         }
 
         QualityCard(current.attempt.result)
@@ -116,17 +156,33 @@ fun ResultsScreen(
             EventsCard(current.attempt.result)
         }
 
-        ProvisionalNotice()
+        if (current.attempt.mode == AttemptMode.PRACTICE) {
+            Text(
+                text = stringResource(R.string.practice_notice),
+                style = MaterialTheme.typography.bodySmall
+            )
+        } else {
+            ProvisionalNotice()
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedButton(
-                onClick = onRetry,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(stringResource(R.string.action_try_again))
+            // A scored official session attempt used that test's one
+            // submission: there is nothing to try again. An unscored one was
+            // never queued, so the athlete may still go.
+            val usedSubmission = current.attempt.sessionId != null &&
+                current.attempt.mode == AttemptMode.OFFICIAL &&
+                current.attempt.result.status == AttemptStatus.COMPLETE
+
+            if (reviewing || !usedSubmission) {
+                OutlinedButton(
+                    onClick = onRetry,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(stringResource(if (reviewing) R.string.action_back else R.string.action_try_again))
+                }
             }
 
             Button(
@@ -364,9 +420,24 @@ private fun EventsCard(result: AnalyzerResult) {
 
     val summary = Labels.summarise(result.events)
     val lines = buildList {
-        if (summary.repsCounted > 0) add(stringResource(R.string.summary_reps_counted, summary.repsCounted))
-        if (summary.partialReps > 0) add(stringResource(R.string.summary_partial_reps, summary.partialReps))
+        // The sit-up wording names the movement; every other rep test gets the generic lines.
+        val sitUps = result.testType == TestType.SIT_UPS
+        if (summary.repsCounted > 0) add(
+            stringResource(
+                if (sitUps) R.string.summary_reps_counted else R.string.summary_reps_counted_generic,
+                summary.repsCounted
+            )
+        )
+        if (summary.partialReps > 0) add(
+            stringResource(
+                if (sitUps) R.string.summary_partial_reps else R.string.summary_partial_reps_generic,
+                summary.partialReps
+            )
+        )
         if (summary.tooFastReps > 0) add(stringResource(R.string.summary_too_fast_reps, summary.tooFastReps))
+        if (summary.formRejectedReps > 0) add(stringResource(R.string.summary_form_rejected, summary.formRejectedReps))
+        if (summary.formWarnings > 0) add(stringResource(R.string.summary_form_warnings, summary.formWarnings))
+        if (summary.wrongArmReps > 0) add(stringResource(R.string.summary_wrong_arm, summary.wrongArmReps))
         if (summary.jumpsMeasured > 0) add(stringResource(R.string.summary_jumps_measured, summary.jumpsMeasured))
         if (summary.jumpsRejected > 0) add(stringResource(R.string.summary_jumps_rejected, summary.jumpsRejected))
         if (summary.trackingLost > 0) add(stringResource(R.string.summary_tracking_lost, summary.trackingLost))
@@ -397,6 +468,58 @@ private fun EventsCard(result: AnalyzerResult) {
 }
 
 /**
+ * How well the reps were done, not just how many.
+ *
+ * The count says whether the athlete scored; this says what to practise. It
+ * names at most two things, most frequent first — a list of every fault is a
+ * list nobody acts on.
+ */
+@Composable
+private fun FormCard(summary: FormSummary, testType: TestType) {
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+
+            Text(
+                text = stringResource(R.string.form_title),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.semantics { heading() }
+            )
+
+            Text(
+                text = "${summary.scorePercent}%",
+                style = MaterialTheme.typography.headlineMedium
+            )
+
+            Text(
+                text = stringResource(R.string.form_good_reps, summary.goodReps, summary.attemptedReps),
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            if (summary.toWorkOn.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.form_all_good),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                summary.toWorkOn.forEach { cue ->
+                    Text(
+                        text = stringResource(R.string.form_work_on, stringResource(Labels.cue(cue, testType))),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * The system's first invariant, said out loud to the athlete.
  *
  * They should never be surprised when the official number differs from what
@@ -411,9 +534,80 @@ private fun ProvisionalNotice() {
     )
 }
 
+/** Says "practice" in words, not only colour, so it survives a screen reader and bright sun. */
+@Composable
+private fun PracticeLabel() {
+    Text(
+        text = stringResource(R.string.practice_badge),
+        style = MaterialTheme.typography.labelLarge,
+        color = Color.Black,
+        modifier = Modifier
+            .background(Color(0xFFFFC107), RoundedCornerShape(6.dp))
+            .padding(horizontal = 10.dp, vertical = 3.dp)
+    )
+}
+
+/**
+ * Progress, in the athlete's terms: a personal best, or how this attempt
+ * compares with their best and their last one.
+ */
+@Composable
+private fun PracticeProgressCard(comparison: PracticeComparison, attempt: Attempt) {
+
+    val unit = stringResource(Labels.unit(attempt.result.unit))
+
+    fun format(value: Double) =
+        if (attempt.testType.countsReps) value.toInt().toString()
+        else String.format(Locale.getDefault(), "%.1f", value)
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+
+            when {
+                comparison.isFirstScored -> Text(
+                    text = stringResource(R.string.practice_first_best),
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                comparison.isPersonalBest -> Text(
+                    text = stringResource(R.string.practice_new_best),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color(0xFF2E7D32),
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                )
+
+                else -> comparison.previousBest?.let { best ->
+                    Text(
+                        text = stringResource(R.string.practice_your_best, "${format(best)} $unit"),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+
+            comparison.changeFromPrevious?.let { change ->
+                Text(
+                    text = when {
+                        change > 0.0 -> stringResource(R.string.practice_vs_last_up, "${format(change)} $unit")
+                        change < 0.0 -> stringResource(R.string.practice_vs_last_down, "${format(-change)} $unit")
+                        else -> stringResource(R.string.practice_vs_last_same)
+                    },
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
 private data class LoadedAttempt(
     val attempt: Attempt,
-    val frames: List<PoseFrame>
+    val frames: List<PoseFrame>,
+    val comparison: PracticeComparison? = null
 )
 
 private const val MIN_FRAME_DELAY_MS = 16L

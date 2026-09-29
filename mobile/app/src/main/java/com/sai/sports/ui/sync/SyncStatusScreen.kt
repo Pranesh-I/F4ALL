@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -21,19 +22,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.res.stringResource
 import com.sai.sports.R
-import com.sai.sports.ui.common.Labels
-import com.sai.sports.ui.common.ScreenTitle
+import com.sai.sports.auth.AppServices
 import com.sai.sports.data.SyncRepository
 import com.sai.sports.data.local.TestAttemptEntity
+import com.sai.sports.sync.Delivery
+import com.sai.sports.sync.FailureHint
+import com.sai.sports.sync.NetworkMonitor
 import com.sai.sports.sync.SyncScheduler
 import com.sai.sports.sync.SyncStatus
+import com.sai.sports.ui.common.Labels
+import com.sai.sports.ui.common.ScreenTitle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -59,11 +65,17 @@ fun SyncStatusScreen(
     val scope = rememberCoroutineScope()
     val repository = remember { SyncRepository(context) }
 
-    val attempts by repository.observeAttempts()
-        .collectAsStateWithLifecycle(initialValue = emptyList())
+    // Only the signed-in athlete's queue: a shared phone may hold others'.
+    val athleteId = remember { AppServices.session(context).current()?.athleteId }
+    val attempts by remember(athleteId) {
+        athleteId?.let(repository::observeAttempts) ?: flowOf(emptyList())
+    }.collectAsStateWithLifecycle(initialValue = emptyList())
 
     val isSyncing by SyncScheduler.observeSyncRunning(context)
         .collectAsStateWithLifecycle(initialValue = false)
+
+    val online by remember { NetworkMonitor.observeOnline(context) }
+        .collectAsStateWithLifecycle(initialValue = true)
 
     Column(
         modifier = Modifier
@@ -85,7 +97,22 @@ fun SyncStatusScreen(
             }
         }
 
-        val pending = attempts.count { it.syncStatus.isPending }
+        val pending = attempts.count {
+            Delivery.of(it) == Delivery.SENDING || Delivery.of(it) == Delivery.WAITING_TO_SUBMIT
+        }
+
+        // Said plainly, because the fear is that closing the app loses the test.
+        if (!online && pending > 0) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.sync_offline_title), style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.sync_offline_body), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
 
         Text(
             text = when {
@@ -97,9 +124,9 @@ fun SyncStatusScreen(
             style = MaterialTheme.typography.bodyMedium
         )
 
-        if (pending > 0 && !isSyncing) {
+        if (pending > 0 && !isSyncing && online) {
             OutlinedButton(
-                onClick = { SyncScheduler.syncNow(context) }
+                onClick = { SyncScheduler.sendNow(context) }
             ) {
                 Text(stringResource(R.string.sync_try_now))
             }
@@ -130,7 +157,7 @@ fun SyncStatusScreen(
                             withContext(Dispatchers.IO) {
                                 repository.retry(attempt.id)
                             }
-                            SyncScheduler.syncNow(context)
+                            SyncScheduler.sendNow(context)
                         }
                     }
                 )
@@ -177,12 +204,22 @@ private fun AttemptRow(
                 style = MaterialTheme.typography.bodySmall
             )
 
+            val delivery = Delivery.of(attempt)
+
             Text(
-                text = stringResource(Labels.syncStatus(attempt.syncStatus)),
+                text = stringResource(
+                    when (delivery) {
+                        Delivery.SENDING -> Labels.syncStatus(attempt.syncStatus)
+                        Delivery.WAITING_TO_SUBMIT -> R.string.sync_waiting_to_submit
+                        Delivery.SUBMITTED -> R.string.sync_submitted
+                        Delivery.NOT_ACCEPTED -> R.string.sync_not_accepted
+                        Delivery.FAILED -> R.string.sync_failed
+                    }
+                ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = when (attempt.syncStatus) {
-                    SyncStatus.SYNCED -> MaterialTheme.colorScheme.primary
-                    SyncStatus.FAILED -> MaterialTheme.colorScheme.error
+                color = when (delivery) {
+                    Delivery.SUBMITTED -> MaterialTheme.colorScheme.primary
+                    Delivery.FAILED, Delivery.NOT_ACCEPTED -> MaterialTheme.colorScheme.error
                     else -> MaterialTheme.colorScheme.onSurface
                 }
             )
@@ -192,6 +229,27 @@ private fun AttemptRow(
                     progress = { attempt.progress() },
                     modifier = Modifier.fillMaxWidth()
                 )
+                // In megabytes, because that is what the athlete's data pack is sold in.
+                Text(
+                    text = stringResource(
+                        R.string.sync_progress_mb,
+                        megabytes(attempt.uploadedBytes),
+                        megabytes(attempt.compressedSizeBytes)
+                    ),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            // SAI's own words for why, since the athlete may need to act on
+            // them (e.g. ask an official about a closed session).
+            if (delivery == Delivery.NOT_ACCEPTED) {
+                Text(
+                    text = stringResource(R.string.sync_not_accepted_hint),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                attempt.lastError?.let {
+                    Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
             }
 
             // Once submitted, the athlete can follow the result through SAI's
@@ -209,21 +267,31 @@ private fun AttemptRow(
 
                 // The stored error is an English diagnostic for developers;
                 // the athlete gets a plain instruction in their language.
-                attempt.lastError?.let {
-                    Text(
-                        text = stringResource(R.string.sync_failed_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
+                val hint = FailureHint.of(attempt.lastError)
+                Text(
+                    text = stringResource(
+                        when (hint) {
+                            FailureHint.RECORDING_MISSING -> R.string.sync_failed_missing
+                            FailureHint.SIGN_IN -> R.string.sync_failed_sign_in
+                            FailureHint.RETRY -> R.string.sync_failed_hint
+                        }
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
 
-                OutlinedButton(onClick = onRetry) {
-                    Text(stringResource(R.string.action_retry))
+                if (hint.retryable) {
+                    OutlinedButton(onClick = onRetry) {
+                        Text(stringResource(R.string.action_retry))
+                    }
                 }
             }
         }
     }
 }
+
+private fun megabytes(bytes: Long): String =
+    String.format(Locale.getDefault(), "%.1f", bytes / (1024.0 * 1024.0))
 
 private fun formatScore(attempt: TestAttemptEntity): String =
     if (attempt.scoreUnit == "reps") attempt.provisionalScore.toInt().toString()

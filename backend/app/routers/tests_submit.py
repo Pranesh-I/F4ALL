@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
 from ..database import get_db
 from ..models import (
+    AssessmentSession,
     Athlete,
+    IdentityCheck,
     ReviewActionRecord,
     Test,
     TestResult,
@@ -30,6 +34,7 @@ from ..schemas import (
 )
 from ..security import current_athlete
 from ..services import benchmarks as benchmark_service
+from ..services import sessions as session_rules
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +113,9 @@ def submit_test(
                     result_id=existing.id, status=_value(existing.status)
                 )
 
+    session = _session_for(db, payload, test, athlete_id, settings)
+    identity_check = _identity_check_for(db, payload, athlete_id)
+
     attempt_number = (
         db.execute(
             select(func.coalesce(func.max(TestResult.attempt_number), 0)).where(
@@ -121,6 +129,8 @@ def submit_test(
     result = TestResult(
         athlete_id=athlete_id,
         test_id=test.id,
+        session_id=session.id if session else None,
+        identity_check_id=identity_check.id if identity_check else None,
         attempt_number=attempt_number,
         provisional_score=payload.provisional_score,
         # processing, never verified. The device's number is provisional until
@@ -134,7 +144,18 @@ def submit_test(
         video.test_result_id = result.id
         db.add(video)
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # The session's one-submission slot was taken by a request that
+        # committed between our check and this insert. The database index is
+        # the final word on it.
+        db.rollback()
+        if session is None:
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=ALREADY_SUBMITTED
+        ) from None
     db.refresh(result)
 
     if video is not None:
@@ -149,6 +170,92 @@ def submit_test(
         )
 
     return SubmitTestResponse(result_id=result.id, status=result.status.value)
+
+
+ALREADY_SUBMITTED = "You have already submitted this test for this assessment session"
+
+
+def _identity_check_for(
+    db: Session, payload: SubmitTestRequest, athlete_id
+) -> IdentityCheck | None:
+    """The photo check this attempt names — only ever the athlete's own.
+
+    Whether it matched is not judged here: an attempt without a match still
+    lands, and verification routes it to a reviewer.
+    """
+    if payload.identity_check_id is None:
+        return None
+    check = db.get(IdentityCheck, payload.identity_check_id)
+    if check is None or check.athlete_id != athlete_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unknown identity check",
+        )
+    return check
+
+
+def _session_for(
+    db: Session,
+    payload: SubmitTestRequest,
+    test: Test,
+    athlete_id: uuid.UUID,
+    settings: Settings,
+) -> AssessmentSession | None:
+    """The session this official attempt counts towards, after checking it may.
+
+    Runs after the idempotent-retry return above, so a phone repeating a
+    submission that already landed still gets its result back instead of
+    being told it has already submitted.
+    """
+    if payload.session_id is None:
+        if settings.sessions_required:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Official tests must be submitted within an assessment session",
+            )
+        return None
+
+    session = db.get(AssessmentSession, payload.session_id)
+    athlete = db.get(Athlete, athlete_id)
+    if session is None or athlete is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unknown assessment session",
+        )
+
+    recorded_at = (
+        datetime.fromtimestamp(payload.recorded_at_ms / 1000, tz=UTC)
+        if payload.recorded_at_ms is not None
+        else None
+    )
+    problem = session_rules.submission_problem(
+        session,
+        athlete,
+        test.code,
+        recorded_at,
+        now=datetime.now(UTC),
+        grace=timedelta(hours=settings.session_submission_grace_hours),
+    )
+    if problem is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=problem)
+
+    already = db.execute(
+        select(func.count())
+        .select_from(TestResult)
+        .where(
+            TestResult.athlete_id == athlete_id,
+            TestResult.session_id == session.id,
+            TestResult.test_id == test.id,
+            # An official's request to resubmit frees the slot.
+            TestResult.status != TestResultStatus.pending_sync,
+        )
+    ).scalar_one()
+    if already:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=ALREADY_SUBMITTED
+        )
+
+    return session
 
 
 def _assert_video_owner(db: Session, video: Video, athlete: Athlete | None) -> None:

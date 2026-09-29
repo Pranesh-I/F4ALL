@@ -15,6 +15,9 @@ pydantic-settings>=2.6
 # --- Auth (Sprint 7 issues real tokens; the middleware verifies them now) ---
 pyjwt>=2.10
 
+# --- Identity: registration photos are encrypted before storage (AES-GCM) ---
+cryptography>=43
+
 # --- Async verification pipeline ---
 celery[redis]>=5.4
 redis>=5.2

@@ -1,12 +1,34 @@
 package com.sai.sports.analyzer
 
-/** The two tests in the MVP battery. Sprint 10 adds shuttle run and endurance run. */
+/**
+ * The F4ALL test battery.
+ *
+ * Declaration order is display order. Room stores the name, never the ordinal,
+ * so reordering is safe; renaming a constant is not — it is the stable code the
+ * server keys verification off.
+ */
 enum class TestType(
     val displayName: String,
     val unit: String
 ) {
-    SIT_UPS("Sit-ups", "reps"),
-    VERTICAL_JUMP("Vertical Jump", "cm");
+    SQUATS("Squats", "reps"),
+    PUSH_UPS("Push-ups", "reps"),
+    BICEP_CURLS("Bicep Curls", "reps"),
+    LUNGES("Lunges", "reps"),
+    VERTICAL_JUMP("Vertical Jump", "cm"),
+    SIT_UPS("Sit-ups", "reps");
+
+    /** Scored by counting repetitions, rather than by a measurement. */
+    val countsReps: Boolean
+        get() = unit == "reps"
+
+    /**
+     * Whether a bigger score is a better one. True for every test in the
+     * current battery (reps, jump height); a timed test such as the shuttle
+     * run will not be, and personal bests must not assume otherwise.
+     */
+    val higherIsBetter: Boolean
+        get() = true
 
     companion object {
         fun fromDisplayName(name: String): TestType? =
@@ -63,10 +85,8 @@ data class AnalyzerResult(
 
     /** Score formatted for display — reps are whole numbers, jump height is not. */
     fun formattedScore(): String =
-        when (testType) {
-            TestType.SIT_UPS -> score.toInt().toString()
-            TestType.VERTICAL_JUMP -> String.format(java.util.Locale.US, "%.1f", score)
-        }
+        if (testType.countsReps) score.toInt().toString()
+        else String.format(java.util.Locale.US, "%.1f", score)
 
     companion object {
 
@@ -109,12 +129,42 @@ interface TestAnalyzer {
     /** The score as it stands right now, for live display. */
     fun currentScore(): Double
 
+    /** Whether the start position has been seen, so reps or jumps can now score. */
+    fun isReady(): Boolean
+
+    /**
+     * Trace events recorded so far, skipping the first [fromIndex]. Lets live
+     * coaching react to each rep as it is judged without copying the whole
+     * trace every frame.
+     */
+    fun eventsSince(fromIndex: Int): List<AnalyzerEvent>
+
     /** Finalize and return the attempt result. */
     fun result(): AnalyzerResult
 
     /** Clear all state for a fresh attempt. */
     fun reset()
 }
+
+/**
+ * The analyzer that scores [testType].
+ *
+ * [athleteHeightCm] is required for [TestType.VERTICAL_JUMP] — without it there
+ * is no way to turn normalized displacement into centimetres — and ignored by
+ * every other test.
+ */
+fun analyzerFor(testType: TestType, athleteHeightCm: Double?): TestAnalyzer =
+    when (testType) {
+        TestType.SQUATS -> SquatAnalyzer()
+        TestType.PUSH_UPS -> PushUpAnalyzer()
+        TestType.BICEP_CURLS -> BicepCurlAnalyzer()
+        TestType.LUNGES -> LungeAnalyzer()
+        TestType.SIT_UPS -> SitUpAnalyzer()
+        TestType.VERTICAL_JUMP -> VerticalJumpAnalyzer(
+            athleteHeightCm = athleteHeightCm
+                ?: error("Vertical jump needs the athlete's height to calibrate")
+        )
+    }
 
 /** Runs an analyzer over a complete recorded sequence. Used by the validation harness. */
 fun TestAnalyzer.analyzeSequence(frames: List<PoseFrame>): AnalyzerResult {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lunge start: standing tall, side-on. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M8,108 L112,108 M53,18 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 M60,25 L60,62 M60,62 L60,106 M60,34 L66,58" />
+</vector>

@@ -1,0 +1,161 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "8fbab7e8ea0f06db617f58e3c18b76ef",
+    "entities": [
+      {
+        "tableName": "test_attempts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `test_type` TEXT NOT NULL, `recorded_at_ms` INTEGER NOT NULL, `provisional_score` REAL NOT NULL, `score_unit` TEXT NOT NULL, `sync_status` TEXT NOT NULL, `source_video_path` TEXT NOT NULL, `compressed_video_path` TEXT, `source_size_bytes` INTEGER NOT NULL, `compressed_size_bytes` INTEGER NOT NULL, `checksum_sha256` TEXT, `upload_id` TEXT, `uploaded_bytes` INTEGER NOT NULL, `video_id` TEXT, `attempt_count` INTEGER NOT NULL, `last_error` TEXT, `last_attempt_at_ms` INTEGER, `synced_at_ms` INTEGER, `result_id` TEXT, `athlete_id` TEXT, `session_id` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "testType",
+            "columnName": "test_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordedAtMs",
+            "columnName": "recorded_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "provisionalScore",
+            "columnName": "provisional_score",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scoreUnit",
+            "columnName": "score_unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "sync_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceVideoPath",
+            "columnName": "source_video_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "compressedVideoPath",
+            "columnName": "compressed_video_path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceSizeBytes",
+            "columnName": "source_size_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "compressedSizeBytes",
+            "columnName": "compressed_size_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "checksumSha256",
+            "columnName": "checksum_sha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "uploadId",
+            "columnName": "upload_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "uploadedBytes",
+            "columnName": "uploaded_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "videoId",
+            "columnName": "video_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "attemptCount",
+            "columnName": "attempt_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastError",
+            "columnName": "last_error",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastAttemptAtMs",
+            "columnName": "last_attempt_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "syncedAtMs",
+            "columnName": "synced_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "resultId",
+            "columnName": "result_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "athleteId",
+            "columnName": "athlete_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "session_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_test_attempts_sync_status",
+            "unique": false,
+            "columnNames": [
+              "sync_status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_test_attempts_sync_status` ON `${TABLE_NAME}` (`sync_status`)"
+          },
+          {
+            "name": "index_test_attempts_recorded_at_ms",
+            "unique": false,
+            "columnNames": [
+              "recorded_at_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_test_attempts_recorded_at_ms` ON `${TABLE_NAME}` (`recorded_at_ms`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8fbab7e8ea0f06db617f58e3c18b76ef')"
+    ]
+  }
+}

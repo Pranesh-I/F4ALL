@@ -35,6 +35,7 @@ object RegistrationRules {
         dateOfBirth: LocalDate?,
         gender: String?,
         region: String?,
+        city: String,
         heightCm: String,
         weightKg: String,
         today: LocalDate = LocalDate.now()
@@ -50,6 +51,7 @@ object RegistrationRules {
 
         if (gender == null) return Problem(R.string.register_error_gender)
         if (region == null) return Problem(R.string.register_error_region)
+        if (city.isBlank()) return Problem(R.string.register_error_city)
 
         // Required, not optional: vertical jump cannot be measured without it,
         // and asking later means a jump test that cannot be scored.

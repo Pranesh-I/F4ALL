@@ -106,6 +106,28 @@ class Settings(BaseSettings):
     discrepancy_tolerance_reps: float = 2.0
     discrepancy_tolerance_cm: float = 5.0
 
+    # --- Assessment sessions ---
+    # An official attempt must be recorded inside its session's window, but may
+    # arrive later: an athlete in a village records during the session and the
+    # phone only finds signal days afterwards. This is how late it may arrive.
+    session_submission_grace_hours: int = 72
+
+    # When true, every official submission must name an assessment session.
+    # Off by default so app versions from before sessions keep working; turn it
+    # on once every phone in the field sends a session.
+    sessions_required: bool = False
+
+    # --- Identity ---
+    # 32 random bytes, base64url, that encrypt registration face photos before
+    # they reach storage. Required in production; development derives one from
+    # jwt_secret. Generate with `python -m app.cli identity-key`.
+    identity_encryption_key: str = ""
+
+    # Pre-test identity checks an athlete may run per hour. Enough for several
+    # retakes before each of a session's tests; not enough to tune a photo
+    # against the matcher by trial and error.
+    identity_checks_per_hour: int = 12
+
     @property
     def is_production(self) -> bool:
         return self.environment.lower() in {"production", "prod", "staging"}

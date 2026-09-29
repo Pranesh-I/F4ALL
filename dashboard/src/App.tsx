@@ -6,6 +6,7 @@ import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { QueuePage } from "./pages/QueuePage";
 import { ReviewPage } from "./pages/ReviewPage";
+import { SessionsPage } from "./pages/SessionsPage";
 
 function RequireOfficial({ children }: { children: ReactNode }) {
   const { official, restoring } = useAuth();
@@ -36,6 +37,7 @@ export function App() {
         <Route path="/reviews" element={<QueuePage />} />
         <Route path="/reviews/:resultId" element={<ReviewPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="/sessions" element={<SessionsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/reviews" replace />} />
     </Routes>

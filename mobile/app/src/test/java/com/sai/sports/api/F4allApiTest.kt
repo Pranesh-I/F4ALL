@@ -37,6 +37,139 @@ class F4allApiTest {
             .setHeader("Content-Type", "application/json")
 
     @Test
+    fun `an official submission names its session and when it was recorded`() {
+        server.enqueue(json(201, """{"result_id":"r-9","status":"processing"}"""))
+
+        api.submitTest("SQUATS", 15.0, "video-9", null, sessionId = "s-1", recordedAtMs = 1_700_000_000_000)
+
+        val sent = JSONObject(server.takeRequest().body.readUtf8())
+        assertEquals("s-1", sent.getString("session_id"))
+        assertEquals(1_700_000_000_000, sent.getLong("recorded_at_ms"))
+    }
+
+    @Test
+    fun `an official submission names the photo check taken before it`() {
+        server.enqueue(json(201, """{"result_id":"r-9","status":"processing"}"""))
+
+        api.submitTest("SQUATS", 15.0, "video-9", null, sessionId = "s-1", identityCheckId = "c-7")
+
+        assertEquals("c-7", JSONObject(server.takeRequest().body.readUtf8()).getString("identity_check_id"))
+    }
+
+    @Test
+    fun `the photo check sends the photo, when it was taken and the session`() {
+        server.enqueue(json(201, """{"check_id":"c-1","outcome":"no_face","remaining_this_hour":10}"""))
+
+        val result = (api.identityCheck(byteArrayOf(1, 2, 3), 1_700_000_000_000, "s-1") as ApiResult.Success).value
+
+        val request = server.takeRequest()
+        assertEquals("/api/athletes/me/identity-checks", request.path)
+        assertEquals("Bearer token-123", request.getHeader("Authorization"))
+        val body = request.body.readUtf8()
+        assertTrue(body.contains("name=\"file\""))
+        assertTrue(body.contains("name=\"captured_at_ms\""))
+        assertTrue(body.contains("1700000000000"))
+        assertTrue(body.contains("name=\"session_id\""))
+        assertEquals(IdentityCheckResult("c-1", "no_face", 10), result)
+        assertFalse(result.matched)
+    }
+
+    @Test
+    fun `consent is sent with its purpose, and the profile says what is missing`() {
+        server.enqueue(
+            json(
+                200,
+                """{"athlete_id":"a","name":"A","dob":"2011-01-01","age_years":15,"gender":"female",
+                   "region":"Kerala","phone":"9","height_cm":150,"weight_kg":null,"has_reference_photo":false,
+                   "city":"Kochi","place":null,"achievements":"District relay",
+                   "consents":["face_verification","registration"],"missing":["photo"]}"""
+            )
+        )
+
+        val profile = (api.giveConsent(
+            ConsentPurpose.FACE_VERIFICATION,
+            ConsentGrant("2026-09", "guardian", "R. Nair")
+        ) as ApiResult.Success).value
+
+        val sent = JSONObject(server.takeRequest().body.readUtf8())
+        assertEquals("face_verification", sent.getString("purpose"))
+        assertEquals("R. Nair", sent.getString("guardian_name"))
+        assertEquals("Kochi", profile.city)
+        assertNull(profile.place)
+        assertEquals("District relay", profile.achievements)
+        assertEquals(listOf("face_verification", "registration"), profile.consents)
+        assertEquals(listOf("photo"), profile.missing)
+        assertFalse(profile.complete)
+    }
+
+    @Test
+    fun `withdrawing face consent is a delete of that consent`() {
+        server.enqueue(
+            json(
+                200,
+                """{"athlete_id":"a","name":"A","dob":"2011-01-01","age_years":15,"gender":"female",
+                   "region":"Kerala","phone":"9","height_cm":150,"weight_kg":null,"has_reference_photo":false,
+                   "consents":["registration"],"missing":["face_consent","photo"]}"""
+            )
+        )
+
+        api.withdrawFaceConsent()
+
+        val request = server.takeRequest()
+        assertEquals("DELETE", request.method)
+        assertEquals("/api/athletes/me/consents/face_verification", request.path)
+    }
+
+    @Test
+    fun `a profile from an older server reads as complete-unknown, not a crash`() {
+        server.enqueue(
+            json(
+                200,
+                """{"athlete_id":"a","name":"A","dob":"2011-01-01","age_years":15,"gender":"female",
+                   "region":"Kerala","phone":"9","height_cm":150,"weight_kg":null,"has_reference_photo":true}"""
+            )
+        )
+
+        val profile = (api.profile() as ApiResult.Success).value
+
+        assertNull(profile.city)
+        assertEquals(emptyList<String>(), profile.missing)
+    }
+
+    @Test
+    fun `a submission outside any session sends no session`() {
+        server.enqueue(json(201, """{"result_id":"r-9","status":"processing"}"""))
+
+        api.submitTest("SQUATS", 15.0, "video-9", null)
+
+        val sent = JSONObject(server.takeRequest().body.readUtf8())
+        assertFalse(sent.has("session_id"))
+    }
+
+    @Test
+    fun `active sessions are read with their tests and windows`() {
+        server.enqueue(
+            json(
+                200,
+                """{"server_time":"2026-10-01T10:00:00.123456+00:00","sessions":[{"session_id":"s-1",
+                "name":"Trials","description":null,"rules":null,"starts_at":"2026-10-01T09:00:00Z",
+                "ends_at":"2026-10-01T11:00:00Z","tests":[{"test_type":"LUNGES","unit":"reps",
+                "submitted":true,"result_status":"verified"}]}]}"""
+            )
+        )
+
+        val sessions = (api.activeSessions() as ApiResult.Success).value
+
+        assertEquals("/api/sessions/active", server.takeRequest().path)
+        assertEquals(java.time.Instant.parse("2026-10-01T10:00:00.123Z").toEpochMilli(), sessions.serverTimeMs)
+        val session = sessions.sessions.single()
+        assertNull(session.description)
+        assertEquals(7_200_000L, session.endsAtMs - session.startsAtMs)
+        assertTrue(session.tests.single().submitted)
+        assertEquals("verified", session.tests.single().resultStatus)
+    }
+
+    @Test
     fun `requesting an otp sends the phone and no token`() {
         server.enqueue(json(200, """{"message":"sent","expires_at":"2026-01-01T00:00:00Z","development_code":"000000"}"""))
 
@@ -84,12 +217,29 @@ class F4allApiTest {
         )
 
         val registered = (api.register(
-            Registration("A", "2008-01-01", "male", "Kerala", 170.0, null)
+            Registration(
+                name = "A",
+                dateOfBirthIso = "2008-01-01",
+                gender = "male",
+                region = "Kerala",
+                city = "Kochi",
+                place = null,
+                heightCm = 170.0,
+                weightKg = null,
+                achievements = null,
+                consent = ConsentGrant("2026-09", "guardian", "R. Nair")
+            )
         ) as ApiResult.Success).value
 
         val sent = JSONObject(server.takeRequest().body.readUtf8())
         assertEquals("2008-01-01", sent.getString("dob"))
+        assertEquals("Kochi", sent.getString("city"))
         assertFalse("A missing weight is omitted, not sent as null", sent.has("weight_kg"))
+        assertFalse(sent.has("place"))
+        val consent = sent.getJSONObject("consent")
+        assertEquals("guardian", consent.getString("given_by"))
+        assertEquals("R. Nair", consent.getString("guardian_name"))
+        assertEquals("2026-09", consent.getString("version"))
 
         assertEquals("new-a", registered.tokens.accessToken)
         assertEquals("id-1", registered.tokens.athleteId)

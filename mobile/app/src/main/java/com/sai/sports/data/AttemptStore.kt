@@ -13,6 +13,24 @@ import org.json.JSONObject
 import java.io.File
 
 /**
+ * Why an attempt was recorded, which decides where it may go.
+ *
+ * PRACTICE attempts are the athlete's own: kept on the phone for history and
+ * personal bests, never queued for upload, never an official submission.
+ * OFFICIAL attempts go to SAI. Attempts saved before modes existed were all
+ * uploaded, so an attempt with no mode on disk reads as OFFICIAL.
+ */
+enum class AttemptMode {
+    PRACTICE,
+    OFFICIAL;
+
+    companion object {
+        fun fromName(name: String?): AttemptMode =
+            entries.firstOrNull { it.name == name } ?: OFFICIAL
+    }
+}
+
+/**
  * One recorded attempt: the video, the pose sequence, and the provisional score.
  */
 data class Attempt(
@@ -23,7 +41,14 @@ data class Attempt(
     val result: AnalyzerResult,
     /** Source frame dimensions, so the results screen can replay at the right aspect ratio. */
     val imageWidth: Int = 0,
-    val imageHeight: Int = 0
+    val imageHeight: Int = 0,
+    val mode: AttemptMode = AttemptMode.OFFICIAL,
+    /** Who recorded it. Null only for attempts saved before accounts were tracked. */
+    val athleteId: String? = null,
+    /** For practice: whether the result has reached the athlete's account yet. */
+    val savedToAccount: Boolean = false,
+    /** For an official attempt: the assessment session it was recorded for. */
+    val sessionId: String? = null
 )
 
 /**
@@ -41,8 +66,11 @@ data class Attempt(
  *     attempts/test_<ts>.json       the provisional result
  */
 class AttemptStore(
-    private val context: Context
+    /** Normally the app's files directory; a temporary folder in tests. */
+    private val root: File
 ) {
+
+    constructor(context: Context) : this(context.filesDir)
 
     fun save(
         attempt: Attempt,
@@ -101,11 +129,35 @@ class AttemptStore(
         emptyList()
     }
 
-    /** Newest first. Sprint 7's athlete profile screen reads this. */
+    /**
+     * Rewrites just the result JSON, e.g. to record that a practice attempt
+     * reached the athlete's account. The pose sequence is left alone.
+     */
+    fun update(attempt: Attempt): Boolean = try {
+        directory(ATTEMPTS_DIR)
+            .resolve("${attempt.id}.json")
+            .writeText(toJson(attempt).toString())
+        true
+    } catch (exception: Exception) {
+        Log.e(TAG, "Failed to update attempt ${attempt.id}", exception)
+        false
+    }
+
+    /** Whether an attempt with this id is already on the phone. */
+    fun exists(attemptId: String): Boolean =
+        directory(ATTEMPTS_DIR).resolve("$attemptId.json").exists()
+
+    /** Only [athleteId]'s attempts, newest first. Nobody else's are ever shown. */
+    fun listAttempts(athleteId: String): List<Attempt> =
+        listAttempts().filter { it.athleteId == athleteId }
+
+    /**
+     * Newest first, by when the attempt was recorded — not by file time, which
+     * a backup restore or a re-save would reorder.
+     */
     fun listAttempts(): List<Attempt> =
         directory(ATTEMPTS_DIR)
             .listFiles { file -> file.extension == "json" }
-            ?.sortedByDescending { it.lastModified() }
             ?.mapNotNull { file ->
                 try {
                     fromJson(JSONObject(file.readText()))
@@ -114,13 +166,26 @@ class AttemptStore(
                     null
                 }
             }
+            ?.sortedByDescending { it.recordedAtMs }
             ?: emptyList()
 
     fun videoFile(attempt: Attempt): File =
         directory(VIDEOS_DIR).resolve(attempt.videoFileName)
 
+    /**
+     * Deletes the attempt's video, keeping its result and pose sequence.
+     *
+     * Practice videos are never uploaded and the results screen replays the
+     * skeleton, not the video, so keeping them would only fill the phone —
+     * one HD minute at a time, with unlimited attempts.
+     */
+    fun deleteVideo(attempt: Attempt): Boolean {
+        val file = videoFile(attempt)
+        return !file.exists() || file.delete()
+    }
+
     private fun directory(name: String): File =
-        File(context.filesDir, name).apply {
+        File(root, name).apply {
             if (!exists()) mkdirs()
         }
 
@@ -143,6 +208,10 @@ class AttemptStore(
             .put("recordedAtMs", attempt.recordedAtMs)
             .put("imageWidth", attempt.imageWidth)
             .put("imageHeight", attempt.imageHeight)
+            .put("mode", attempt.mode.name)
+            .put("athleteId", attempt.athleteId ?: JSONObject.NULL)
+            .put("savedToAccount", attempt.savedToAccount)
+            .put("sessionId", attempt.sessionId ?: JSONObject.NULL)
             .put("score", attempt.result.score)
             .put("unit", attempt.result.unit)
             .put("status", attempt.result.status.name)
@@ -178,6 +247,10 @@ class AttemptStore(
             recordedAtMs = json.optLong("recordedAtMs"),
             imageWidth = json.optInt("imageWidth"),
             imageHeight = json.optInt("imageHeight"),
+            mode = AttemptMode.fromName(json.optString("mode").takeIf { it.isNotEmpty() }),
+            athleteId = json.optString("athleteId").takeIf { it.isNotEmpty() && it != "null" },
+            savedToAccount = json.optBoolean("savedToAccount", false),
+            sessionId = json.optString("sessionId").takeIf { it.isNotEmpty() && it != "null" },
             result = AnalyzerResult(
                 testType = testType,
                 score = json.optDouble("score", 0.0),

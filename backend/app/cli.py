@@ -6,6 +6,8 @@
     python -m app.cli sla                  report the verification backlog
     python -m app.cli seed-benchmarks      load age/gender norms
     python -m app.cli create-official      provision a dashboard account
+    python -m app.cli identity-key         print a new photo-encryption key
+    python -m app.cli encrypt-photos       encrypt photos stored before Sprint 8
 """
 
 from __future__ import annotations
@@ -25,6 +27,30 @@ from .models import Test, TestResult, TestResultStatus
 logger = logging.getLogger(__name__)
 
 TEST_BATTERY = [
+    {
+        "code": "SQUATS",
+        "name": "Squats",
+        "unit": "reps",
+        "description": "Full-depth squats completed, filmed side-on.",
+    },
+    {
+        "code": "PUSH_UPS",
+        "name": "Push-ups",
+        "unit": "reps",
+        "description": "Full-range push-ups with a straight body, filmed side-on.",
+    },
+    {
+        "code": "BICEP_CURLS",
+        "name": "Bicep Curls",
+        "unit": "reps",
+        "description": "Full-range curls on one working arm, filmed facing the camera.",
+    },
+    {
+        "code": "LUNGES",
+        "name": "Lunges",
+        "unit": "reps",
+        "description": "Lunges to depth with a split stance, filmed side-on.",
+    },
     {
         "code": "SIT_UPS",
         "name": "Sit-ups",
@@ -239,6 +265,53 @@ def sla_report() -> int:
     return 1 if breaching else 0
 
 
+def identity_key() -> int:
+    import base64
+    import os
+
+    print(base64.urlsafe_b64encode(os.urandom(32)).decode())
+    return 0
+
+
+def encrypt_photos() -> int:
+    """Encrypt registration photos stored in the clear before Sprint 8.
+
+    Each is re-stored under a new ``.enc`` key and the plaintext deleted.
+    Safe to run again: encrypted photos are skipped.
+    """
+    from .models import Athlete
+    from .services import identity_crypto
+    from .storage import get_storage
+
+    settings = get_settings()
+    storage = get_storage(settings)
+    converted = failed = 0
+
+    with session_scope() as db:
+        athletes = db.execute(
+            select(Athlete).where(Athlete.reference_face_key.is_not(None))
+        ).scalars()
+        for athlete in athletes:
+            old_key = athlete.reference_face_key
+            if identity_crypto.is_encrypted_key(old_key):
+                continue
+            try:
+                photo = identity_crypto.load_photo(storage, settings, old_key)
+                athlete.reference_face_key = identity_crypto.store_photo(
+                    storage, settings, athlete.id, photo
+                )
+                db.add(athlete)
+                db.flush()
+                storage.delete(old_key)
+                converted += 1
+            except Exception:
+                logger.exception("Could not encrypt photo for %s", athlete.id)
+                failed += 1
+
+    print(f"Encrypted {converted} photo(s); {failed} failed")
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     configure_logging(debug=False, json_output=False)
 
@@ -279,6 +352,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     official_parser.add_argument("--region", default=None)
 
+    subparsers.add_parser("identity-key", help="Print a new photo-encryption key")
+    subparsers.add_parser(
+        "encrypt-photos", help="Encrypt registration photos stored in the clear"
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "seed":
@@ -291,6 +369,10 @@ def main(argv: list[str] | None = None) -> int:
         return sla_report()
     if args.command == "seed-benchmarks":
         return seed_benchmarks_command(args.file, args.replace)
+    if args.command == "identity-key":
+        return identity_key()
+    if args.command == "encrypt-photos":
+        return encrypt_photos()
     if args.command == "create-official":
         return create_official_command(
             args.email, args.name, args.role, args.region, password=None

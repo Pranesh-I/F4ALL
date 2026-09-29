@@ -3,6 +3,8 @@ package com.sai.sports
 import android.app.Application
 import android.util.Log
 import com.sai.sports.data.SyncRepository
+import com.sai.sports.sync.PracticeSyncWorker
+import com.sai.sports.sync.NetworkMonitor
 import com.sai.sports.sync.SyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,8 +44,28 @@ class F4allApplication : Application() {
             runCatching {
                 SyncScheduler.ensurePeriodicSync(this@F4allApplication)
                 SyncScheduler.syncNow(this@F4allApplication)
+                // Practice saved while offline reaches the account on next launch.
+                PracticeSyncWorker.syncSoon(this@F4allApplication)
             }.onFailure {
                 Log.e(TAG, "Could not schedule sync", it)
+            }
+        }
+
+        // Signal coming back while the app is alive sends the queue at once,
+        // instead of waiting out a retry backoff that grew while the phone was
+        // on a weak link. With the app closed, WorkManager's network
+        // constraint does the same job on its own.
+        applicationScope.launch {
+            runCatching {
+                var wasOnline: Boolean? = null
+                NetworkMonitor.observeOnline(this@F4allApplication).collect { online ->
+                    if (online && wasOnline == false) {
+                        SyncScheduler.sendNow(this@F4allApplication)
+                    }
+                    wasOnline = online
+                }
+            }.onFailure {
+                Log.e(TAG, "Could not watch connectivity", it)
             }
         }
     }

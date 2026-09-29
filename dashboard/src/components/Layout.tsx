@@ -22,6 +22,9 @@ export function Layout() {
               <NavLink to="/leaderboard" className={link}>
                 Leaderboard
               </NavLink>
+              <NavLink to="/sessions" className={link}>
+                Sessions
+              </NavLink>
             </nav>
           </div>
           {official && (

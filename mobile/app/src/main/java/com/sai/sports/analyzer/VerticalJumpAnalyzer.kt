@@ -309,6 +309,11 @@ class VerticalJumpAnalyzer(
 
     override fun currentScore(): Double = bestJumpCm
 
+    override fun isReady(): Boolean = phase == Phase.READY || phase == Phase.AIRBORNE
+
+    override fun eventsSince(fromIndex: Int): List<AnalyzerEvent> =
+        if (fromIndex >= events.size) emptyList() else events.subList(fromIndex, events.size).toList()
+
     fun currentPhase(): Phase = phase
 
     /** Live height above the standing reference, for the on-screen readout. */

@@ -34,6 +34,8 @@ class CheatCheck(str, Enum):
     FRAMERATE_IMPLAUSIBLE = "framerate_implausible"
     FACE_MISMATCH = "face_mismatch"
     FACE_NOT_FOUND = "face_not_found"
+    # The athlete did not pass the photo check before an official test.
+    IDENTITY_UNCONFIRMED = "identity_unconfirmed"
 
 
 class Severity(str, Enum):

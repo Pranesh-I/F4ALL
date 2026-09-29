@@ -218,6 +218,11 @@ class SitUpAnalyzer : TestAnalyzer {
 
     override fun currentScore(): Double = repCount.toDouble()
 
+    override fun isReady(): Boolean = state != State.WAITING_FOR_DOWN
+
+    override fun eventsSince(fromIndex: Int): List<AnalyzerEvent> =
+        if (fromIndex >= events.size) emptyList() else events.subList(fromIndex, events.size).toList()
+
     /** Live torso angle, for the on-screen debug readout. */
     fun currentAngle(): Double? = lastAngle
 

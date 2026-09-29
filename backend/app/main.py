@@ -17,7 +17,10 @@ from .routers import (
     dashboard,
     dashboard_auth,
     health,
+    identity,
     media,
+    practice,
+    sessions,
     tests_submit,
     videos,
 )
@@ -83,6 +86,10 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(athletes.router)
+    app.include_router(identity.router)
+    app.include_router(practice.router)
+    app.include_router(sessions.router)
+    app.include_router(sessions.admin_router)
     app.include_router(videos.router)
     app.include_router(tests_submit.router)
     app.include_router(dashboard_auth.router)

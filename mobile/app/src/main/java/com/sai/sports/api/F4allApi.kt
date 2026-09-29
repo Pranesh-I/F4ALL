@@ -71,8 +71,12 @@ class F4allApi(
                 .put("dob", registration.dateOfBirthIso)
                 .put("gender", registration.gender)
                 .put("region", registration.region)
+                .put("city", registration.city)
+                .putOpt("place", registration.place)
                 .putOpt("height_cm", registration.heightCm)
                 .putOpt("weight_kg", registration.weightKg)
+                .putOpt("achievements", registration.achievements)
+                .put("consent", consentJson(registration.consent))
         ) { json ->
             Registered(
                 profile = athleteProfile(json.getJSONObject("profile")),
@@ -96,6 +100,70 @@ class F4allApi(
         return execute(
             request("/api/athletes/me/photo", auth = true).post(body).build()
         ) { }
+    }
+
+    /** Only the fields given are changed; an empty place or achievements clears it. */
+    fun updateProfile(
+        city: String? = null,
+        place: String? = null,
+        achievements: String? = null
+    ): ApiResult<AthleteProfile> {
+        val body = JSONObject()
+            .putOpt("city", city)
+            .putOpt("place", place)
+            .putOpt("achievements", achievements)
+        return execute(
+            request("/api/athletes/me", auth = true)
+                .patch(body.toString().toRequestBody(JSON.toMediaType()))
+                .build(),
+            ::athleteProfile
+        )
+    }
+
+    /** Records a consent; [purpose] is one of [ConsentPurpose]. */
+    fun giveConsent(purpose: String, grant: ConsentGrant): ApiResult<AthleteProfile> =
+        post(
+            "/api/athletes/me/consents",
+            consentJson(grant).put("purpose", purpose),
+            parse = ::athleteProfile
+        )
+
+    /** Withdraws consent to face verification; the server deletes the photo. */
+    fun withdrawFaceConsent(): ApiResult<AthleteProfile> =
+        execute(
+            request("/api/athletes/me/consents/${ConsentPurpose.FACE_VERIFICATION}", auth = true)
+                .delete()
+                .build(),
+            ::athleteProfile
+        )
+
+    /**
+     * Compares a photo taken before an official test with the registration
+     * photo. The server keeps only the outcome, never the photo.
+     */
+    fun identityCheck(
+        jpeg: ByteArray,
+        capturedAtMs: Long?,
+        sessionId: String?
+    ): ApiResult<IdentityCheckResult> {
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("file", "check.jpg", jpeg.toRequestBody(JPEG.toMediaType()))
+            .apply {
+                capturedAtMs?.let { addFormDataPart("captured_at_ms", it.toString()) }
+                sessionId?.let { addFormDataPart("session_id", it) }
+            }
+            .build()
+
+        return execute(
+            request("/api/athletes/me/identity-checks", auth = true).post(body).build()
+        ) { json ->
+            IdentityCheckResult(
+                checkId = json.getString("check_id"),
+                outcome = json.getString("outcome"),
+                remainingThisHour = json.optInt("remaining_this_hour", 0)
+            )
+        }
     }
 
     /** Only the fields given are changed. */
@@ -191,7 +259,10 @@ class F4allApi(
         testType: String,
         provisionalScore: Double,
         videoId: String,
-        heightCm: Double?
+        heightCm: Double?,
+        sessionId: String? = null,
+        recordedAtMs: Long? = null,
+        identityCheckId: String? = null
     ): ApiResult<String> =
         post(
             "/api/tests/submit",
@@ -200,7 +271,37 @@ class F4allApi(
                 .put("provisional_score", provisionalScore)
                 .put("video_id", videoId)
                 .putOpt("athlete_height_cm", heightCm)
+                .putOpt("session_id", sessionId)
+                .putOpt("recorded_at_ms", recordedAtMs)
+                .putOpt("identity_check_id", identityCheckId)
         ) { it.getString("result_id") }
+
+    // -- assessment sessions ------------------------------------------------
+
+    fun activeSessions(): ApiResult<ActiveSessions> =
+        get("/api/sessions/active") { json ->
+            ActiveSessions(
+                serverTimeMs = epochMillis(json.getString("server_time")),
+                sessions = json.getJSONArray("sessions").objects().map { session ->
+                    AssessmentSessionInfo(
+                        id = session.getString("session_id"),
+                        name = session.getString("name"),
+                        description = session.optStringOrNull("description"),
+                        rules = session.optStringOrNull("rules"),
+                        startsAtMs = epochMillis(session.getString("starts_at")),
+                        endsAtMs = epochMillis(session.getString("ends_at")),
+                        tests = session.getJSONArray("tests").objects().map { test ->
+                            SessionTest(
+                                testType = test.getString("test_type"),
+                                unit = test.getString("unit"),
+                                submitted = test.getBoolean("submitted"),
+                                resultStatus = test.optStringOrNull("result_status")
+                            )
+                        }
+                    )
+                }
+            )
+        }
 
     fun result(resultId: String): ApiResult<ServerResult> =
         get("/api/results/$resultId") { json ->
@@ -222,6 +323,68 @@ class F4allApi(
                 }
             )
         }
+
+    // -- practice (private to the athlete) ----------------------------------
+
+    /**
+     * Saves one practice attempt to the athlete's account. Idempotent on
+     * [practice]'s client id, so a retry after a lost response is harmless.
+     */
+    fun savePractice(practice: PracticeUpload): ApiResult<Unit> {
+        val events = JSONArray()
+        practice.events.forEach { event ->
+            events.put(
+                JSONObject()
+                    .put("timestamp_ms", event.timestampMs)
+                    .put("label", event.label)
+                    .put("detail", event.detail)
+            )
+        }
+        val body = JSONObject()
+            .put("test_type", practice.testType)
+            .put("score", practice.score)
+            .put("unit", practice.unit)
+            .put("status", practice.status)
+            .put("confidence", practice.confidence)
+            .putOpt("invalid_reason", practice.invalidReason)
+            .put("recorded_at_ms", practice.recordedAtMs)
+            .put("events", events)
+
+        return execute(
+            request("/api/athletes/me/practice/${practice.clientAttemptId}", auth = true)
+                .put(body.toString().toRequestBody(JSON.toMediaType()))
+                .build()
+        ) { }
+    }
+
+    /** The signed-in athlete's practice, newest first, one page at a time. */
+    fun practiceHistory(beforeMs: Long? = null, limit: Int = 200): ApiResult<List<PracticeUpload>> {
+        val query = buildString {
+            append("?limit=").append(limit)
+            beforeMs?.let { append("&before_ms=").append(it) }
+        }
+        return get("/api/athletes/me/practice$query") { json ->
+            json.getJSONArray("attempts").objects().map { item ->
+                PracticeUpload(
+                    clientAttemptId = item.getString("client_attempt_id"),
+                    testType = item.getString("test_type"),
+                    score = item.getDouble("score"),
+                    unit = item.getString("unit"),
+                    status = item.getString("status"),
+                    confidence = item.optDouble("confidence", 0.0),
+                    invalidReason = item.optStringOrNull("invalid_reason"),
+                    recordedAtMs = item.getLong("recorded_at_ms"),
+                    events = item.optJSONArray("events")?.objects()?.map { event ->
+                        PracticeEvent(
+                            timestampMs = event.optLong("timestamp_ms"),
+                            label = event.optString("label"),
+                            detail = event.optString("detail")
+                        )
+                    }.orEmpty()
+                )
+            }
+        }
+    }
 
     // -- plumbing -----------------------------------------------------------
 
@@ -302,8 +465,18 @@ class F4allApi(
         weightKg = json.optDoubleOrNull("weight_kg"),
         hasReferencePhoto = json.optBoolean("has_reference_photo", false),
         leaderboardOptIn = json.optBoolean("leaderboard_opt_in", false),
-        preferredLanguage = json.optString("preferred_language", "en")
+        preferredLanguage = json.optString("preferred_language", "en"),
+        city = json.optStringOrNull("city"),
+        place = json.optStringOrNull("place"),
+        achievements = json.optStringOrNull("achievements"),
+        consents = json.optJSONArray("consents")?.strings().orEmpty(),
+        missing = json.optJSONArray("missing")?.strings().orEmpty()
     )
+
+    private fun consentJson(grant: ConsentGrant) = JSONObject()
+        .put("version", grant.version)
+        .put("given_by", grant.givenBy)
+        .putOpt("guardian_name", grant.guardianName)
 
     private fun benchmark(json: JSONObject) = Benchmark(
         band = json.getString("band"),
@@ -329,6 +502,18 @@ class F4allApi(
     }
 }
 
+/**
+ * ISO-8601 with an offset, as FastAPI writes it ("…Z" or "…+00:00"). A bad
+ * value is reported as a malformed response, the same as bad JSON, rather
+ * than escaping as an exception the caller never expected.
+ */
+private fun epochMillis(value: String): Long =
+    try {
+        java.time.OffsetDateTime.parse(value).toInstant().toEpochMilli()
+    } catch (error: java.time.format.DateTimeParseException) {
+        throw org.json.JSONException("Unreadable time: $value")
+    }
+
 private fun JSONObject.optStringOrNull(key: String): String? =
     if (has(key) && !isNull(key)) getString(key) else null
 
@@ -337,3 +522,6 @@ private fun JSONObject.optDoubleOrNull(key: String): Double? =
 
 private fun JSONArray.objects(): List<JSONObject> =
     (0 until length()).map { getJSONObject(it) }
+
+private fun JSONArray.strings(): List<String> =
+    (0 until length()).map { getString(it) }

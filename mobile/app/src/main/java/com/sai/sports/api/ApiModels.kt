@@ -54,10 +54,47 @@ data class Registration(
     val name: String,
     val dateOfBirthIso: String,
     val gender: String,
+    /** State or union territory. */
     val region: String,
+    val city: String,
+    val place: String?,
     val heightCm: Double?,
-    val weightKg: Double?
+    val weightKg: Double?,
+    val achievements: String?,
+    /** Consent to hold the profile; face-photo consent is asked with the photo. */
+    val consent: ConsentGrant
 )
+
+/** A consent as the athlete — or, for a minor, their guardian — gave it. */
+data class ConsentGrant(
+    /** Which wording was shown; see `ConsentText.VERSION`. */
+    val version: String,
+    /** "self" or "guardian". */
+    val givenBy: String,
+    val guardianName: String?
+)
+
+object ConsentPurpose {
+    const val REGISTRATION = "registration"
+    const val FACE_VERIFICATION = "face_verification"
+}
+
+/** What the photo check before an official test concluded. */
+data class IdentityCheckResult(
+    val checkId: String,
+    /** "match", "no_match", "no_face" or "unavailable". */
+    val outcome: String,
+    val remainingThisHour: Int
+) {
+    val matched: Boolean get() = outcome == MATCH
+
+    companion object {
+        const val MATCH = "match"
+        const val NO_MATCH = "no_match"
+        const val NO_FACE = "no_face"
+        const val UNAVAILABLE = "unavailable"
+    }
+}
 
 data class AthleteProfile(
     val athleteId: String,
@@ -70,8 +107,21 @@ data class AthleteProfile(
     val hasReferencePhoto: Boolean,
     /** Hidden from other athletes unless they switched this on. */
     val leaderboardOptIn: Boolean = false,
-    val preferredLanguage: String = "en"
-)
+    val preferredLanguage: String = "en",
+    val city: String? = null,
+    val place: String? = null,
+    val achievements: String? = null,
+    /** Purposes with a consent in force; see [ConsentPurpose]. */
+    val consents: List<String> = emptyList(),
+    /**
+     * What still stands between the athlete and an official test, in the
+     * order to ask for it: "city", "registration_consent", "face_consent",
+     * "photo". Empty when the profile is complete.
+     */
+    val missing: List<String> = emptyList()
+) {
+    val complete: Boolean get() = missing.isEmpty()
+}
 
 data class Registered(
     val profile: AthleteProfile,
@@ -171,4 +221,55 @@ data class Leaderboard(
     val entries: List<LeaderboardEntry>,
     val you: YourStanding?,
     val totalRanked: Int
+)
+
+/**
+ * A practice attempt as it travels to and from the athlete's account.
+ *
+ * Result and analyzer trace only: practice videos and pose sequences never
+ * leave the phone that recorded them.
+ */
+data class PracticeUpload(
+    val clientAttemptId: String,
+    val testType: String,
+    val score: Double,
+    val unit: String,
+    val status: String,
+    val confidence: Double,
+    val invalidReason: String?,
+    val recordedAtMs: Long,
+    val events: List<PracticeEvent>
+)
+
+data class PracticeEvent(
+    val timestampMs: Long,
+    val label: String,
+    val detail: String
+)
+
+/** What the server says is open to this athlete right now. */
+data class ActiveSessions(
+    /** The server's clock when it answered, so session windows are judged on its time, not the phone's. */
+    val serverTimeMs: Long,
+    val sessions: List<AssessmentSessionInfo>
+)
+
+/** An official assessment window SAI has opened. */
+data class AssessmentSessionInfo(
+    val id: String,
+    val name: String,
+    val description: String?,
+    val rules: String?,
+    val startsAtMs: Long,
+    val endsAtMs: Long,
+    val tests: List<SessionTest>
+)
+
+data class SessionTest(
+    val testType: String,
+    val unit: String,
+    /** A live official submission exists on the server. */
+    val submitted: Boolean,
+    /** The latest result's status; "pending_sync" means an official asked for a resubmission. */
+    val resultStatus: String?
 )

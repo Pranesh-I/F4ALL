@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Squat bottom: thighs level, hips back. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M8,108 L112,108 M63,42 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 M68,49 L48,80 M48,80 L76,80 L68,106 M64,56 L90,58" />
+</vector>

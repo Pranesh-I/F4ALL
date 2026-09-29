@@ -1,8 +1,12 @@
-import type { ResultStatus, Severity } from "../api/types";
+import type { IdentityCheckOutcome, ResultStatus, Severity } from "../api/types";
 
 export const TEST_NAMES: Record<string, string> = {
-  SIT_UPS: "Sit-ups",
+  SQUATS: "Squats",
+  PUSH_UPS: "Push-ups",
+  BICEP_CURLS: "Bicep curls",
+  LUNGES: "Lunges",
   VERTICAL_JUMP: "Vertical jump",
+  SIT_UPS: "Sit-ups",
 };
 
 export function testName(code: string): string {
@@ -31,11 +35,28 @@ const FLAG_REASONS: Record<string, string> = {
   framerate_implausible: "Implausible frame rate",
   face_mismatch: "Face does not clearly match",
   face_not_found: "No face found",
+  identity_unconfirmed: "Identity not confirmed before the test",
   score_discrepancy: "Phone and server scores disagree",
   server_could_not_score: "Server could not score",
   low_tracking_quality: "Poor tracking quality",
   device_score_missing: "No score from the phone",
 };
+
+/** What the athlete's photo check before the test concluded, for a reviewer. */
+export function identityCheckLabel(outcome: IdentityCheckOutcome | null | undefined): string {
+  switch (outcome) {
+    case "match":
+      return "matched the registration photo";
+    case "no_match":
+      return "did not clearly match — the athlete continued after retrying";
+    case "no_face":
+      return "showed no clear face — the athlete continued after retrying";
+    case "unavailable":
+      return "could not run";
+    default:
+      return "not taken";
+  }
+}
 
 export function flagReason(reason: string): string {
   return FLAG_REASONS[reason] ?? reason.replace(/_/g, " ");

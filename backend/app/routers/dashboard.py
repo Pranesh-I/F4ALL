@@ -24,6 +24,7 @@ from ..models import (
     FaceVerification,
     Flag,
     FlagResolution,
+    IdentityCheck,
     Official,
     OfficialRole,
     ReviewAction,
@@ -47,6 +48,7 @@ from ..schemas import (
 from ..security import current_official
 from ..services import benchmarks as benchmark_service
 from ..storage import get_storage
+from .media import identity_photo_url
 from .tests_submit import _benchmark_for
 
 logger = logging.getLogger(__name__)
@@ -198,9 +200,16 @@ def review_detail(
     # URL would be a data-protection incident waiting to happen.
     video_url = storage.signed_url(video.s3_key) if video is not None else None
 
+    # Decrypted by the media router, never by the bucket.
     reference_photo_url = (
-        storage.signed_url(athlete.reference_face_key)
+        identity_photo_url(settings, athlete.reference_face_key)
         if athlete.reference_face_key
+        else None
+    )
+
+    identity_check = (
+        db.get(IdentityCheck, result.identity_check_id)
+        if result.identity_check_id is not None
         else None
     )
 
@@ -240,6 +249,7 @@ def review_detail(
         athlete_height_cm=_as_float(athlete.height_cm),
         video_duration_seconds=_as_float(video.duration_seconds) if video else None,
         reference_photo_url=reference_photo_url,
+        identity_check=_value(identity_check.outcome) if identity_check else None,
         face_verification=(
             FaceVerificationResponse(
                 status=_value(face.verification_status),

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bicep curl top: one hand brought up to the shoulder, elbow by the side. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M20,108 L100,108 M53,18 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 M60,25 L60,70 M60,70 L50,106 M60,70 L70,106 M46,32 L74,32 M46,32 L44,52 L44,72 M74,32 L76,52 L72,34" />
+</vector>

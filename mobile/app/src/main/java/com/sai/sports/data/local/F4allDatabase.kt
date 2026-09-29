@@ -41,9 +41,42 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+/**
+ * v2 -> v3: who each queued attempt belongs to.
+ *
+ * Additive and nullable again: every queued test survives. Existing rows have
+ * no owner until the worker's next run under a signed-in athlete claims them.
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE test_attempts ADD COLUMN athlete_id TEXT")
+    }
+}
+
+/**
+ * v3 -> v4: the assessment session each official attempt belongs to. Existing
+ * rows were recorded before sessions and keep a null session.
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE test_attempts ADD COLUMN session_id TEXT")
+    }
+}
+
+/**
+ * v4 -> v5: the photo check taken before each official attempt — its server
+ * id, or the photo still waiting to be checked. Existing rows have neither.
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE test_attempts ADD COLUMN identity_check_id TEXT")
+        db.execSQL("ALTER TABLE test_attempts ADD COLUMN identity_photo_path TEXT")
+    }
+}
+
 @Database(
     entities = [TestAttemptEntity::class],
-    version = 2,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(SyncStatusConverter::class)
@@ -65,7 +98,7 @@ abstract class F4allDatabase : RoomDatabase() {
 
         private fun build(context: Context): F4allDatabase =
             Room.databaseBuilder(context, F4allDatabase::class.java, DATABASE_NAME)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 // No fallbackToDestructiveMigration, on purpose. This table can
                 // hold the only copy of a test an athlete travelled to record.
                 // A future schema change must ship a real migration; failing

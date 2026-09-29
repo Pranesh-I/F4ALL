@@ -378,8 +378,10 @@ def register_payload(**overrides) -> dict:
         "dob": "2008-04-01",
         "gender": "male",
         "region": "Kerala",
+        "city": "Kochi",
         "height_cm": 172.0,
         "weight_kg": 60.0,
+        "consent": {"version": "2026-09", "given_by": "self"},
     }
     payload.update(overrides)
     return payload

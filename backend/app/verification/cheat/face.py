@@ -262,6 +262,60 @@ def compare_faces(
         embedder.close()
 
 
+class NoFaceInPhoto(RuntimeError):
+    """The photo being checked shows no face — a retake, not a mismatch."""
+
+
+def compare_photos(photo: bytes, reference: bytes, models_dir: Path) -> FaceComparison:
+    """Compare a photo taken before a test against the registration photo.
+
+    Both arrive as encoded image bytes and are decoded in memory; neither is
+    written anywhere. Raises [NoFaceInPhoto] when the new photo has no face and
+    [FaceCheckUnavailable] when the comparison cannot run at all.
+    """
+    try:
+        import cv2
+        import numpy as np
+    except ImportError as exc:  # pragma: no cover
+        raise FaceCheckUnavailable("opencv is not installed") from exc
+
+    def decode(content: bytes):
+        return cv2.imdecode(np.frombuffer(content, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+    reference_image = decode(reference)
+    if reference_image is None:
+        raise FaceCheckUnavailable("Registration photo could not be read")
+    photo_image = decode(photo)
+    if photo_image is None:
+        raise NoFaceInPhoto("The photo could not be read")
+
+    detector, embedder, vision = _load_tasks(models_dir)
+    try:
+        reference_crop = _largest_face_crop(reference_image, detector)
+        if reference_crop is None:
+            raise FaceCheckUnavailable("No face found in the registration photo")
+        reference_embedding = _embed(reference_crop, embedder)
+
+        crop = _largest_face_crop(photo_image, detector)
+        if crop is None:
+            raise NoFaceInPhoto("No face found in the photo")
+        embedding = _embed(crop, embedder)
+
+        if reference_embedding is None or embedding is None:
+            raise FaceCheckUnavailable("Could not embed the photos")
+
+        return FaceComparison(
+            similarity=vision.ImageEmbedder.cosine_similarity(
+                reference_embedding, embedding
+            ),
+            frames_with_face=1,
+            frames_sampled=1,
+        )
+    finally:
+        detector.close()
+        embedder.close()
+
+
 def check_face(
     video_path: Path,
     reference_image_path: Path | None,

@@ -34,6 +34,11 @@ DURATION_BOUNDS: dict[str, tuple[float, float]] = {
     "SIT_UPS": (8.0, 300.0),
     # A jump needs a still calibration period plus the jump itself.
     "VERTICAL_JUMP": (3.0, 180.0),
+    # Rep tests need a held start position plus at least one rep.
+    "SQUATS": (5.0, 300.0),
+    "PUSH_UPS": (5.0, 300.0),
+    "BICEP_CURLS": (5.0, 300.0),
+    "LUNGES": (5.0, 300.0),
 }
 
 DEFAULT_DURATION_BOUNDS = (3.0, 600.0)

@@ -33,6 +33,7 @@ import com.sai.sports.api.ApiFailure
 import com.sai.sports.api.ApiResult
 import com.sai.sports.auth.AppServices
 import com.sai.sports.i18n.LanguageStore
+import com.sai.sports.sync.PracticeSyncWorker
 import com.sai.sports.sync.SyncScheduler
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
@@ -113,8 +114,10 @@ fun LoginScreen(
                 is ApiResult.Success -> {
                     withContext(Dispatchers.IO) { session.store(result.value) }
                     if (result.value.registered) {
-                        // Anything recorded before signing in can go now.
+                        // Anything recorded before signing in can go now,
+                        // and this account's practice comes to this phone.
                         SyncScheduler.syncNow(context)
+                        PracticeSyncWorker.syncSoon(context)
                         // Remember the language chosen during onboarding on the
                         // account too. Best effort; the phone's choice stands.
                         LanguageStore.current(context)?.let { language ->

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lunge bottom: front thigh level, back knee near the ground. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M8,108 L112,108 M53,31 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 M60,38 L60,72 M60,72 L84,74 L84,106 M60,72 L48,100 L24,106 M60,46 L64,68" />
+</vector>

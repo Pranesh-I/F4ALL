@@ -115,4 +115,8 @@ dependencies {
     testImplementation(libs.json)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.room.testing)
+    // Sprint 9 — drives the real sync worker through "no network" then
+    // "network back" on a device, against a fake SAI server.
+    androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.okhttp.mockwebserver)
 }

@@ -6,9 +6,11 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.sai.sports.auth.AppServices
 import com.sai.sports.data.AthleteProfileStore
+import com.sai.sports.data.IdentityPhotos
 import com.sai.sports.data.SyncRepository
 import com.sai.sports.data.local.TestAttemptEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -45,8 +47,27 @@ class SyncWorker(
 
     override suspend fun doWork(): Result {
 
+        // The one-shot, the periodic safety net and an athlete's "send now" are
+        // separate WorkManager jobs and can start together. Only one may drain:
+        // a second one's recovery pass below would reset the first one's
+        // in-flight upload to QUEUED and start uploading the same file again.
+        // Whoever holds the lock sends everything, so the others just stand down.
+        if (!DRAIN_LOCK.tryLock()) {
+            Log.i(TAG, "Another sync is already draining the queue")
+            return Result.success()
+        }
+        return try {
+            drain()
+        } finally {
+            DRAIN_LOCK.unlock()
+        }
+    }
+
+    private suspend fun drain(): Result {
+
         // Anything stranded by a process death is rescued before we decide
-        // what the queue contains.
+        // what the queue contains. Safe here only because no other drain is
+        // running in this process (see DRAIN_LOCK).
         repository.recoverInterrupted()
 
         if (!session.isRegistered) {
@@ -64,10 +85,16 @@ class SyncWorker(
             return if (session.isLoggedIn) Result.retry() else Result.success()
         }
 
-        val queue = repository.workQueue()
+        // Only the signed-in athlete's tests are sent, under their account.
+        // Another athlete's queue on a shared phone waits for them to sign in.
+        val athleteId = session.current()?.athleteId ?: return Result.success()
+        repository.claimUnowned(athleteId)
+        repository.deleteOrphanIdentityPhotos(olderThanMs = IdentityPhotos.ORPHAN_AFTER_MS)
+
+        val queue = repository.workQueue(athleteId)
 
         if (queue.isEmpty()) {
-            return if (submitPending()) Result.success() else Result.retry()
+            return if (submitPending(athleteId)) Result.success() else Result.retry()
         }
 
         Log.i(TAG, "Draining ${queue.size} queued attempt(s)")
@@ -90,7 +117,7 @@ class SyncWorker(
             }
         }
 
-        if (!submitPending()) {
+        if (!submitPending(athleteId)) {
             shouldRetryLater = true
         }
 
@@ -104,15 +131,25 @@ class SyncWorker(
      * the server is idempotent on the video, so a submission whose response was
      * lost comes back as the same result rather than a duplicate attempt.
      */
-    private suspend fun submitPending(): Boolean {
+    private suspend fun submitPending(athleteId: String): Boolean {
         var allDone = true
 
-        for (entity in repository.unsubmitted()) {
+        for (entity in repository.unsubmitted(athleteId)) {
             if (isStopped) return false
 
             if (!retryPolicy.hasAttemptsLeft(entity.attemptCount)) continue
 
             val videoId = entity.videoId ?: continue
+
+            // A photo taken offline before this attempt is checked first, so
+            // the submission can name the check.
+            val identityCheckId = when (val identity = identityFor(entity)) {
+                IdentityOutcome.Wait -> {
+                    allDone = false
+                    continue
+                }
+                is IdentityOutcome.Ready -> identity.checkId
+            }
 
             val response = withContext(Dispatchers.IO) {
                 api.submitTest(
@@ -121,7 +158,12 @@ class SyncWorker(
                     videoId = videoId,
                     // The server prefers the registered profile height; this is
                     // only a fallback for a profile saved without one.
-                    heightCm = profileStore.heightCm()
+                    heightCm = profileStore.heightCm(),
+                    // The recording time, not now: the server checks it fell
+                    // inside the session, however late the phone found signal.
+                    sessionId = entity.sessionId,
+                    recordedAtMs = entity.recordedAtMs,
+                    identityCheckId = identityCheckId
                 )
             }
 
@@ -134,16 +176,54 @@ class SyncWorker(
                 SubmissionPolicy.Decision.RetryLater -> allDone = false
 
                 is SubmissionPolicy.Decision.Refused -> {
+                    // A refusal is SAI's answer about this test — already
+                    // submitted, session closed — and asking again gets the
+                    // same answer. It is shown to the athlete, not retried.
                     Log.w(TAG, "Submission refused for ${entity.id}: ${decision.reason}")
-                    repository.recordAttemptFailure(
-                        entity.id,
-                        "Could not submit: ${decision.reason}"
-                    )
+                    repository.recordSubmissionRefused(entity.id, decision.reason)
                 }
             }
         }
 
         return allDone
+    }
+
+    private sealed interface IdentityOutcome {
+        data object Wait : IdentityOutcome
+        data class Ready(val checkId: String?) : IdentityOutcome
+    }
+
+    private suspend fun identityFor(entity: TestAttemptEntity): IdentityOutcome {
+        val photoPath = entity.identityPhotoPath
+            ?: return IdentityOutcome.Ready(entity.identityCheckId)
+
+        val photo = repository.identityPhotoFile(photoPath)
+        if (!photo.exists()) {
+            // Another attempt from the same sitting already sent it; that row
+            // was updated, but this copy of the entity predates the update.
+            return IdentityOutcome.Ready(repository.find(entity.id)?.identityCheckId)
+        }
+
+        val response = withContext(Dispatchers.IO) {
+            api.identityCheck(
+                jpeg = photo.readBytes(),
+                capturedAtMs = photo.lastModified(),
+                sessionId = entity.sessionId
+            )
+        }
+
+        return when (val decision = IdentityUploadPolicy.decide(response)) {
+            is IdentityUploadPolicy.Decision.Attach -> {
+                repository.resolveIdentityPhoto(photoPath, decision.checkId)
+                IdentityOutcome.Ready(decision.checkId)
+            }
+            IdentityUploadPolicy.Decision.RetryLater -> IdentityOutcome.Wait
+            IdentityUploadPolicy.Decision.SubmitWithout -> {
+                Log.w(TAG, "Photo check for ${entity.id} could not be made; submitting without")
+                repository.resolveIdentityPhoto(photoPath, null)
+                IdentityOutcome.Ready(null)
+            }
+        }
     }
 
     private enum class Outcome { DONE, RETRY_LATER, GAVE_UP }
@@ -324,5 +404,8 @@ class SyncWorker(
     companion object {
         private const val TAG = "SyncWorker"
         const val WORK_NAME = "f4all-sync"
+
+        /** Held for the whole of a drain; see [doWork]. Workers share this process. */
+        internal val DRAIN_LOCK = Mutex()
     }
 }

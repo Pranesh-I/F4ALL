@@ -1,6 +1,8 @@
 package com.sai.sports.analyzer
 
+import kotlin.math.abs
 import kotlin.math.acos
+import kotlin.math.atan2
 import kotlin.math.sqrt
 
 /**
@@ -81,6 +83,48 @@ object PoseMath {
         z = (first.z + second.z) / 2f,
         visibility = minOf(first.visibility, second.visibility)
     )
+
+    /**
+     * Angle in degrees between the segment [lower] -> [upper] and straight up.
+     *
+     * 0 is perfectly upright; 90 is horizontal. Screen y grows downward, so
+     * "up" is negative y. Computed in doubles because it feeds form checks the
+     * server re-runs in Python.
+     */
+    fun angleFromVertical(
+        upper: PosePoint,
+        lower: PosePoint
+    ): Double {
+        val deltaX = (upper.x - lower.x).toDouble()
+        val deltaY = (upper.y - lower.y).toDouble()
+        return Math.toDegrees(atan2(abs(deltaX), -deltaY))
+    }
+
+    /**
+     * Angle in degrees between the segment [first] -> [second] and the
+     * horizontal, ignoring direction: 0 is level, 90 is vertical.
+     */
+    fun angleFromHorizontal(
+        first: PosePoint,
+        second: PosePoint
+    ): Double {
+        val deltaX = (second.x - first.x).toDouble()
+        val deltaY = (second.y - first.y).toDouble()
+        return Math.toDegrees(atan2(abs(deltaY), abs(deltaX)))
+    }
+
+    /**
+     * Which side of the line [start] -> [end] the [point] lies on, as the 2D
+     * cross product. Positive means below the line on screen when [end] is to
+     * the right of [start]; the sign flips with the line's direction.
+     */
+    fun crossProduct(
+        start: PosePoint,
+        end: PosePoint,
+        point: PosePoint
+    ): Double =
+        (end.x - start.x).toDouble() * (point.y - start.y).toDouble() -
+            (end.y - start.y).toDouble() * (point.x - start.x).toDouble()
 
     fun mean(values: List<Double>): Double =
         if (values.isEmpty()) 0.0 else values.sum() / values.size

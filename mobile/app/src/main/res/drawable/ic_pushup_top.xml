@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Push-up start: straight arms, straight body. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M8,100 L112,100 M16,52 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 M30,58 L68,78 L106,98 M30,58 L30,98" />
+</vector>

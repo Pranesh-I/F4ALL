@@ -9,6 +9,14 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Voice coaching: from Android 11 the text-to-speech engine is invisible
+         to the app unless declared here. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".F4allApplication"
         android:allowBackup="true"
@@ -23,6 +31,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.SAISportsTalentAssessment"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

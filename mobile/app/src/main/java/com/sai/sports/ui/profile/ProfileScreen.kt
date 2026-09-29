@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,13 +37,14 @@ import com.sai.sports.api.ApiResult
 import com.sai.sports.api.AthleteSummary
 import com.sai.sports.auth.AppServices
 import com.sai.sports.data.AthleteProfileStore
-import com.sai.sports.ui.auth.ReferencePhotoStep
+import com.sai.sports.data.ProfileStatusStore
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
 import com.sai.sports.ui.common.LoadFailed
 import com.sai.sports.ui.common.SectionTitle
 import com.sai.sports.ui.common.TitleBar
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** The athlete's profile, personal bests and every result SAI holds for them. */
@@ -51,16 +54,19 @@ fun ProfileScreen(
     onResultSelected: (String) -> Unit,
     onBadges: () -> Unit,
     onLeaderboard: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onCompleteProfile: () -> Unit
 ) {
     val context = LocalContext.current
     val api = remember { AppServices.api(context) }
     val profileStore = remember { AthleteProfileStore(context) }
+    val statusStore = remember { ProfileStatusStore(context) }
+    val scope = rememberCoroutineScope()
 
     var summary by remember { mutableStateOf<AthleteSummary?>(null) }
     var error by remember { mutableStateOf<Int?>(null) }
     var reload by remember { mutableIntStateOf(0) }
-    var addingPhoto by remember { mutableStateOf(false) }
+    var confirmingRemoval by remember { mutableStateOf(false) }
 
     LaunchedEffect(reload) {
         error = null
@@ -69,17 +75,37 @@ fun ProfileScreen(
                 summary = result.value
                 // Keep the on-device jump calibration in step with the profile.
                 result.value.profile.heightCm?.let(profileStore::setHeightCm)
+                statusStore.save(result.value.profile)
             }
             is ApiResult.Failure -> error = Labels.failure(result.kind, R.string.error_load)
         }
     }
 
-    if (addingPhoto) {
-        ReferencePhotoStep(onDone = {
-            addingPhoto = false
-            reload += 1
-        })
-        return
+    if (confirmingRemoval) {
+        AlertDialog(
+            onDismissRequest = { confirmingRemoval = false },
+            title = { Text(stringResource(R.string.profile_remove_photo)) },
+            text = { Text(stringResource(R.string.profile_remove_photo_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmingRemoval = false
+                    scope.launch {
+                        when (val result = withContext(Dispatchers.IO) { api.withdrawFaceConsent() }) {
+                            is ApiResult.Success -> {
+                                statusStore.save(result.value)
+                                reload += 1
+                            }
+                            is ApiResult.Failure -> error = Labels.failure(result.kind, R.string.error_load)
+                        }
+                    }
+                }) { Text(stringResource(R.string.profile_remove_photo_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingRemoval = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 
     Column(
@@ -120,10 +146,23 @@ fun ProfileScreen(
                                     )
                                 )
                             }
-                            if (!profile.hasReferencePhoto) {
-                                ErrorText(stringResource(R.string.profile_no_photo))
-                                TextButton(onClick = { addingPhoto = true }) {
-                                    Text(stringResource(R.string.profile_add_photo))
+                            profile.city?.let { city ->
+                                Text(listOfNotNull(profile.place, city).joinToString(", "))
+                            }
+                            profile.achievements?.let {
+                                Text(
+                                    stringResource(R.string.profile_achievements, it),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            if (!profile.complete) {
+                                ErrorText(stringResource(R.string.profile_incomplete))
+                                TextButton(onClick = onCompleteProfile) {
+                                    Text(stringResource(R.string.profile_complete_action))
+                                }
+                            } else if (profile.hasReferencePhoto) {
+                                TextButton(onClick = { confirmingRemoval = true }) {
+                                    Text(stringResource(R.string.profile_remove_photo))
                                 }
                             }
                         }

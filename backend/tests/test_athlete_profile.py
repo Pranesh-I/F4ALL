@@ -17,6 +17,15 @@ def auth(athlete, settings) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+def consent_to_photos(client, headers) -> None:
+    response = client.post(
+        "/api/athletes/me/consents",
+        json={"purpose": "face_verification", "version": "2026-09", "given_by": "self"},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+
+
 def add_result(db, athlete, test, **fields) -> TestResult:
     result = TestResult(
         id=uuid.uuid4(),
@@ -68,20 +77,26 @@ def test_implausible_height_is_refused(client, athlete, settings):
 
 
 def test_photo_upload_sets_the_reference_face(client, athlete, settings, db):
+    headers = auth(athlete, settings)
+    consent_to_photos(client, headers)
     response = client.post(
         "/api/athletes/me/photo",
         files={"file": ("face.jpg", b"\xff\xd8\xff fake jpeg", "image/jpeg")},
-        headers=auth(athlete, settings),
+        headers=headers,
     )
 
     assert response.status_code == 200
     db.refresh(athlete)
     assert athlete.reference_face_key
-    assert (settings.storage_local_path / athlete.reference_face_key).exists()
+    stored = settings.storage_local_path / athlete.reference_face_key
+    assert stored.exists()
+    # Encrypted before storage: the JPEG is nowhere in what was written.
+    assert b"fake jpeg" not in stored.read_bytes()
 
 
 def test_replacing_the_photo_deletes_the_old_one(client, athlete, settings, db):
     headers = auth(athlete, settings)
+    consent_to_photos(client, headers)
     files = {"file": ("face.jpg", b"first", "image/jpeg")}
     client.post("/api/athletes/me/photo", files=files, headers=headers)
     db.refresh(athlete)
@@ -97,10 +112,12 @@ def test_replacing_the_photo_deletes_the_old_one(client, athlete, settings, db):
 
 
 def test_non_image_photo_is_refused(client, athlete, settings):
+    headers = auth(athlete, settings)
+    consent_to_photos(client, headers)
     response = client.post(
         "/api/athletes/me/photo",
         files={"file": ("x.txt", b"hello", "text/plain")},
-        headers=auth(athlete, settings),
+        headers=headers,
     )
     assert response.status_code == 415
 

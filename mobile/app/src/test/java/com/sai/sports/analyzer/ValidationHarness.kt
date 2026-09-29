@@ -137,10 +137,7 @@ object ValidationHarness {
                 continue
             }
 
-            val analyzer: TestAnalyzer = when (case.testType) {
-                TestType.SIT_UPS -> SitUpAnalyzer()
-                TestType.VERTICAL_JUMP -> VerticalJumpAnalyzer(case.athleteHeightCm!!)
-            }
+            val analyzer = analyzerFor(case.testType, case.athleteHeightCm)
 
             val result = analyzer.analyzeSequence(frames)
 
@@ -149,6 +146,10 @@ object ValidationHarness {
             val tolerance = when (case.testType) {
                 TestType.SIT_UPS -> AnalyzerThresholds.TARGET_SITUP_TOLERANCE_REPS.toDouble()
                 TestType.VERTICAL_JUMP -> AnalyzerThresholds.TARGET_JUMP_TOLERANCE_CM
+                TestType.SQUATS,
+                TestType.PUSH_UPS,
+                TestType.BICEP_CURLS,
+                TestType.LUNGES -> AnalyzerThresholds.TARGET_REP_TOLERANCE_REPS.toDouble()
             }
 
             outcomes += Outcome(

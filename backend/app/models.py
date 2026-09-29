@@ -13,6 +13,7 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -31,6 +32,7 @@ from sqlalchemy import (
     Enum as SAEnum,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.sql import text
 
 
 def _utcnow() -> datetime:
@@ -134,6 +136,29 @@ class ReviewAction(str, enum.Enum):
     requested_resubmission = "requested_resubmission"
 
 
+class ConsentPurpose(str, enum.Enum):
+    # Holding the profile and test results at all.
+    registration = "registration"
+    # Keeping a face photo and comparing faces against it. Separate, because it
+    # is biometric processing an athlete may refuse while still practising.
+    face_verification = "face_verification"
+
+
+class ConsentGiver(str, enum.Enum):
+    self = "self"
+    # A parent or guardian, required for anyone under 18.
+    guardian = "guardian"
+
+
+class IdentityCheckOutcome(str, enum.Enum):
+    match = "match"
+    no_match = "no_match"
+    # No face in the photo the athlete just took — retake, not a mismatch.
+    no_face = "no_face"
+    # The comparison could not run (no models, unreadable registration photo).
+    unavailable = "unavailable"
+
+
 # ---------------------------------------------------------------------------
 # Tables
 # ---------------------------------------------------------------------------
@@ -151,7 +176,17 @@ class Athlete(TimestampMixin, Base):
     weight_kg: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     phone: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
 
+    # Where the athlete lives, below the state level `region` records. Null for
+    # athletes registered before Sprint 8 until they complete their profile.
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    place: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # Free text in the athlete's own words: district meets, school teams.
+    achievements: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Captured once at registration; Sprint 6 compares test-video faces to it.
+    # Encrypted by the application before storage (keys ending ".enc"); see
+    # services/identity_crypto.py.
     reference_face_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Off unless the athlete turns it on. Most athletes are minors, and a public
@@ -215,6 +250,18 @@ class TestResult(TimestampMixin, Base):
     )
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
+    # The assessment session this official attempt was made for. Null for
+    # submissions from before sessions existed.
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("assessment_sessions.id"), nullable=True
+    )
+
+    # The pre-test identity check the athlete took before recording. Several
+    # tests recorded in one sitting share one check.
+    identity_check_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("identity_checks.id"), nullable=True
+    )
+
     # The three scores are kept apart on purpose. Collapsing them would destroy
     # the audit trail that lets a reviewer see the device and the server
     # disagreed, which is the entire basis for trusting the final number.
@@ -246,6 +293,21 @@ class TestResult(TimestampMixin, Base):
             "athlete_id", "test_id", "attempt_number", name="uq_result_attempt"
         ),
         Index("ix_test_results_status", "status"),
+        # One live official submission per athlete, session and test — enforced
+        # by the database, so two submissions racing in cannot both land. A
+        # result sent back for resubmission (pending_sync) no longer holds the
+        # slot, which is what lets the athlete submit again.
+        Index(
+            "uq_session_submission",
+            "athlete_id",
+            "session_id",
+            "test_id",
+            unique=True,
+            postgresql_where=text(
+                "session_id IS NOT NULL AND status <> 'pending_sync'"
+            ),
+            sqlite_where=text("session_id IS NOT NULL AND status <> 'pending_sync'"),
+        ),
         CheckConstraint(
             "status IN ('pending_sync','processing','verified','flagged',"
             "'approved','rejected')",
@@ -580,3 +642,166 @@ class RefreshToken(Base):
     )
 
     __table_args__ = (Index("ix_refresh_tokens_subject", "subject_id"),)
+
+
+class PracticeAttempt(TimestampMixin, Base):
+    """One practice attempt, kept so an athlete's practice follows their account.
+
+    Deliberately a separate table from ``test_results``. Practice is the
+    athlete's own: nothing official reads this table — no verification, no
+    review queue, no benchmark, leaderboard or badge — and only the athlete who
+    recorded an attempt can ever read it back. Keeping it apart makes that a
+    property of the schema rather than a filter someone must remember to add.
+
+    No video is stored; practice videos never leave the phone. ``events`` is
+    the on-device analyzer's trace (rep outcomes and form faults), which is
+    what the app rebuilds history, personal bests and form feedback from.
+    """
+
+    __tablename__ = "practice_attempts"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_new_uuid)
+    athlete_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("athletes.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # The phone's own id for the attempt. Unique per athlete, which is what makes
+    # an upload retried after a lost response an update rather than a duplicate.
+    client_attempt_id: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    test_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    score: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    unit: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    confidence: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False, default=0)
+    invalid_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    events: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "athlete_id", "client_attempt_id", name="uq_practice_attempts_client_id"
+        ),
+        Index("ix_practice_attempts_athlete_recorded", "athlete_id", "recorded_at"),
+        CheckConstraint(
+            "status IN ('COMPLETE','INVALID')", name="ck_practice_attempts_status"
+        ),
+    )
+
+
+class AssessmentSession(TimestampMixin, Base):
+    """An official assessment window, created by SAI.
+
+    Athletes see a session only while it is enabled and open, and — when
+    ``region`` is set — only if they are registered in that region. Within it
+    they may make one official submission per test in ``allowed_tests``.
+
+    Whether a session is scheduled, active or ended is computed from the clock
+    rather than stored, so it can never be left stale by a missed job.
+    """
+
+    __tablename__ = "assessment_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_new_uuid)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Shown to the athlete before they start: anything particular to this
+    # session (where to film, what to wear, who to contact).
+    rules: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # Test codes (SQUATS, VERTICAL_JUMP, ...), in the order they are shown.
+    allowed_tests: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    # Null: open to every region.
+    region: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("officials.id"), nullable=True
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("officials.id"), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint("ends_at > starts_at", name="ck_assessment_sessions_window"),
+        Index("ix_assessment_sessions_window", "enabled", "starts_at", "ends_at"),
+    )
+
+
+class AthleteConsent(Base):
+    """A consent an athlete — or their guardian — gave, and when it ended.
+
+    Rows are never updated except to record withdrawal, so the history of what
+    was agreed to, under which version of the wording, survives.
+    """
+
+    __tablename__ = "athlete_consents"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_new_uuid)
+    athlete_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("athletes.id"), nullable=False
+    )
+    purpose: Mapped[ConsentPurpose] = mapped_column(
+        enum_column(ConsentPurpose, 40), nullable=False
+    )
+    # Which wording the athlete was shown. Changing the text means a new
+    # version, and consent to an old one says nothing about the new.
+    version: Mapped[str] = mapped_column(String(20), nullable=False)
+    given_by: Mapped[ConsentGiver] = mapped_column(
+        enum_column(ConsentGiver, 20), nullable=False
+    )
+    guardian_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    given_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    withdrawn_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_athlete_consents_athlete_purpose", "athlete_id", "purpose"),
+        CheckConstraint(
+            "given_by <> 'guardian' OR guardian_name IS NOT NULL",
+            name="ck_athlete_consents_guardian_named",
+        ),
+    )
+
+
+class IdentityCheck(Base):
+    """One comparison of a photo taken before a test against the registration photo.
+
+    Only the outcome is kept. The photo itself is compared in memory and
+    discarded, so nothing here is biometric data.
+    """
+
+    __tablename__ = "identity_checks"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_new_uuid)
+    athlete_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("athletes.id"), nullable=False
+    )
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("assessment_sessions.id"), nullable=True
+    )
+    outcome: Mapped[IdentityCheckOutcome] = mapped_column(
+        enum_column(IdentityCheckOutcome, 20), nullable=False
+    )
+    similarity: Mapped[float | None] = mapped_column(Numeric(5, 4), nullable=True)
+    # Why the check could not run, for `unavailable`.
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # When the phone took the photo; a check made offline is sent later.
+    captured_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_identity_checks_athlete_created", "athlete_id", "created_at"),
+    )

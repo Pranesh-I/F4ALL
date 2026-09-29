@@ -40,6 +40,7 @@ import com.sai.sports.R
 import com.sai.sports.api.ApiFailure
 import com.sai.sports.api.ApiResult
 import com.sai.sports.api.Registration
+import com.sai.sports.ui.common.SectionTitle
 import com.sai.sports.auth.AppServices
 import com.sai.sports.data.AthleteProfileStore
 import com.sai.sports.data.Regions
@@ -60,6 +61,10 @@ import java.time.ZoneOffset
  *
  * Date of birth and gender cannot be edited afterwards — they choose the
  * comparison group — so the screen says so before the athlete commits.
+ *
+ * Nothing is sent without consent to hold it; for an athlete under 18 that
+ * consent comes from a named parent or guardian, which the form asks for as
+ * soon as the date of birth shows a minor.
  */
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
@@ -78,6 +83,11 @@ fun RegistrationScreen(
     var region by rememberSaveable { mutableStateOf<String?>(null) }
     var height by rememberSaveable { mutableStateOf(profileStore.heightCm()?.toInt()?.toString() ?: "") }
     var weight by rememberSaveable { mutableStateOf("") }
+    var city by rememberSaveable { mutableStateOf("") }
+    var place by rememberSaveable { mutableStateOf("") }
+    var achievements by rememberSaveable { mutableStateOf("") }
+    var agreed by rememberSaveable { mutableStateOf(false) }
+    var guardianName by rememberSaveable { mutableStateOf("") }
     var profileCreated by rememberSaveable { mutableStateOf(false) }
 
     var showDatePicker by remember { mutableStateOf(false) }
@@ -86,15 +96,26 @@ fun RegistrationScreen(
     var problem by remember { mutableStateOf<RegistrationRules.Problem?>(null) }
 
     val dateOfBirth = dobEpochDay?.let(LocalDate::ofEpochDay)
+    val minor = dateOfBirth?.let { ConsentRules.needsGuardian(RegistrationRules.ageOn(it)) } ?: true
 
     if (profileCreated) {
-        ReferencePhotoStep(onDone = onRegistered)
+        ReferencePhotoStep(
+            minor = minor,
+            faceConsentGiven = false,
+            initialGuardianName = guardianName,
+            onDone = onRegistered,
+            onSkip = onRegistered
+        )
         return
     }
 
     fun submit() {
-        problem = RegistrationRules.problem(name, dateOfBirth, gender, region, height, weight)
+        problem = RegistrationRules.problem(name, dateOfBirth, gender, region, city, height, weight)
         if (problem != null) return
+        val consent = ConsentRules.grant(agreed, minor, guardianName).getOrElse { missing ->
+            problem = RegistrationRules.Problem((missing as ConsentRules.ConsentMissing).messageRes)
+            return
+        }
 
         busy = true
         scope.launch {
@@ -105,8 +126,12 @@ fun RegistrationScreen(
                         dateOfBirthIso = dateOfBirth.toString(),
                         gender = gender!!,
                         region = region!!,
+                        city = city.trim(),
+                        place = place.trim().ifEmpty { null },
                         heightCm = height.toDouble(),
-                        weightKg = weight.toDoubleOrNull()
+                        weightKg = weight.toDoubleOrNull(),
+                        achievements = achievements.trim().ifEmpty { null },
+                        consent = consent
                     )
                 )
             }
@@ -220,6 +245,22 @@ fun RegistrationScreen(
         }
 
         OutlinedTextField(
+            value = city,
+            onValueChange = { city = it.take(100) },
+            label = { Text(stringResource(R.string.register_city)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = place,
+            onValueChange = { place = it.take(100) },
+            label = { Text(stringResource(R.string.register_place)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
             value = height,
             onValueChange = { height = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
             label = { Text(stringResource(R.string.register_height)) },
@@ -237,7 +278,27 @@ fun RegistrationScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
+        OutlinedTextField(
+            value = achievements,
+            onValueChange = { achievements = it.take(1000) },
+            label = { Text(stringResource(R.string.register_achievements)) },
+            supportingText = { Text(stringResource(R.string.register_achievements_hint)) },
+            minLines = 2,
+            modifier = Modifier.fillMaxWidth()
+        )
+
         Text(stringResource(R.string.register_cohort_note), style = MaterialTheme.typography.bodySmall)
+
+        SectionTitle(stringResource(R.string.consent_title))
+        ConsentCard(
+            title = R.string.consent_registration_title,
+            points = REGISTRATION_CONSENT_POINTS,
+            minor = minor,
+            agreed = agreed,
+            onAgreedChange = { agreed = it },
+            guardianName = guardianName,
+            onGuardianNameChange = { guardianName = it }
+        )
 
         problem?.let {
             ErrorText(stringResource(it.message, *it.args.toTypedArray()))

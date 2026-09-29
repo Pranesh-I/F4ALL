@@ -1,7 +1,9 @@
 import type {
+  AssessmentSession,
   DashboardStats,
   Leaderboard,
   OfficialProfile,
+  NewAssessmentSession,
   OfficialTokens,
   PoseSequence,
   ReviewActionName,
@@ -150,6 +152,27 @@ export class DashboardApi {
 
   stats(): Promise<DashboardStats> {
     return this.send("GET", "/api/dashboard/stats");
+  }
+
+  // -- assessment sessions -------------------------------------------------
+
+  sessions(): Promise<AssessmentSession[]> {
+    return this.send("GET", "/api/dashboard/sessions");
+  }
+
+  createSession(session: NewAssessmentSession): Promise<AssessmentSession> {
+    return this.send("POST", "/api/dashboard/sessions", session);
+  }
+
+  updateSession(
+    sessionId: string,
+    changes: Partial<NewAssessmentSession>,
+  ): Promise<AssessmentSession> {
+    return this.send("PATCH", `/api/dashboard/sessions/${encodeURIComponent(sessionId)}`, changes);
+  }
+
+  deleteSession(sessionId: string): Promise<{ message: string }> {
+    return this.send("DELETE", `/api/dashboard/sessions/${encodeURIComponent(sessionId)}`);
   }
 
   // -- plumbing ------------------------------------------------------------

@@ -22,11 +22,13 @@ from .models import (
     Flag,
     FlagSeverity,
     FlagSource,
+    IdentityCheck,
     Test,
     TestResult,
     TestResultStatus,
     Video,
 )
+from .services import identity_crypto
 from .storage import get_storage
 from .verification import discrepancy
 from .verification.analyzers import (
@@ -38,6 +40,7 @@ from .verification.analyzers import (
 )
 from .verification.cheat import pipeline as cheat_pipeline
 from .verification.cheat.findings import CheatReport, FaceOutcome
+from .verification.cheat.identity import identity_finding
 from .verification.extractor import ExtractionError, analyze_video
 from .worker import celery_app
 
@@ -149,6 +152,16 @@ def _run_verification(
         # the face check reports itself as "not run" rather than "passed".
         reference_face_key = athlete.reference_face_key if athlete else None
 
+        # An official attempt should come with a passed photo check; one that
+        # does not is routed to a reviewer (never refused — see identity.py).
+        official = result.session_id is not None
+        identity_check = (
+            db.get(IdentityCheck, result.identity_check_id)
+            if result.identity_check_id is not None
+            else None
+        )
+        identity_outcome = identity_check.outcome if identity_check else None
+
     test_type = TestType(test_code)
 
     # Vertical jump cannot be scored without a real-world reference. Guessing a
@@ -176,7 +189,7 @@ def _run_verification(
         analysis = analyze_video(local_video, MODELS_DIR)
 
         reference_face = _materialise_reference_face(
-            storage, reference_face_key, working
+            storage, reference_face_key, working, settings
         )
 
         cheat_report = cheat_pipeline.run_checks(
@@ -190,6 +203,10 @@ def _run_verification(
             reference_face_path=reference_face,
             models_dir=MODELS_DIR,
         )
+
+    finding = identity_finding(official=official, outcome=identity_outcome)
+    if finding is not None:
+        cheat_report.add(finding)
 
     frames = analysis.frames
 
@@ -399,7 +416,9 @@ def _persist_pose_sequence(storage, video_id, video_key: str, frames) -> None:
         )
 
 
-def _materialise_reference_face(storage, reference_face_key, working_dir: Path):
+def _materialise_reference_face(
+    storage, reference_face_key, working_dir: Path, settings
+):
     """Fetch the registration photo, if there is one.
 
     Returns None rather than raising: no photo on file is a gap in our data, not
@@ -409,8 +428,12 @@ def _materialise_reference_face(storage, reference_face_key, working_dir: Path):
         return None
 
     try:
+        # Decrypted only into this job's temporary directory, which is removed
+        # when verification finishes.
         destination = working_dir / "reference_face.jpg"
-        storage.fetch_to(reference_face_key, destination)
+        destination.write_bytes(
+            identity_crypto.load_photo(storage, settings, reference_face_key)
+        )
         return destination
     except Exception:
         logger.warning(

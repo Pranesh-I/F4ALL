@@ -124,6 +124,30 @@ def angle(first: PosePoint, vertex: PosePoint, second: PosePoint) -> float:
     return math.degrees(math.acos(cosine))
 
 
+def distance(first: PosePoint, second: PosePoint) -> float:
+    """Euclidean distance in the image plane, in normalized units."""
+    return math.hypot(first.x - second.x, first.y - second.y)
+
+
+def angle_from_vertical(upper: PosePoint, lower: PosePoint) -> float:
+    """Angle between ``lower`` -> ``upper`` and straight up: 0 upright, 90 level."""
+    return math.degrees(math.atan2(abs(upper.x - lower.x), -(upper.y - lower.y)))
+
+
+def angle_from_horizontal(first: PosePoint, second: PosePoint) -> float:
+    """Angle between ``first`` -> ``second`` and the horizontal, ignoring direction."""
+    return math.degrees(
+        math.atan2(abs(second.y - first.y), abs(second.x - first.x))
+    )
+
+
+def cross_product(start: PosePoint, end: PosePoint, point: PosePoint) -> float:
+    """Which side of ``start`` -> ``end`` the ``point`` lies on (2D cross product)."""
+    return (end.x - start.x) * (point.y - start.y) - (end.y - start.y) * (
+        point.x - start.x
+    )
+
+
 def mean(values: Sequence[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
