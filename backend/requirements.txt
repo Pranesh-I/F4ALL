@@ -12,6 +12,9 @@ psycopg[binary]>=3.2
 python-dotenv>=1.0
 pydantic-settings>=2.6
 
+# --- API contract: docs/openapi.yaml is generated with it ---
+pyyaml>=6.0
+
 # --- Auth (Sprint 7 issues real tokens; the middleware verifies them now) ---
 pyjwt>=2.10
 

@@ -68,6 +68,27 @@ jobs:
           python -m alembic check
           python -m alembic downgrade base
 
+  backend-image:
+    name: Backend image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: docker build -t f4all-backend backend
+
+      # The image must refuse to start as production with development
+      # settings, rather than start and sign tokens with the published secret.
+      - name: Refuses unsafe production settings
+        run: |
+          if docker run --rm -e ENVIRONMENT=production f4all-backend python -c "import app.main"; then
+            echo "The API started in production with development settings"
+            exit 1
+          fi
+
+      - name: Starts in development
+        run: docker run --rm f4all-backend python -c "import app.main"
+
   dashboard:
     name: Dashboard typecheck, tests and build
     runs-on: ubuntu-latest

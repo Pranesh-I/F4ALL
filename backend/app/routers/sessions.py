@@ -72,8 +72,36 @@ def active_sessions(
         session for session in candidates if rules.visible_to(session, athlete, now)
     ]
 
+    return ActiveSessionsResponse(
+        server_time=now, sessions=_athlete_view(db, athlete, visible)
+    )
+
+
+@router.get("/{session_id}", response_model=ActiveSessionResponse)
+def session_detail(
+    session_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    athlete: Athlete = Depends(require_athlete),
+):
+    """One session, as the athlete sees it in the list.
+
+    404 for a session this athlete cannot see — disabled, outside its window,
+    another region's — exactly as for one that does not exist, so the endpoint
+    does not reveal which sessions exist elsewhere.
+    """
+    session = db.get(AssessmentSession, session_id)
+    if session is None or not rules.visible_to(session, athlete, _now()):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+    return _athlete_view(db, athlete, [session])[0]
+
+
+def _athlete_view(
+    db: Session, athlete: Athlete, visible: list[AssessmentSession]
+) -> list[ActiveSessionResponse]:
+    """Each session with, per test, whether this athlete has used their one
+    submission."""
     if not visible:
-        return ActiveSessionsResponse(server_time=now)
+        return []
 
     results = db.execute(
         select(TestResult, Test.code)
@@ -117,7 +145,7 @@ def active_sessions(
             )
         )
 
-    return ActiveSessionsResponse(server_time=now, sessions=sessions)
+    return sessions
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +169,25 @@ def list_sessions(
     sessions = list(db.execute(query).scalars())
     counts = _submission_counts(db, [session.id for session in sessions])
     return [_response(session, counts.get(session.id, 0)) for session in sessions]
+
+
+@admin_router.get("/{session_id}", response_model=AssessmentSessionResponse)
+def get_session(
+    session_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    official: Official | None = Depends(current_official),
+):
+    """One session. A regional reviewer gets 404 for another region's."""
+    session = _load(db, session_id)
+    if (
+        official is not None
+        and not _is_admin(official)
+        and session.region is not None
+        and session.region != official.region
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+    counts = _submission_counts(db, [session.id])
+    return _response(session, counts.get(session.id, 0))
 
 
 @admin_router.post(

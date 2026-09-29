@@ -8,6 +8,7 @@
     python -m app.cli create-official      provision a dashboard account
     python -m app.cli identity-key         print a new photo-encryption key
     python -m app.cli encrypt-photos       encrypt photos stored before Sprint 8
+    python -m app.cli export-openapi       regenerate docs/openapi.yaml from the code
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import argparse
 import logging
 import sys
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy import select
 
@@ -312,6 +314,30 @@ def encrypt_photos() -> int:
     return 1 if failed else 0
 
 
+OPENAPI_PATH = Path(__file__).resolve().parent.parent.parent / "docs" / "openapi.yaml"
+
+OPENAPI_HEADER = (
+    "# Generated from the backend by `python -m app.cli export-openapi`.\n"
+    "# Do not edit by hand: tests/test_api_contract.py fails when this file and\n"
+    "# the code disagree.\n"
+)
+
+
+def openapi_document() -> dict:
+    from .main import create_app
+
+    return create_app().openapi()
+
+
+def export_openapi(path: Path = OPENAPI_PATH) -> int:
+    import yaml
+
+    text = yaml.safe_dump(openapi_document(), sort_keys=False, allow_unicode=True)
+    path.write_text(OPENAPI_HEADER + text, encoding="utf-8", newline="\n")
+    print(f"Wrote {path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     configure_logging(debug=False, json_output=False)
 
@@ -353,6 +379,7 @@ def main(argv: list[str] | None = None) -> int:
     official_parser.add_argument("--region", default=None)
 
     subparsers.add_parser("identity-key", help="Print a new photo-encryption key")
+    subparsers.add_parser("export-openapi", help="Regenerate docs/openapi.yaml")
     subparsers.add_parser(
         "encrypt-photos", help="Encrypt registration photos stored in the clear"
     )
@@ -369,6 +396,8 @@ def main(argv: list[str] | None = None) -> int:
         return sla_report()
     if args.command == "seed-benchmarks":
         return seed_benchmarks_command(args.file, args.replace)
+    if args.command == "export-openapi":
+        return export_openapi()
     if args.command == "identity-key":
         return identity_key()
     if args.command == "encrypt-photos":

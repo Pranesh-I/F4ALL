@@ -458,6 +458,37 @@ class TestHistoryItem(BaseModel):
     server_score: float | None
     final_score: float | None
     created_at: datetime
+    # The assessment session an official attempt belonged to.
+    session_id: uuid.UUID | None = None
+
+
+class VerificationStatusResponse(BaseModel):
+    result_id: uuid.UUID
+    test_type: str
+    unit: str
+    status: str
+    provisional_score: float | None = None
+    server_score: float | None = None
+    final_score: float | None = None
+    submitted_at: datetime
+    verified_at: datetime | None = None
+    # While still in `processing`: how long it has waited, against the target.
+    waiting_seconds: int | None = None
+    sla_seconds: int
+    overdue: bool = False
+
+    # Officials only; null for the athlete. The flags describe the cheat
+    # checks, which are not explained to the person they are checking.
+    verification_error: str | None = None
+    flags: list[FlagResponse] | None = None
+    identity_check: str | None = None
+    face_check: str | None = None
+
+
+class TestHistoryPage(BaseModel):
+    items: list[TestHistoryItem] = Field(default_factory=list)
+    # Pass as `before` to fetch the next, older page; null on the last page.
+    next_before: datetime | None = None
 
 
 class AthleteSummaryResponse(BaseModel):

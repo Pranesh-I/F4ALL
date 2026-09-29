@@ -53,6 +53,10 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         request_id = incoming or uuid.uuid4().hex[:16]
 
         token = request_id_var.set(request_id)
+        # Also on the request's state, which outlives this middleware: an
+        # unhandled error is answered by an outer layer, after the context
+        # variable has been reset.
+        request.state.request_id = request_id
         try:
             response = await call_next(request)
             response.headers[REQUEST_ID_HEADER] = request_id

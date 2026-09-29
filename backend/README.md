@@ -29,7 +29,20 @@ uvicorn app.main:app --reload   # API on :8000
 celery -A app.worker.celery_app worker --loglevel=info   # verification worker
 ```
 
-Interactive API docs: <http://localhost:8000/docs>
+Interactive API docs: <http://localhost:8000/docs>. The same contract is
+committed as [`docs/openapi.yaml`](../docs/openapi.yaml), generated from the code
+with `python -m app.cli export-openapi`; a test fails if the two disagree.
+
+### The whole stack in Docker
+
+```bash
+docker compose --profile app up --build    # Postgres, Redis, migrations, API, worker
+docker compose exec api python -m app.cli seed
+```
+
+One image serves both roles (API and verification worker), so the worker can
+never be a different version from the API that queued its work. The models are
+fetched while the image builds. `F4ALL_API_PORT` changes the host port.
 
 ### Running without Docker
 
@@ -58,16 +71,35 @@ app/
 ├── logging_config.py    JSON logs with per-request correlation ids
 ├── worker.py            Celery app
 ├── tasks.py             the re-verification job
-├── cli.py               seed / reverify-pending / sla
-├── routers/             health, auth, videos, tests_submit, dashboard
-├── services/uploads.py  chunked resumable upload receiver
+├── cli.py               operations commands (see Operations)
+├── routers/             one module per API area:
+│   ├── auth.py            OTP sign-in, refresh, logout
+│   ├── athletes.py        registration, profile, consent, history, bests
+│   ├── identity.py        the photo check before an official test
+│   ├── practice.py        private practice history
+│   ├── sessions.py        assessment sessions (athlete + admin)
+│   ├── videos.py          chunked resumable upload
+│   ├── tests_submit.py    official submissions and results
+│   ├── verification.py    verification status and re-running it
+│   ├── dashboard*.py      officials: sign-in, review queue, decisions
+│   └── media.py, health.py
+├── services/            the rules behind the routers (OTP, tokens, consent,
+│                        sessions, badges, benchmarks, identity encryption…)
 └── verification/
     ├── thresholds.py    MUST match the mobile AnalyzerThresholds.kt
     ├── pose.py          geometry, One-Euro smoothing, quality gate
-    ├── analyzers.py     sit-up and vertical-jump scorers
+    ├── analyzers.py     scorer for each test type
+    ├── rep_exercises.py squats, push-ups, curls, lunges
     ├── extractor.py     MediaPipe landmark extraction (the only heavy dep)
-    └── discrepancy.py   device-vs-server comparison and flagging
+    ├── discrepancy.py   device-vs-server comparison and flagging
+    └── cheat/           integrity and identity checks
+alembic/                 migrations
+scripts/fetch_model.py   downloads the pose and face models
 ```
+
+The sprint plan sketches a package per area (`auth/`, `athletes/`, …). Here
+each area is a router module plus its service; the split is the same, without
+moving every file and breaking every import for a rename.
 
 ## The design rule that matters most
 
@@ -131,28 +163,58 @@ python -m app.cli reverify-pending    # re-queue submissions stuck in processing
 python -m app.cli reverify <id>       # re-queue one
 python -m app.cli seed-benchmarks     # load norms (--file, --replace)
 python -m app.cli create-official     # provision or reset a dashboard account
+python -m app.cli identity-key        # a new key for IDENTITY_ENCRYPTION_KEY
+python -m app.cli encrypt-photos      # encrypt photos stored before encryption existed
+python -m app.cli export-openapi      # regenerate docs/openapi.yaml after an API change
 ```
+
+An SAI admin can also re-run a stuck verification from the API:
+`POST /api/verification/{result_id}/process`.
 
 `GET /health`, `GET /ready` and `GET /health/verification` cover liveness,
 readiness and SLA breach counts respectively.
 
 ## Production requirements
 
-These are enforced in code, not left to a checklist:
+With `ENVIRONMENT=production` the API **refuses to start** and names every
+setting that is wrong (`Settings.production_problems`):
 
-- `STORAGE_BACKEND=s3` — local disk raises at startup in production, because
-  videos would vanish with the container and be readable on the host.
-- `ALLOW_UNAUTHENTICATED` is ignored outside development regardless of value.
-- `JWT_SECRET` must be set to a real secret.
-- Uploaded objects are written with `ServerSideEncryption=AES256`, and videos
-  are only ever exposed through short-lived signed URLs — these recordings show
-  minors.
+| Setting | Required |
+|---|---|
+| `JWT_SECRET` | random, 32+ characters — not the development default |
+| `IDENTITY_ENCRYPTION_KEY` | set; back it up, since losing it loses every face photo |
+| `STORAGE_BACKEND` / `S3_BUCKET` | `s3` and a bucket — local disk vanishes with the container |
+| `SMS_BACKEND` / `SMS_API_URL` | `http` and a gateway — otherwise no OTP is ever delivered |
+| `DEBUG` | false |
+| `PUBLIC_BASE_URL` | an `https://` address |
+| `CORS_ORIGINS` | only the dashboard's real origin — no `*`, no localhost |
+
+Also: `ALLOW_UNAUTHENTICATED` is ignored outside development; uploads are
+written with `ServerSideEncryption=AES256` and only exposed through short-lived
+signed URLs, because these recordings show minors.
+
+## API map
+
+The sprint plan's API list, and where each is served (all under `/api`). The
+test `tests/test_api_contract.py` checks every one exists.
+
+| Plan | Served as |
+|---|---|
+| `POST /auth/send-otp` | `POST /api/auth/request-otp` |
+| `POST /auth/verify-otp`, `POST /auth/login` | `POST /api/auth/verify-otp` — signing in *is* verifying the OTP |
+| `POST /auth/register` | `POST /api/athletes/register` — needs the token from a verified OTP |
+| `GET`/`PUT /athlete/profile` | `GET`/`PATCH /api/athletes/me` |
+| `GET /athlete/history` | `GET /api/athletes/me/history` (paged) |
+| `GET /athlete/personal-bests` | `GET /api/athletes/me/personal-bests` |
+| `GET /sessions/active`, `GET /sessions/{id}` | `GET /api/sessions/active`, `GET /api/sessions/{id}` |
+| `POST`/`PUT`/`DELETE /admin/sessions` | `POST`/`PATCH`/`DELETE /api/dashboard/sessions` |
+| `POST /tests/practice` | `PUT /api/athletes/me/practice/{client_attempt_id}` — idempotent retry |
+| `POST /tests/session`, `GET /tests/{id}` | `POST /api/tests/submit`, `GET /api/results/{id}` |
+| `POST /uploads/initiate`, `/chunk`, `/complete` | `/api/videos/upload/init`, `PUT …/chunks/{index}`, `…/complete` |
+| `GET /verification/{id}`, `POST /verification/process` | `GET /api/verification/{id}`, `POST /api/verification/{id}/process` |
 
 ## Known gaps
 
-- **Auth is a stub.** `/api/auth/*` accepts a fixed development OTP and returns
-  501 in production. Sprint 7 implements delivery, expiry and rate limiting.
-- **Sprint 6 cheat detection is not here yet.** Frame-consistency, single-person
-  and face-match checks all hang off the same verification task.
+- **Notifications do not exist yet** (the plan's `notifications/` module).
 - **The SLA is monitored but unproven.** The end-to-end timing target needs a
   real worker under real load; `GET /health/verification` reports it.

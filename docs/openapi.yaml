@@ -1,1212 +1,3297 @@
-openapi: 3.0.3
-
+# Generated from the backend by `python -m app.cli export-openapi`.
+# Do not edit by hand: tests/test_api_contract.py fails when this file and
+# the code disagree.
+openapi: 3.1.0
 info:
   title: F4ALL Sports Talent Assessment API
-  description: >
-    API contract for the F4ALL AI-powered sports talent assessment platform.
-    The mobile application receives a provisional on-device score, while the
-    backend performs server-side verification and stores the final result.
+  description: Backend for the SAI talent assessment platform. The mobile app produces
+    a provisional on-device score; this service independently re-verifies every submission
+    and its score is the one that counts.
   version: 1.0.0
-
-servers:
-  - url: http://localhost:8000
-    description: Local development server
-
-tags:
-  - name: Authentication
-    description: Athlete authentication APIs
-  - name: Videos
-    description: Chunked, resumable video upload APIs
-  - name: Tests
-    description: Test submission APIs
-  - name: Results
-    description: Athlete test result APIs
-  - name: Dashboard
-    description: Official dashboard review APIs
-
 paths:
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health
+      description: Liveness. Cheap enough for a load balancer to hit constantly.
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /ready:
+    get:
+      tags:
+      - Health
+      summary: Readiness
+      description: 'Readiness: can this instance actually do its job right now.'
+      operationId: readiness_ready_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+  /health/verification:
+    get:
+      tags:
+      - Health
+      summary: Verification Backlog
+      description: 'Reports against the Sprint 5 SLA.
 
-  # ============================================================
-  # AUTHENTICATION
-  # ============================================================
 
+        The Definition of Done names a time window from upload to server score.
+
+        Without something that measures it, a growing backlog is invisible until an
+
+        athlete complains — so the SLA is reported here rather than assumed.'
+      operationId: verification_backlog_health_verification_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
   /api/auth/request-otp:
     post:
       tags:
-        - Authentication
-      summary: Request OTP
-      description: Send an OTP to the athlete's registered phone number.
-
+      - Authentication
+      summary: Request Otp
+      operationId: request_otp_api_auth_request_otp_post
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/RequestOtpRequest'
-
+        required: true
       responses:
         '200':
-          description: OTP sent successfully
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
-
-        '400':
-          description: Invalid phone number
-
-
+                $ref: '#/components/schemas/RequestOtpResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/auth/verify-otp:
     post:
       tags:
-        - Authentication
-      summary: Verify OTP
-      description: Verify the OTP and authenticate the athlete.
-
+      - Authentication
+      summary: Verify Otp
+      operationId: verify_otp_api_auth_verify_otp_post
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/VerifyOtpRequest'
-
+        required: true
       responses:
         '200':
-          description: OTP verified successfully
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
-
-        '400':
-          description: Invalid or expired OTP
-
-
-  # ============================================================
-  # TEST SUBMISSION
-  # ============================================================
-
-  /api/tests/submit:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/auth/refresh:
     post:
       tags:
-        - Tests
-      summary: Submit a completed test
-      description: >
-        Submit an athlete's completed test with the provisional on-device
-        result. The server will independently verify the submission.
+      - Authentication
+      summary: Refresh
+      operationId: refresh_api_auth_refresh_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/auth/logout:
+    post:
+      tags:
+      - Authentication
+      summary: Logout
+      description: 'Revoke refresh tokens.
 
-      security:
-        - bearerAuth: []
 
+        `all_devices` exists because a phone in this context is often shared, sold
+
+        on, or lost, and the athlete may have no way to reach the device that still
+
+        holds a token.'
+      operationId: logout_api_auth_logout_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/register:
+    post:
+      tags:
+      - Athletes
+      summary: Register
+      description: 'Create a profile for a phone number that has verified an OTP.
+
+
+        The phone comes from the token, never from the body — see
+
+        `security.registration_claim`.'
+      operationId: register_api_athletes_register_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AthleteRegistrationRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me:
+    get:
+      tags:
+      - Athletes
+      summary: My Profile
+      operationId: my_profile_api_athletes_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteProfileResponse'
+    patch:
+      tags:
+      - Athletes
+      summary: Update My Profile
+      description: 'Update the mutable parts of a profile.
+
+
+        Date of birth and gender are deliberately not editable here. Both select the
+
+        benchmark cohort an athlete is judged against, so making them
+
+        self-service — after results exist — would turn the comparison into
+
+        something an athlete can shop around. Correcting them is a support action
+
+        with an audit trail, which Sprint 8''s dashboard is the right place for.'
+      operationId: update_my_profile_api_athletes_me_patch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AthleteProfileUpdate'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteProfileResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/photo:
+    post:
+      tags:
+      - Athletes
+      summary: Upload Reference Photo
+      description: 'Store the registration photo Sprint 6''s identity check compares
+        against.
+
+
+        Kept in the same private, signed-URL-only storage as the videos, and
+
+        encrypted before it gets there (see `services/identity_crypto.py`). This is
+
+        a photograph of a child''s face held by a government platform; there is no
+
+        version of this that belongs on a public URL.
+
+
+        Refused without consent to face verification: the photo exists only to be
+
+        compared against, and that comparison is what the athlete consents to.'
+      operationId: upload_reference_photo_api_athletes_me_photo_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_upload_reference_photo_api_athletes_me_photo_post'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/consents:
+    post:
+      tags:
+      - Athletes
+      summary: Give Consent
+      description: 'Record a consent — for athletes registered before consent was
+        asked,
+
+        and for face verification, which is asked with the photo.'
+      operationId: give_consent_api_athletes_me_consents_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteProfileResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/consents/{purpose}:
+    delete:
+      tags:
+      - Athletes
+      summary: Withdraw Consent
+      description: 'Withdraw consent to face verification, which deletes the photo.
+
+
+        Official tests need the identity check, so they are unavailable until the
+
+        athlete consents and adds a photo again; practice is unaffected. Consent to
+
+        hold the profile itself is not withdrawn here — that is deleting the
+
+        account, which needs SAI.'
+      operationId: withdraw_consent_api_athletes_me_consents__purpose__delete
+      parameters:
+      - name: purpose
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Purpose
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteProfileResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/summary:
+    get:
+      tags:
+      - Athletes
+      summary: My Summary
+      description: Profile, test history and personal bests.
+      operationId: my_summary_api_athletes_me_summary_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteSummaryResponse'
+  /api/athletes/me/history:
+    get:
+      tags:
+      - Athletes
+      summary: My History
+      description: 'Official results, newest first, a page at a time.
+
+
+        `/me/summary` returns everything at once, which is fine for a new athlete
+
+        and not for one with two years of sessions on a prepaid data pack.'
+      operationId: my_history_api_athletes_me_history_get
+      parameters:
+      - name: test_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Test Type
+      - name: before
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Only results submitted before this time
+          title: Before
+        description: Only results submitted before this time
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestHistoryPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/personal-bests:
+    get:
+      tags:
+      - Athletes
+      summary: My Personal Bests
+      description: Best trusted score per test — see `_personal_bests` for what counts.
+      operationId: my_personal_bests_api_athletes_me_personal_bests_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/PersonalBest'
+                type: array
+                title: Response My Personal Bests Api Athletes Me Personal Bests Get
+  /api/athletes/me/badges:
+    get:
+      tags:
+      - Athletes
+      summary: My Badges
+      description: Badges, computed from results on every request. See `services/badges.py`.
+      operationId: my_badges_api_athletes_me_badges_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadgesResponse'
+  /api/athletes/leaderboard/{test_type}:
+    get:
+      tags:
+      - Athletes
+      summary: Athlete Leaderboard
+      description: Top athletes in the caller's age band and gender, by region or
+        nationally.
+      operationId: athlete_leaderboard_api_athletes_leaderboard__test_type__get
+      parameters:
+      - name: test_type
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Test Type
+      - name: scope
+        in: query
+        required: false
+        schema:
+          type: string
+          default: region
+          title: Scope
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteLeaderboardResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/identity-checks:
+    post:
+      tags:
+      - Identity
+      summary: Create Identity Check
+      operationId: create_identity_check_api_athletes_me_identity_checks_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_create_identity_check_api_athletes_me_identity_checks_post'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityCheckResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/practice/{client_attempt_id}:
+    put:
+      tags:
+      - Practice
+      summary: Save Practice Attempt
+      description: 'Create or replace one practice attempt.
+
+
+        PUT on the phone''s own id makes this idempotent: an upload repeated after
+        a
+
+        lost response overwrites the same row instead of adding a second attempt.'
+      operationId: save_practice_attempt_api_athletes_me_practice__client_attempt_id__put
+      parameters:
+      - name: client_attempt_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[A-Za-z0-9_\-]{1,64}$
+          title: Client Attempt Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubmitTestRequest'
-
+              $ref: '#/components/schemas/PracticeAttemptIn'
       responses:
-        '201':
-          description: Test submitted successfully
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubmitTestResponse'
+                $ref: '#/components/schemas/PracticeAttemptOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/practice:
+    get:
+      tags:
+      - Practice
+      summary: My Practice History
+      description: 'The calling athlete''s practice, newest first.
 
-        '400':
-          description: Invalid test submission
 
-        '401':
-          description: Authentication required
+        Page backwards with ``before_ms`` set to the oldest ``recorded_at_ms`` seen.'
+      operationId: my_practice_history_api_athletes_me_practice_get
+      parameters:
+      - name: before_ms
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            exclusiveMinimum: 0
+          - type: 'null'
+          title: Before Ms
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 200
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PracticeHistoryResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/sessions/active:
+    get:
+      tags:
+      - Sessions
+      summary: Active Sessions
+      description: Sessions open to this athlete now, with what they have already
+        submitted.
+      operationId: active_sessions_api_sessions_active_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveSessionsResponse'
+  /api/sessions/{session_id}:
+    get:
+      tags:
+      - Sessions
+      summary: Session Detail
+      description: 'One session, as the athlete sees it in the list.
 
 
-  # ============================================================
-  # VIDEO UPLOAD (chunked + resumable)
-  # ============================================================
-  #
-  # Added in Sprint 4. The original contract referenced a video_id on
-  # /api/tests/submit but defined no way to produce one.
-  #
-  # The flow is deliberately resumable. Athletes upload over 2G/3G links that
-  # drop mid-transfer, and restarting a 6MB video from byte zero on every drop
-  # burns mobile data they paid for and may not be able to replace.
-  #
-  #   init  ->  (status)  ->  chunk x N  ->  complete
-  #
-  # The client asks the SERVER which chunks arrived rather than trusting its own
-  # record of what it sent, so an upload survives the app being killed.
+        404 for a session this athlete cannot see — disabled, outside its window,
 
+        another region''s — exactly as for one that does not exist, so the endpoint
+
+        does not reveal which sessions exist elsewhere.'
+      operationId: session_detail_api_sessions__session_id__get
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveSessionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/dashboard/sessions:
+    get:
+      tags:
+      - Dashboard
+      summary: List Sessions
+      description: 'Every session, newest window first. A regional reviewer sees national
+
+        sessions and their own region''s.'
+      operationId: list_sessions_api_dashboard_sessions_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/AssessmentSessionResponse'
+                type: array
+                title: Response List Sessions Api Dashboard Sessions Get
+    post:
+      tags:
+      - Dashboard
+      summary: Create Session
+      operationId: create_session_api_dashboard_sessions_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentSessionCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentSessionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/dashboard/sessions/{session_id}:
+    get:
+      tags:
+      - Dashboard
+      summary: Get Session
+      description: One session. A regional reviewer gets 404 for another region's.
+      operationId: get_session_api_dashboard_sessions__session_id__get
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentSessionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - Dashboard
+      summary: Update Session
+      description: Edit a session, including opening or closing it (``enabled``).
+      operationId: update_session_api_dashboard_sessions__session_id__patch
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentSessionUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentSessionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Dashboard
+      summary: Delete Session
+      description: 'Delete a session nobody has submitted to. One with submissions
+        is part
+
+        of the official record: close it (``enabled: false``) instead.'
+      operationId: delete_session_api_dashboard_sessions__session_id__delete
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/videos/upload/init:
     post:
       tags:
-        - Videos
-      summary: Begin a resumable upload
-      description: >
-        Reserve an upload slot and receive an upload_id. The client must persist
-        the upload_id before sending any bytes, so an interrupted upload can be
-        resumed rather than restarted.
-
-      security:
-        - bearerAuth: []
-
+      - Videos
+      summary: Init Upload
+      operationId: init_upload_api_videos_upload_init_post
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/UploadInitRequest'
-
+        required: true
       responses:
         '200':
-          description: Upload session created
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UploadSession'
-
-        '401':
-          description: Authentication required
-
-        '413':
-          description: File exceeds the maximum accepted size
-
-
+                $ref: '#/components/schemas/UploadSessionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/videos/upload/{upload_id}:
     get:
       tags:
-        - Videos
-      summary: Get upload progress
-      description: >
-        Report which chunk indices the server has successfully stored. This is
-        what makes resumption correct after an app restart - the client sends
-        only what is genuinely missing.
+      - Videos
+      summary: Get Upload Status
+      description: 'Which chunks the server actually holds.
 
-      security:
-        - bearerAuth: []
 
+        The client resumes from this rather than from its own record of what it
+
+        sent — a chunk that left the device but never landed is exactly the case
+
+        resumption exists for.'
+      operationId: get_upload_status_api_videos_upload__upload_id__get
       parameters:
-        - name: upload_id
-          in: path
-          required: true
-          schema:
-            type: string
-
+      - name: upload_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Upload Id
       responses:
         '200':
-          description: Upload session state
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UploadSession'
-
-        '401':
-          description: Authentication required
-
-        '404':
-          description: Upload session expired or unknown
-
-
+                $ref: '#/components/schemas/UploadSessionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/videos/upload/{upload_id}/chunks/{index}:
     put:
       tags:
-        - Videos
-      summary: Upload one chunk
-      description: >
-        Send a single chunk of the video. Chunks may arrive in any order and may
-        be re-sent; the server stores each by index and ignores duplicates.
-
-      security:
-        - bearerAuth: []
-
+      - Videos
+      summary: Upload Chunk
+      operationId: upload_chunk_api_videos_upload__upload_id__chunks__index__put
       parameters:
-        - name: upload_id
-          in: path
-          required: true
-          schema:
-            type: string
-
-        - name: index
-          in: path
-          required: true
-          description: Zero-based chunk index
-          schema:
-            type: integer
-            minimum: 0
-
-      requestBody:
+      - name: upload_id
+        in: path
         required: true
-        content:
-          video/mp4:
-            schema:
-              type: string
-              format: binary
-
+        schema:
+          type: string
+          title: Upload Id
+      - name: index
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Index
       responses:
         '200':
-          description: Chunk stored
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UploadChunkResponse'
-
-        '401':
-          description: Authentication required
-
-        '404':
-          description: Upload session expired or unknown
-
-        '409':
-          description: Chunk index outside the declared file size
-
-
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/videos/upload/{upload_id}/complete:
     post:
       tags:
-        - Videos
-      summary: Finalize an upload
-      description: >
-        Reassemble the stored chunks, verify the SHA-256 the client declared at
-        init against what was actually received, and persist the video. A
-        mismatch returns 422 and is NOT retryable by re-sending the same source.
-
-      security:
-        - bearerAuth: []
-
+      - Videos
+      summary: Complete Upload
+      operationId: complete_upload_api_videos_upload__upload_id__complete_post
       parameters:
-        - name: upload_id
-          in: path
-          required: true
-          schema:
-            type: string
-
+      - name: upload_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Upload Id
       responses:
         '200':
-          description: Video stored and verified
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UploadCompleteResponse'
-
-        '400':
-          description: Chunks still missing
-
-        '401':
-          description: Authentication required
-
-        '404':
-          description: Upload session expired or unknown
-
         '422':
-          description: Checksum mismatch - assembled video does not match the client hash
-
-
-  # ============================================================
-  # RESULTS
-  # ============================================================
-
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/tests/submit:
+    post:
+      tags:
+      - Tests
+      summary: Submit Test
+      operationId: submit_test_api_tests_submit_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTestRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitTestResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/results/{result_id}:
     get:
       tags:
-        - Results
-      summary: Get test result
-      description: >
-        Get the current status and scores of a submitted test.
-
-      security:
-        - bearerAuth: []
-
+      - Tests
+      summary: Get Result
+      operationId: get_result_api_results__result_id__get
       parameters:
-        - name: result_id
-          in: path
-          required: true
-          description: Unique test result ID
-          schema:
-            type: string
-            format: uuid
-
+      - name: result_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Result Id
       responses:
         '200':
-          description: Test result retrieved successfully
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TestResult'
-
-        '401':
-          description: Authentication required
-
-        '404':
-          description: Result not found
-
-
-  # ============================================================
-  # DASHBOARD REVIEW
-  # ============================================================
-
+                $ref: '#/components/schemas/ResultWithBenchmarkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/verification/{result_id}:
+    get:
+      tags:
+      - Verification
+      summary: Verification Status
+      operationId: verification_status_api_verification__result_id__get
+      parameters:
+      - name: result_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Result Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationStatusResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/verification/{result_id}/process:
+    post:
+      tags:
+      - Verification
+      summary: Reprocess
+      description: Queue verification again for a submission stuck in `processing`.
+      operationId: reprocess_api_verification__result_id__process_post
+      parameters:
+      - name: result_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Result Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationStatusResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/dashboard/auth/login:
+    post:
+      tags:
+      - Dashboard auth
+      summary: Login
+      operationId: login_api_dashboard_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OfficialLoginRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfficialTokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/dashboard/auth/refresh:
+    post:
+      tags:
+      - Dashboard auth
+      summary: Refresh
+      operationId: refresh_api_dashboard_auth_refresh_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfficialTokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/dashboard/auth/me:
+    get:
+      tags:
+      - Dashboard auth
+      summary: Me
+      operationId: me_api_dashboard_auth_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfficialProfileResponse'
   /api/dashboard/reviews:
     get:
       tags:
-        - Dashboard
-      summary: Get review queue
-      description: >
-        Retrieve test submissions that require official dashboard review.
+      - Dashboard
+      summary: Review Queue
+      description: 'The work queue, most urgent first.
 
-      security:
-        - bearerAuth: []
 
+        Ordered by highest unresolved flag severity, then oldest first — a
+
+        high-severity flag should not wait behind a week of low ones, and within a
+
+        severity nobody should be starved by newer submissions.
+
+
+        The total count is in `X-Total-Count` so the body stays the list the
+
+        contract already describes.'
+      operationId: review_queue_api_dashboard_reviews_get
       parameters:
-        - name: status
-          in: query
-          required: false
-          description: Filter results by review status
-          schema:
-            type: string
-            enum:
-              - flagged
-              - approved
-              - rejected
-              - processing
-
-        - name: test_type
-          in: query
-          required: false
-          description: Filter results by test type
-          schema:
-            type: string
-            enum:
-              - vertical_jump
-              - sit_ups
-
-        - name: region
-          in: query
-          required: false
-          description: Filter results by athlete region
-          schema:
-            type: string
-
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: test_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Test Type
+      - name: region
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Region
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
       responses:
         '200':
-          description: Review queue retrieved successfully
+          description: Successful Response
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  results:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/ReviewItem'
-
-        '401':
-          description: Authentication required
-
-        '403':
-          description: Insufficient dashboard permissions
-
-
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReviewItemResponse'
+                title: Response Review Queue Api Dashboard Reviews Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/dashboard/reviews/{result_id}:
     get:
       tags:
-        - Dashboard
-      summary: Get review details
-      description: >
-        Retrieve complete information about a test submission for official review.
-
-      security:
-        - bearerAuth: []
-
+      - Dashboard
+      summary: Review Detail
+      operationId: review_detail_api_dashboard_reviews__result_id__get
       parameters:
-        - name: result_id
-          in: path
-          required: true
-          description: Test result ID
-          schema:
-            type: string
-            format: uuid
-
+      - name: result_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Result Id
       responses:
         '200':
-          description: Review details retrieved successfully
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReviewDetails'
+                $ref: '#/components/schemas/ReviewDetailResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/dashboard/reviews/{result_id}/pose:
+    get:
+      tags:
+      - Dashboard
+      summary: Review Pose Sequence
+      description: 'The landmarks the server extracted, for the skeleton overlay.
 
-        '401':
-          description: Authentication required
 
-        '403':
-          description: Insufficient dashboard permissions
+        Served through the API rather than as a public file so region scoping
 
-        '404':
-          description: Result not found
-
-
+        applies to it exactly as it does to the video.'
+      operationId: review_pose_sequence_api_dashboard_reviews__result_id__pose_get
+      parameters:
+      - name: result_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Result Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/dashboard/reviews/{result_id}/action:
     post:
       tags:
-        - Dashboard
-      summary: Take review action
-      description: >
-        Approve, reject, or request resubmission for a test submission.
-
-      security:
-        - bearerAuth: []
-
+      - Dashboard
+      summary: Review Action
+      operationId: review_action_api_dashboard_reviews__result_id__action_post
       parameters:
-        - name: result_id
-          in: path
-          required: true
-          description: Test result ID
-          schema:
-            type: string
-            format: uuid
-
+      - name: result_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Result Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ReviewActionRequest'
-
       responses:
         '200':
-          description: Review action completed
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReviewActionResponse'
-
-        '400':
-          description: Invalid review action
-
-        '401':
-          description: Authentication required
-
-        '403':
-          description: Insufficient dashboard permissions
-
-        '404':
-          description: Result not found
-
-
-# ==============================================================
-# COMPONENTS
-# ==============================================================
-
-  # -------------------------------------------------------------------------
-  # Sprint 7: accounts, profile, benchmarks
-  # -------------------------------------------------------------------------
-
-  /api/auth/refresh:
-    post:
-      tags: [Authentication]
-      summary: Exchange a refresh token for a new token pair
-      description: >
-        Rotates the refresh token. Presenting an already-rotated token revokes
-        every session for that subject, since two parties must be holding it.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [refresh_token]
-              properties:
-                refresh_token: {type: string}
-      responses:
-        "200":
-          description: New token pair
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/TokenPair"}
-        "401": {description: Unknown, expired, revoked or reused refresh token}
-
-  /api/auth/logout:
-    post:
-      tags: [Authentication]
-      summary: Revoke a refresh token, or every device's
-      security: [{bearerAuth: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                refresh_token: {type: string, nullable: true}
-                all_devices: {type: boolean, default: false}
-      responses:
-        "200": {description: Signed out}
-
-  /api/athletes/register:
-    post:
-      tags: [Athletes]
-      summary: Create a profile for a verified phone
-      description: >
-        Requires the registering token returned by verify-otp when registered
-        is false. The phone is taken from that token, never from the body.
-        Returns a fresh athlete session; the registering one is revoked.
-      security: [{bearerAuth: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [name, dob, gender, region]
-              properties:
-                name: {type: string, maxLength: 150}
-                dob: {type: string, format: date}
-                gender: {type: string, enum: [male, female, other]}
-                region:
-                  type: string
-                  description: An Indian state or union territory, canonical spelling
-                height_cm: {type: number, nullable: true}
-                weight_kg: {type: number, nullable: true}
-      responses:
-        "201":
-          description: Registered
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  profile: {$ref: "#/components/schemas/AthleteProfile"}
-                  tokens: {$ref: "#/components/schemas/TokenPair"}
-        "403": {description: Token is not a registering token}
-        "409": {description: Phone already registered}
-        "422": {description: Invalid age, gender or region}
-
-  /api/athletes/me:
-    get:
-      tags: [Athletes]
-      summary: The calling athlete's profile
-      security: [{bearerAuth: []}]
-      responses:
-        "200":
-          description: Profile
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/AthleteProfile"}
-    patch:
-      tags: [Athletes]
-      summary: Update name, region, height or weight
-      description: Date of birth and gender select the benchmark cohort and are not self-service.
-      security: [{bearerAuth: []}]
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name: {type: string}
-                region: {type: string}
-                height_cm: {type: number}
-                weight_kg: {type: number}
-                leaderboard_opt_in: {type: boolean}
-                preferred_language: {type: string, enum: [en, hi, ta, bn]}
-      responses:
-        "200":
-          description: Updated profile
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/AthleteProfile"}
-
-  /api/athletes/me/photo:
-    post:
-      tags: [Athletes]
-      summary: Upload the registration photo used by the identity check
-      security: [{bearerAuth: []}]
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                file: {type: string, format: binary}
-      responses:
-        "200": {description: Saved; any previous photo is deleted}
-        "413": {description: Larger than 5MB}
-        "415": {description: Not JPEG, PNG or WebP}
-
-  /api/athletes/me/summary:
-    get:
-      tags: [Athletes]
-      summary: Profile, full result history and personal bests
-      description: Personal bests count only verified or approved results, and say which are official.
-      security: [{bearerAuth: []}]
-      responses:
-        "200": {description: Summary}
-
-  # -------------------------------------------------------------------------
-  # Sprint 8: official dashboard
-  # -------------------------------------------------------------------------
-
-  /api/dashboard/auth/login:
-    post:
-      tags: [Dashboard]
-      summary: Official sign-in with email and password
-      description: Five failed attempts lock the account for 15 minutes.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email, password]
-              properties:
-                email: {type: string}
-                password: {type: string}
-      responses:
-        "200": {description: Token pair and official profile}
-        "401": {description: Incorrect email or password, identical for unknown accounts}
-        "423": {description: Account temporarily locked}
-
-  /api/dashboard/auth/refresh:
-    post:
-      tags: [Dashboard]
-      summary: Rotate an official refresh token
-      description: Athlete refresh tokens are refused.
-      responses:
-        "200": {description: New token pair}
-        "401": {description: Invalid token or inactive account}
-
-  /api/dashboard/auth/me:
-    get:
-      tags: [Dashboard]
-      summary: The signed-in official
-      security: [{bearerAuth: []}]
-      responses:
-        "200": {description: Official profile}
-
-  /api/dashboard/reviews/{result_id}/pose:
-    get:
-      tags: [Dashboard]
-      summary: The server-extracted landmarks for the skeleton overlay
-      description: "Frames of {t: ms, p: [x, y, visibility] per landmark}. Region-scoped like the result."
-      security: [{bearerAuth: []}]
-      parameters:
-        - {name: result_id, in: path, required: true, schema: {type: string, format: uuid}}
-      responses:
-        "200": {description: Pose sequence}
-        "404": {description: No sequence, or result outside the official's region}
-
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/dashboard/leaderboard:
     get:
-      tags: [Dashboard]
-      summary: Top performers from approved results, best attempt per athlete
-      security: [{bearerAuth: []}]
-      parameters:
-        - {name: test_type, in: query, required: true, schema: {type: string}}
-        - {name: region, in: query, schema: {type: string}}
-        - {name: gender, in: query, schema: {type: string}}
-        - {name: age_min, in: query, schema: {type: integer}}
-        - {name: age_max, in: query, schema: {type: integer}}
-      responses:
-        "200": {description: Ranked entries}
+      tags:
+      - Dashboard
+      summary: Leaderboard
+      description: 'Top performers from APPROVED results only.
 
+
+        A ranking built on unreviewed numbers would put a flagged or tampered
+
+        submission at the top of a list officials use to spot talent.'
+      operationId: leaderboard_api_dashboard_leaderboard_get
+      parameters:
+      - name: test_type
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Test Type
+      - name: region
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Region
+      - name: gender
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gender
+      - name: age_min
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 0
+          - type: 'null'
+          title: Age Min
+      - name: age_max
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 100
+            minimum: 0
+          - type: 'null'
+          title: Age Max
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/dashboard/stats:
     get:
-      tags: [Dashboard]
-      summary: Result counts by status, high-severity flags and SLA breaches
-      security: [{bearerAuth: []}]
+      tags:
+      - Dashboard
+      summary: Stats
+      description: Counts for the dashboard header, scoped like everything else.
+      operationId: stats_api_dashboard_stats_get
       responses:
-        "200": {description: Counts, scoped to the official's region}
-
-  # -------------------------------------------------------------------------
-  # Sprint 9: badges, athlete leaderboard, preferences
-  # -------------------------------------------------------------------------
-
-  /api/athletes/me/badges:
-    get:
-      tags: [Athletes]
-      summary: Progress badges, computed from results on every request
-      description: >
-        Returned as stable codes (first_test, first_verified, personal_best,
-        all_tests, streak_N_weeks) that the app translates. Score badges count
-        only verified or approved results; a rejected result removes its badges.
-      security: [{bearerAuth: []}]
-      responses:
-        "200": {description: Badges with progress, and current and longest weekly streaks}
-
-  /api/athletes/leaderboard/{test_type}:
-    get:
-      tags: [Athletes]
-      summary: Leaderboard for the caller's age band and gender
-      description: >
-        Approved results only, best per athlete, athletes who opted in only,
-        shown as first name and last initial. The caller's own standing is
-        always returned in `you`, whether or not they opted in.
-      security: [{bearerAuth: []}]
-      parameters:
-        - {name: test_type, in: path, required: true, schema: {type: string}}
-        - {name: scope, in: query, schema: {type: string, enum: [region, national], default: region}}
-      responses:
-        "200": {description: Entries and the caller's standing}
-        "404": {description: Unknown test}
-
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
 components:
-
-  # ------------------------------------------------------------
-  # AUTHENTICATION
-  # ------------------------------------------------------------
-
-  securitySchemes:
-
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
-
-  # ------------------------------------------------------------
-  # REQUEST SCHEMAS
-  # ------------------------------------------------------------
-
   schemas:
-
-    RequestOtpRequest:
-      type: object
-      required:
-        - phone
+    ActiveSessionResponse:
       properties:
-        phone:
-          type: string
-          description: Athlete phone number
-          example: '+919876543210'
-
-
-    VerifyOtpRequest:
-      type: object
-      required:
-        - phone
-        - otp
-      properties:
-        phone:
-          type: string
-          description: Athlete phone number
-          example: '+919876543210'
-
-        otp:
-          type: string
-          description: One-time password
-          example: '123456'
-
-
-    SubmitTestRequest:
-      type: object
-      required:
-        - test_id
-        - provisional_score
-      properties:
-        test_id:
+        session_id:
           type: string
           format: uuid
-          description: ID of the test being submitted
-          example: '550e8400-e29b-41d4-a716-446655440000'
-
-        provisional_score:
+          title: Session Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        rules:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Rules
+        starts_at:
+          type: string
+          format: date-time
+          title: Starts At
+        ends_at:
+          type: string
+          format: date-time
+          title: Ends At
+        tests:
+          items:
+            $ref: '#/components/schemas/SessionTestStatus'
+          type: array
+          title: Tests
+      type: object
+      required:
+      - session_id
+      - name
+      - description
+      - rules
+      - starts_at
+      - ends_at
+      - tests
+      title: ActiveSessionResponse
+    ActiveSessionsResponse:
+      properties:
+        server_time:
+          type: string
+          format: date-time
+          title: Server Time
+        sessions:
+          items:
+            $ref: '#/components/schemas/ActiveSessionResponse'
+          type: array
+          title: Sessions
+      type: object
+      required:
+      - server_time
+      title: ActiveSessionsResponse
+    AssessmentSessionCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 150
+          minLength: 1
+          title: Name
+        description:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Description
+        rules:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Rules
+        starts_at:
+          type: string
+          format: date-time
+          title: Starts At
+        ends_at:
+          type: string
+          format: date-time
+          title: Ends At
+        enabled:
+          type: boolean
+          title: Enabled
+          default: false
+        allowed_tests:
+          items:
+            type: string
+          type: array
+          maxItems: 20
+          minItems: 1
+          title: Allowed Tests
+        region:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Region
+      type: object
+      required:
+      - name
+      - starts_at
+      - ends_at
+      - allowed_tests
+      title: AssessmentSessionCreate
+    AssessmentSessionResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        rules:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Rules
+        starts_at:
+          type: string
+          format: date-time
+          title: Starts At
+        ends_at:
+          type: string
+          format: date-time
+          title: Ends At
+        enabled:
+          type: boolean
+          title: Enabled
+        allowed_tests:
+          items:
+            type: string
+          type: array
+          title: Allowed Tests
+        region:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Region
+        status:
+          type: string
+          title: Status
+        submission_count:
+          type: integer
+          title: Submission Count
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - rules
+      - starts_at
+      - ends_at
+      - enabled
+      - allowed_tests
+      - region
+      - status
+      - submission_count
+      - created_at
+      - updated_at
+      title: AssessmentSessionResponse
+    AssessmentSessionUpdate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 150
+            minLength: 1
+          - type: 'null'
+          title: Name
+        description:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Description
+        rules:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Rules
+        starts_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Starts At
+        ends_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Ends At
+        enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+        allowed_tests:
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 20
+            minItems: 1
+          - type: 'null'
+          title: Allowed Tests
+        region:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Region
+        clear_region:
+          type: boolean
+          title: Clear Region
+          default: false
+      type: object
+      title: AssessmentSessionUpdate
+    AthleteLeaderboardEntry:
+      properties:
+        rank:
+          type: integer
+          title: Rank
+        display_name:
+          type: string
+          title: Display Name
+        region:
+          type: string
+          title: Region
+        score:
           type: number
-          format: double
-          description: Provisional score calculated on the athlete's device
-          example: 28
-
-        video_id:
-          type: string
-          format: uuid
-          nullable: true
-          description: ID of the uploaded test video
-          example: '660e8400-e29b-41d4-a716-446655440000'
-
-
-    UploadInitRequest:
+          title: Score
+        is_you:
+          type: boolean
+          title: Is You
+          default: false
       type: object
       required:
-        - test_type
-        - file_size_bytes
-        - checksum_sha256
+      - rank
+      - display_name
+      - region
+      - score
+      title: AthleteLeaderboardEntry
+    AthleteLeaderboardResponse:
       properties:
         test_type:
           type: string
-          enum:
-            - VERTICAL_JUMP
-            - SIT_UPS
-          example: SIT_UPS
-
-        file_size_bytes:
-          type: integer
-          format: int64
-          description: Size of the compressed video the client will send
-          example: 2411724
-
-        chunk_size_bytes:
-          type: integer
-          description: >
-            Chunk size the client intends to use. The server may override it in
-            the response, and the client must honour the returned value.
-          example: 262144
-
-        checksum_sha256:
+          title: Test Type
+        unit:
           type: string
-          description: >
-            SHA-256 of the compressed video, computed on the device over the
-            exact bytes to be sent. Verified server-side at completion.
-          example: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
-
-        content_type:
+          title: Unit
+        scope:
           type: string
-          example: video/mp4
-
-
-    UploadSession:
-      type: object
-      properties:
-        upload_id:
+          title: Scope
+        region:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Region
+        cohort:
           type: string
-          example: up_7c1f2b90
-
-        chunk_size_bytes:
-          type: integer
-          description: Authoritative chunk size; the client must use this value
-          example: 262144
-
-        received_chunks:
-          type: array
-          description: Zero-based indices the server has stored
+          title: Cohort
+        entries:
           items:
+            $ref: '#/components/schemas/AthleteLeaderboardEntry'
+          type: array
+          title: Entries
+        you:
+          anyOf:
+          - $ref: '#/components/schemas/YourStanding'
+          - type: 'null'
+        total_ranked:
+          type: integer
+          title: Total Ranked
+      type: object
+      required:
+      - test_type
+      - unit
+      - scope
+      - region
+      - cohort
+      - entries
+      - total_ranked
+      title: AthleteLeaderboardResponse
+    AthleteProfileResponse:
+      properties:
+        athlete_id:
+          type: string
+          format: uuid
+          title: Athlete Id
+        name:
+          type: string
+          title: Name
+        dob:
+          type: string
+          format: date
+          title: Dob
+        age_years:
+          type: integer
+          title: Age Years
+        gender:
+          type: string
+          title: Gender
+        region:
+          type: string
+          title: Region
+        phone:
+          type: string
+          title: Phone
+        height_cm:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Height Cm
+        weight_kg:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Weight Kg
+        has_reference_photo:
+          type: boolean
+          title: Has Reference Photo
+        leaderboard_opt_in:
+          type: boolean
+          title: Leaderboard Opt In
+          default: false
+        preferred_language:
+          type: string
+          title: Preferred Language
+          default: en
+        city:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: City
+        place:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Place
+        achievements:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Achievements
+        consents:
+          items:
+            type: string
+          type: array
+          title: Consents
+          default: []
+        missing:
+          items:
+            type: string
+          type: array
+          title: Missing
+          default: []
+      type: object
+      required:
+      - athlete_id
+      - name
+      - dob
+      - age_years
+      - gender
+      - region
+      - phone
+      - height_cm
+      - weight_kg
+      - has_reference_photo
+      title: AthleteProfileResponse
+    AthleteProfileUpdate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 150
+            minLength: 1
+          - type: 'null'
+          title: Name
+        region:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Region
+        city:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: City
+        place:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Place
+        achievements:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          title: Achievements
+        height_cm:
+          anyOf:
+          - type: number
+            exclusiveMaximum: 260.0
+            exclusiveMinimum: 50.0
+          - type: 'null'
+          title: Height Cm
+        weight_kg:
+          anyOf:
+          - type: number
+            exclusiveMaximum: 250.0
+            exclusiveMinimum: 10.0
+          - type: 'null'
+          title: Weight Kg
+        leaderboard_opt_in:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Leaderboard Opt In
+        preferred_language:
+          anyOf:
+          - type: string
+            maxLength: 8
+          - type: 'null'
+          title: Preferred Language
+      type: object
+      title: AthleteProfileUpdate
+    AthleteRegistrationRequest:
+      properties:
+        name:
+          type: string
+          maxLength: 150
+          minLength: 1
+          title: Name
+        dob:
+          type: string
+          format: date
+          title: Dob
+        gender:
+          type: string
+          title: Gender
+        region:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Region
+        city:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: City
+        place:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Place
+        height_cm:
+          anyOf:
+          - type: number
+            exclusiveMaximum: 260.0
+            exclusiveMinimum: 50.0
+          - type: 'null'
+          title: Height Cm
+        weight_kg:
+          anyOf:
+          - type: number
+            exclusiveMaximum: 250.0
+            exclusiveMinimum: 10.0
+          - type: 'null'
+          title: Weight Kg
+        achievements:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          title: Achievements
+        consent:
+          $ref: '#/components/schemas/ConsentGrant'
+      type: object
+      required:
+      - name
+      - dob
+      - gender
+      - region
+      - city
+      - consent
+      title: AthleteRegistrationRequest
+    AthleteSummaryResponse:
+      properties:
+        profile:
+          $ref: '#/components/schemas/AthleteProfileResponse'
+        personal_bests:
+          items:
+            $ref: '#/components/schemas/PersonalBest'
+          type: array
+          title: Personal Bests
+        history:
+          items:
+            $ref: '#/components/schemas/TestHistoryItem'
+          type: array
+          title: History
+        total_tests:
+          type: integer
+          title: Total Tests
+          default: 0
+      type: object
+      required:
+      - profile
+      title: AthleteSummaryResponse
+    BadgeResponse:
+      properties:
+        code:
+          type: string
+          title: Code
+        earned:
+          type: boolean
+          title: Earned
+        earned_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Earned At
+        progress:
+          type: integer
+          title: Progress
+          default: 0
+        target:
+          type: integer
+          title: Target
+          default: 1
+      type: object
+      required:
+      - code
+      - earned
+      title: BadgeResponse
+    BadgesResponse:
+      properties:
+        badges:
+          items:
+            $ref: '#/components/schemas/BadgeResponse'
+          type: array
+          title: Badges
+        current_streak_weeks:
+          type: integer
+          title: Current Streak Weeks
+        longest_streak_weeks:
+          type: integer
+          title: Longest Streak Weeks
+      type: object
+      required:
+      - badges
+      - current_streak_weeks
+      - longest_streak_weeks
+      title: BadgesResponse
+    BenchmarkComparisonResponse:
+      properties:
+        band:
+          type: string
+          title: Band
+        label:
+          type: string
+          title: Label
+        percentile:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Percentile
+        percentile_50:
+          type: number
+          title: Percentile 50
+        percentile_75:
+          type: number
+          title: Percentile 75
+        percentile_90:
+          type: number
+          title: Percentile 90
+        next_target:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Next Target
+        cohort:
+          type: string
+          title: Cohort
+        unit:
+          type: string
+          title: Unit
+        source:
+          type: string
+          title: Source
+        provisional:
+          type: boolean
+          title: Provisional
+      type: object
+      required:
+      - band
+      - label
+      - percentile_50
+      - percentile_75
+      - percentile_90
+      - cohort
+      - unit
+      - source
+      - provisional
+      title: BenchmarkComparisonResponse
+    Body_create_identity_check_api_athletes_me_identity_checks_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+        captured_at_ms:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Captured At Ms
+        session_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+      type: object
+      required:
+      - file
+      title: Body_create_identity_check_api_athletes_me_identity_checks_post
+    Body_upload_reference_photo_api_athletes_me_photo_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_upload_reference_photo_api_athletes_me_photo_post
+    ConsentGrant:
+      properties:
+        version:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Version
+        given_by:
+          type: string
+          title: Given By
+        guardian_name:
+          anyOf:
+          - type: string
+            maxLength: 150
+          - type: 'null'
+          title: Guardian Name
+      type: object
+      required:
+      - version
+      - given_by
+      title: ConsentGrant
+    ConsentRequest:
+      properties:
+        version:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Version
+        given_by:
+          type: string
+          title: Given By
+        guardian_name:
+          anyOf:
+          - type: string
+            maxLength: 150
+          - type: 'null'
+          title: Guardian Name
+        purpose:
+          type: string
+          title: Purpose
+      type: object
+      required:
+      - version
+      - given_by
+      - purpose
+      title: ConsentRequest
+    DashboardStats:
+      properties:
+        by_status:
+          additionalProperties:
             type: integer
-
+          type: object
+          title: By Status
+        flagged_high_severity:
+          type: integer
+          title: Flagged High Severity
+        breaching_sla:
+          type: integer
+          title: Breaching Sla
+      type: object
+      required:
+      - by_status
+      - flagged_high_severity
+      - breaching_sla
+      title: DashboardStats
+    FaceVerificationResponse:
+      properties:
+        status:
+          type: string
+          title: Status
+        similarity_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Similarity Score
+        verified_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Verified At
+      type: object
+      required:
+      - status
+      - similarity_score
+      - verified_at
+      title: FaceVerificationResponse
+    FlagResponse:
+      properties:
+        reason:
+          type: string
+          title: Reason
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+        severity:
+          type: string
+          title: Severity
+        source:
+          type: string
+          title: Source
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        resolution:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolution
+        resolved_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Resolved At
+      type: object
+      required:
+      - reason
+      - severity
+      - source
+      - created_at
+      title: FlagResponse
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthResponse:
+      properties:
+        status:
+          type: string
+          title: Status
+        environment:
+          type: string
+          title: Environment
+        database:
+          type: string
+          title: Database
+        storage:
+          type: string
+          title: Storage
+      type: object
+      required:
+      - status
+      - environment
+      - database
+      - storage
+      title: HealthResponse
+    IdentityCheckResponse:
+      properties:
+        check_id:
+          type: string
+          format: uuid
+          title: Check Id
+        outcome:
+          type: string
+          title: Outcome
+        remaining_this_hour:
+          type: integer
+          title: Remaining This Hour
+      type: object
+      required:
+      - check_id
+      - outcome
+      - remaining_this_hour
+      title: IdentityCheckResponse
+    LatestReview:
+      properties:
+        action:
+          type: string
+          title: Action
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - action
+      - created_at
+      title: LatestReview
+      description: The most recent official decision, as the athlete is allowed to
+        see it.
+    LeaderboardEntry:
+      properties:
+        rank:
+          type: integer
+          title: Rank
+        athlete_id:
+          type: string
+          format: uuid
+          title: Athlete Id
+        athlete_name:
+          type: string
+          title: Athlete Name
+        region:
+          type: string
+          title: Region
+        gender:
+          type: string
+          title: Gender
+        age_years:
+          type: integer
+          title: Age Years
+        score:
+          type: number
+          title: Score
+        unit:
+          type: string
+          title: Unit
+        achieved_at:
+          type: string
+          format: date-time
+          title: Achieved At
+      type: object
+      required:
+      - rank
+      - athlete_id
+      - athlete_name
+      - region
+      - gender
+      - age_years
+      - score
+      - unit
+      - achieved_at
+      title: LeaderboardEntry
+    LeaderboardResponse:
+      properties:
+        test_type:
+          type: string
+          title: Test Type
+        unit:
+          type: string
+          title: Unit
+        higher_is_better:
+          type: boolean
+          title: Higher Is Better
+        entries:
+          items:
+            $ref: '#/components/schemas/LeaderboardEntry'
+          type: array
+          title: Entries
+      type: object
+      required:
+      - test_type
+      - unit
+      - higher_is_better
+      - entries
+      title: LeaderboardResponse
+    LogoutRequest:
+      properties:
+        refresh_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Refresh Token
+        all_devices:
+          type: boolean
+          title: All Devices
+          default: false
+      type: object
+      title: LogoutRequest
+    MessageResponse:
+      properties:
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - message
+      title: MessageResponse
+    OfficialLoginRequest:
+      properties:
+        email:
+          type: string
+          maxLength: 150
+          minLength: 3
+          title: Email
+        password:
+          type: string
+          maxLength: 256
+          minLength: 1
+          title: Password
+      type: object
+      required:
+      - email
+      - password
+      title: OfficialLoginRequest
+    OfficialProfileResponse:
+      properties:
+        official_id:
+          type: string
+          format: uuid
+          title: Official Id
+        name:
+          type: string
+          title: Name
+        email:
+          type: string
+          title: Email
+        role:
+          type: string
+          title: Role
+        region:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Region
+      type: object
+      required:
+      - official_id
+      - name
+      - email
+      - role
+      - region
+      title: OfficialProfileResponse
+    OfficialTokenResponse:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        refresh_token:
+          type: string
+          title: Refresh Token
+        token_type:
+          type: string
+          title: Token Type
+          default: bearer
+        expires_in:
+          type: integer
+          title: Expires In
+        official:
+          $ref: '#/components/schemas/OfficialProfileResponse'
+      type: object
+      required:
+      - access_token
+      - refresh_token
+      - expires_in
+      - official
+      title: OfficialTokenResponse
+    PersonalBest:
+      properties:
+        test_type:
+          type: string
+          title: Test Type
+        unit:
+          type: string
+          title: Unit
+        score:
+          type: number
+          title: Score
+        achieved_at:
+          type: string
+          format: date-time
+          title: Achieved At
+        official:
+          type: boolean
+          title: Official
+      type: object
+      required:
+      - test_type
+      - unit
+      - score
+      - achieved_at
+      - official
+      title: PersonalBest
+    PracticeAttemptIn:
+      properties:
+        test_type:
+          type: string
+          maxLength: 50
+          minLength: 1
+          title: Test Type
+        score:
+          type: number
+          maximum: 10000.0
+          minimum: 0.0
+          title: Score
+        unit:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Unit
+        status:
+          type: string
+          pattern: ^(COMPLETE|INVALID)$
+          title: Status
+        confidence:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: Confidence
+          default: 0
+        invalid_reason:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Invalid Reason
+        recorded_at_ms:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Recorded At Ms
+        events:
+          items:
+            $ref: '#/components/schemas/PracticeEvent'
+          type: array
+          maxItems: 2000
+          title: Events
+      type: object
+      required:
+      - test_type
+      - score
+      - unit
+      - status
+      - recorded_at_ms
+      title: PracticeAttemptIn
+    PracticeAttemptOut:
+      properties:
+        test_type:
+          type: string
+          maxLength: 50
+          minLength: 1
+          title: Test Type
+        score:
+          type: number
+          maximum: 10000.0
+          minimum: 0.0
+          title: Score
+        unit:
+          type: string
+          maxLength: 20
+          minLength: 1
+          title: Unit
+        status:
+          type: string
+          pattern: ^(COMPLETE|INVALID)$
+          title: Status
+        confidence:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: Confidence
+          default: 0
+        invalid_reason:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Invalid Reason
+        recorded_at_ms:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Recorded At Ms
+        events:
+          items:
+            $ref: '#/components/schemas/PracticeEvent'
+          type: array
+          maxItems: 2000
+          title: Events
+        client_attempt_id:
+          type: string
+          title: Client Attempt Id
+      type: object
+      required:
+      - test_type
+      - score
+      - unit
+      - status
+      - recorded_at_ms
+      - client_attempt_id
+      title: PracticeAttemptOut
+    PracticeEvent:
+      properties:
+        timestamp_ms:
+          type: integer
+          minimum: 0.0
+          title: Timestamp Ms
+        label:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Label
+        detail:
+          type: string
+          maxLength: 200
+          title: Detail
+          default: ''
+      type: object
+      required:
+      - timestamp_ms
+      - label
+      title: PracticeEvent
+    PracticeHistoryResponse:
+      properties:
+        attempts:
+          items:
+            $ref: '#/components/schemas/PracticeAttemptOut'
+          type: array
+          title: Attempts
+      type: object
+      title: PracticeHistoryResponse
+    ReadinessResponse:
+      properties:
+        ready:
+          type: boolean
+          title: Ready
+        database:
+          type: boolean
+          title: Database
+        broker:
+          type: boolean
+          title: Broker
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+      type: object
+      required:
+      - ready
+      - database
+      - broker
+      title: ReadinessResponse
+    RefreshRequest:
+      properties:
+        refresh_token:
+          type: string
+          title: Refresh Token
+      type: object
+      required:
+      - refresh_token
+      title: RefreshRequest
+    RegistrationResponse:
+      properties:
+        profile:
+          $ref: '#/components/schemas/AthleteProfileResponse'
+        tokens:
+          $ref: '#/components/schemas/TokenResponse'
+      type: object
+      required:
+      - profile
+      - tokens
+      title: RegistrationResponse
+    RequestOtpRequest:
+      properties:
+        phone:
+          type: string
+          maxLength: 20
+          minLength: 6
+          title: Phone
+      type: object
+      required:
+      - phone
+      title: RequestOtpRequest
+    RequestOtpResponse:
+      properties:
+        message:
+          type: string
+          title: Message
         expires_at:
           type: string
           format: date-time
-          nullable: true
-          description: >
-            After this time the session may be discarded and the client must
-            start a fresh upload.
-
-
-    UploadChunkResponse:
+          title: Expires At
+        development_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Development Code
       type: object
+      required:
+      - message
+      - expires_at
+      title: RequestOtpResponse
+    ResultWithBenchmarkResponse:
+      properties:
+        result_id:
+          type: string
+          format: uuid
+          title: Result Id
+        test_type:
+          type: string
+          title: Test Type
+        status:
+          type: string
+          title: Status
+        provisional_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Provisional Score
+        server_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Server Score
+        final_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Final Score
+        unit:
+          type: string
+          title: Unit
+        verified_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Verified At
+        flags:
+          items:
+            $ref: '#/components/schemas/FlagResponse'
+          type: array
+          title: Flags
+        latest_review:
+          anyOf:
+          - $ref: '#/components/schemas/LatestReview'
+          - type: 'null'
+        benchmark:
+          anyOf:
+          - $ref: '#/components/schemas/BenchmarkComparisonResponse'
+          - type: 'null'
+        benchmark_unavailable:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Benchmark Unavailable
+      type: object
+      required:
+      - result_id
+      - test_type
+      - status
+      - unit
+      title: ResultWithBenchmarkResponse
+    ReviewActionRequest:
+      properties:
+        action:
+          type: string
+          title: Action
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Notes
+        final_score:
+          anyOf:
+          - type: number
+            maximum: 10000.0
+            minimum: 0.0
+          - type: 'null'
+          title: Final Score
+      type: object
+      required:
+      - action
+      title: ReviewActionRequest
+    ReviewActionResponse:
+      properties:
+        result_id:
+          type: string
+          format: uuid
+          title: Result Id
+        action:
+          type: string
+          title: Action
+        status:
+          type: string
+          title: Status
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - result_id
+      - action
+      - status
+      - message
+      title: ReviewActionResponse
+    ReviewDetailResponse:
+      properties:
+        result_id:
+          type: string
+          format: uuid
+          title: Result Id
+        athlete_name:
+          type: string
+          title: Athlete Name
+        region:
+          type: string
+          title: Region
+        test_type:
+          type: string
+          title: Test Type
+        status:
+          type: string
+          title: Status
+        provisional_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Provisional Score
+        server_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Server Score
+        unit:
+          type: string
+          title: Unit
+        video_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Video Url
+        flags:
+          items:
+            $ref: '#/components/schemas/FlagResponse'
+          type: array
+          title: Flags
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        verified_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Verified At
+        final_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Final Score
+        attempt_number:
+          type: integer
+          title: Attempt Number
+          default: 1
+        athlete_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Athlete Id
+        athlete_age_years:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Athlete Age Years
+        athlete_gender:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Athlete Gender
+        athlete_height_cm:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Athlete Height Cm
+        video_duration_seconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Video Duration Seconds
+        reference_photo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reference Photo Url
+        face_verification:
+          anyOf:
+          - $ref: '#/components/schemas/FaceVerificationResponse'
+          - type: 'null'
+        identity_check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identity Check
+        has_pose_sequence:
+          type: boolean
+          title: Has Pose Sequence
+          default: false
+        benchmark:
+          anyOf:
+          - $ref: '#/components/schemas/BenchmarkComparisonResponse'
+          - type: 'null'
+        review_history:
+          items:
+            $ref: '#/components/schemas/ReviewHistoryItem'
+          type: array
+          title: Review History
+        allowed_actions:
+          items:
+            type: string
+          type: array
+          title: Allowed Actions
+      type: object
+      required:
+      - result_id
+      - athlete_name
+      - region
+      - test_type
+      - status
+      - provisional_score
+      - server_score
+      - unit
+      - video_url
+      - flags
+      - created_at
+      - verified_at
+      title: ReviewDetailResponse
+    ReviewHistoryItem:
+      properties:
+        action:
+          type: string
+          title: Action
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        official_name:
+          type: string
+          title: Official Name
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - action
+      - notes
+      - official_name
+      - created_at
+      title: ReviewHistoryItem
+    ReviewItemResponse:
+      properties:
+        result_id:
+          type: string
+          format: uuid
+          title: Result Id
+        athlete_name:
+          type: string
+          title: Athlete Name
+        region:
+          type: string
+          title: Region
+        test_type:
+          type: string
+          title: Test Type
+        status:
+          type: string
+          title: Status
+        provisional_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Provisional Score
+        server_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Server Score
+        flag_count:
+          type: integer
+          title: Flag Count
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        max_severity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Max Severity
+        attempt_number:
+          type: integer
+          title: Attempt Number
+          default: 1
+        unit:
+          type: string
+          title: Unit
+          default: ''
+      type: object
+      required:
+      - result_id
+      - athlete_name
+      - region
+      - test_type
+      - status
+      - provisional_score
+      - server_score
+      - flag_count
+      - created_at
+      title: ReviewItemResponse
+    SessionTestStatus:
+      properties:
+        test_type:
+          type: string
+          title: Test Type
+        unit:
+          type: string
+          title: Unit
+        submitted:
+          type: boolean
+          title: Submitted
+        result_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Status
+      type: object
+      required:
+      - test_type
+      - unit
+      - submitted
+      title: SessionTestStatus
+    SubmitTestRequest:
+      properties:
+        test_id:
+          type: string
+          title: Test Id
+        provisional_score:
+          type: number
+          title: Provisional Score
+        video_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Video Id
+        session_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+        recorded_at_ms:
+          anyOf:
+          - type: integer
+            exclusiveMinimum: 0.0
+          - type: 'null'
+          title: Recorded At Ms
+        identity_check_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Identity Check Id
+        athlete_height_cm:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Athlete Height Cm
+      type: object
+      required:
+      - test_id
+      - provisional_score
+      title: SubmitTestRequest
+    SubmitTestResponse:
+      properties:
+        result_id:
+          type: string
+          format: uuid
+          title: Result Id
+        status:
+          type: string
+          title: Status
+      type: object
+      required:
+      - result_id
+      - status
+      title: SubmitTestResponse
+    TestHistoryItem:
+      properties:
+        result_id:
+          type: string
+          format: uuid
+          title: Result Id
+        test_type:
+          type: string
+          title: Test Type
+        unit:
+          type: string
+          title: Unit
+        status:
+          type: string
+          title: Status
+        provisional_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Provisional Score
+        server_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Server Score
+        final_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Final Score
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        session_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+      type: object
+      required:
+      - result_id
+      - test_type
+      - unit
+      - status
+      - provisional_score
+      - server_score
+      - final_score
+      - created_at
+      title: TestHistoryItem
+    TestHistoryPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/TestHistoryItem'
+          type: array
+          title: Items
+        next_before:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Next Before
+      type: object
+      title: TestHistoryPage
+    TokenResponse:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        refresh_token:
+          type: string
+          title: Refresh Token
+        token_type:
+          type: string
+          title: Token Type
+          default: bearer
+        expires_in:
+          type: integer
+          title: Expires In
+        athlete_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Athlete Id
+        registered:
+          type: boolean
+          title: Registered
+          default: true
+      type: object
+      required:
+      - access_token
+      - refresh_token
+      - expires_in
+      title: TokenResponse
+    UploadChunkResponse:
       properties:
         received_chunks_count:
           type: integer
-          example: 3
-
+          title: Received Chunks Count
         next_expected_index:
-          type: integer
-          nullable: true
-          example: 3
-
-
-    UploadCompleteResponse:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Next Expected Index
       type: object
+      required:
+      - received_chunks_count
+      title: UploadChunkResponse
+    UploadCompleteResponse:
       properties:
         video_id:
           type: string
           format: uuid
-          description: Reference to pass to /api/tests/submit
-          example: '660e8400-e29b-41d4-a716-446655440000'
-
+          title: Video Id
         checksum_verified:
           type: boolean
-          example: true
-
-
-    ReviewActionRequest:
+          title: Checksum Verified
       type: object
       required:
-        - action
+      - video_id
+      - checksum_verified
+      title: UploadCompleteResponse
+    UploadInitRequest:
       properties:
-        action:
+        test_type:
           type: string
-          enum:
-            - approved
-            - rejected
-            - requested_resubmission
-          example: approved
-
-        notes:
+          title: Test Type
+        file_size_bytes:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: File Size Bytes
+        checksum_sha256:
           type: string
-          nullable: true
-          description: Optional note from the official
-          example: 'Submission verified successfully.'
-
-
-  # ------------------------------------------------------------
-  # RESPONSE SCHEMAS
-  # ------------------------------------------------------------
-
-    MessageResponse:
+          maxLength: 64
+          minLength: 64
+          title: Checksum Sha256
+        chunk_size_bytes:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Chunk Size Bytes
+        content_type:
+          type: string
+          title: Content Type
+          default: video/mp4
       type: object
+      required:
+      - test_type
+      - file_size_bytes
+      - checksum_sha256
+      title: UploadInitRequest
+    UploadSessionResponse:
       properties:
-        message:
+        upload_id:
           type: string
-          example: OTP sent successfully
-
-
-    AuthResponse:
-      type: object
-      properties:
-        access_token:
-          type: string
-          description: JWT access token
-          example: jwt-token
-
-        athlete_id:
-          type: string
-          format: uuid
-          description: Authenticated athlete ID
-          example: '550e8400-e29b-41d4-a716-446655440000'
-
-
-    SubmitTestResponse:
-      type: object
-      properties:
-        result_id:
-          type: string
-          format: uuid
-          description: Created test result ID
-          example: '770e8400-e29b-41d4-a716-446655440000'
-
-        status:
-          type: string
-          enum:
-            - pending_sync
-            - processing
-            - verified
-            - flagged
-            - approved
-            - rejected
-          example: processing
-
-
-    TestResult:
-      type: object
-      properties:
-        result_id:
-          type: string
-          format: uuid
-
-        athlete_id:
-          type: string
-          format: uuid
-
-        test_id:
-          type: string
-          format: uuid
-
-        provisional_score:
-          type: number
-          format: double
-          nullable: true
-
-        server_score:
-          type: number
-          format: double
-          nullable: true
-
-        final_score:
-          type: number
-          format: double
-          nullable: true
-
-        status:
-          type: string
-          enum:
-            - pending_sync
-            - processing
-            - verified
-            - flagged
-            - approved
-            - rejected
-
-
-    ReviewItem:
-      type: object
-      properties:
-        result_id:
-          type: string
-          format: uuid
-
-        athlete_id:
-          type: string
-          format: uuid
-
-        athlete_name:
-          type: string
-          example: 'Arun Kumar'
-
-        test_name:
-          type: string
-          enum:
-            - vertical_jump
-            - sit_ups
-          example: vertical_jump
-
-        provisional_score:
-          type: number
-          format: double
-          nullable: true
-          example: 42
-
-        server_score:
-          type: number
-          format: double
-          nullable: true
-          example: 41
-
-        status:
-          type: string
-          example: flagged
-
-
-    ReviewDetails:
-      type: object
-      properties:
-        result_id:
-          type: string
-          format: uuid
-
-        athlete:
-          type: object
-          properties:
-            id:
-              type: string
-              format: uuid
-
-            name:
-              type: string
-
-            dob:
-              type: string
-              format: date
-
-            gender:
-              type: string
-
-            region:
-              type: string
-
-        test:
-          type: object
-          properties:
-            id:
-              type: string
-              format: uuid
-
-            name:
-              type: string
-              enum:
-                - vertical_jump
-                - sit_ups
-
-        provisional_score:
-          type: number
-          format: double
-          nullable: true
-
-        server_score:
-          type: number
-          format: double
-          nullable: true
-
-        final_score:
-          type: number
-          format: double
-          nullable: true
-
-        status:
-          type: string
-
-        video:
-          type: object
-          nullable: true
-          properties:
-            id:
-              type: string
-              format: uuid
-
-            s3_key:
-              type: string
-
-        flags:
-          type: array
+          title: Upload Id
+        chunk_size_bytes:
+          type: integer
+          title: Chunk Size Bytes
+        received_chunks:
           items:
-            type: object
-            properties:
-              reason:
-                type: string
-
-              severity:
-                type: string
-                enum:
-                  - low
-                  - medium
-                  - high
-
-        face_verification:
-          type: object
-          nullable: true
-          properties:
-            verification_status:
-              type: string
-              enum:
-                - pass
-                - fail
-                - manual_review
-
-            similarity_score:
-              type: number
-              format: double
-              nullable: true
-
-
-    ReviewActionResponse:
+            type: integer
+          type: array
+          title: Received Chunks
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
       type: object
+      required:
+      - upload_id
+      - chunk_size_bytes
+      - received_chunks
+      title: UploadSessionResponse
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    VerificationStatusResponse:
       properties:
         result_id:
           type: string
           format: uuid
-
-        action:
+          title: Result Id
+        test_type:
           type: string
-          enum:
-            - approved
-            - rejected
-            - requested_resubmission
-
+          title: Test Type
+        unit:
+          type: string
+          title: Unit
         status:
           type: string
-          example: approved
-
-        message:
+          title: Status
+        provisional_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Provisional Score
+        server_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Server Score
+        final_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Final Score
+        submitted_at:
           type: string
-          example: Review action completed successfully.
-
-    TokenPair:
+          format: date-time
+          title: Submitted At
+        verified_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Verified At
+        waiting_seconds:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Waiting Seconds
+        sla_seconds:
+          type: integer
+          title: Sla Seconds
+        overdue:
+          type: boolean
+          title: Overdue
+          default: false
+        verification_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Verification Error
+        flags:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/FlagResponse'
+            type: array
+          - type: 'null'
+          title: Flags
+        identity_check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Identity Check
+        face_check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Face Check
       type: object
+      required:
+      - result_id
+      - test_type
+      - unit
+      - status
+      - submitted_at
+      - sla_seconds
+      title: VerificationStatusResponse
+    VerifyOtpRequest:
       properties:
-        access_token: {type: string}
-        refresh_token: {type: string}
-        token_type: {type: string, example: bearer}
-        expires_in: {type: integer, description: Access token lifetime in seconds}
-        athlete_id: {type: string, format: uuid, nullable: true}
-        registered: {type: boolean}
-
-    AthleteProfile:
+        phone:
+          type: string
+          maxLength: 20
+          minLength: 6
+          title: Phone
+        otp:
+          type: string
+          maxLength: 8
+          minLength: 4
+          title: Otp
       type: object
+      required:
+      - phone
+      - otp
+      title: VerifyOtpRequest
+    YourStanding:
       properties:
-        athlete_id: {type: string, format: uuid}
-        name: {type: string}
-        dob: {type: string, format: date}
-        age_years: {type: integer}
-        gender: {type: string}
-        region: {type: string}
-        phone: {type: string}
-        height_cm: {type: number, nullable: true}
-        weight_kg: {type: number, nullable: true}
-        has_reference_photo: {type: boolean}
-        leaderboard_opt_in: {type: boolean, description: Visible to other athletes; false by default}
-        preferred_language: {type: string, enum: [en, hi, ta, bn]}
+        rank:
+          type: integer
+          title: Rank
+        score:
+          type: number
+          title: Score
+        visible_to_others:
+          type: boolean
+          title: Visible To Others
+      type: object
+      required:
+      - rank
+      - score
+      - visible_to_others
+      title: YourStanding

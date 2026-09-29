@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import get_settings
-from .logging_config import RequestIdMiddleware, configure_logging
+from .logging_config import RequestIdMiddleware, configure_logging, request_id_var
 from .routers import (
     athletes,
     auth,
@@ -22,6 +22,7 @@ from .routers import (
     practice,
     sessions,
     tests_submit,
+    verification,
     videos,
 )
 
@@ -58,6 +59,13 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
 
+    problems = settings.production_problems()
+    if problems:
+        raise RuntimeError(
+            "Refusing to start in production with unsafe settings: "
+            + "; ".join(problems)
+        )
+
     configure_logging(debug=settings.debug, json_output=settings.is_production)
 
     app = FastAPI(
@@ -78,7 +86,8 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"],
+        # DELETE: the dashboard removes unused assessment sessions.
+        allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
         expose_headers=["X-Request-ID", "Retry-After", "X-Total-Count"],
     )
@@ -92,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(sessions.admin_router)
     app.include_router(videos.router)
     app.include_router(tests_submit.router)
+    app.include_router(verification.router)
     app.include_router(dashboard_auth.router)
     app.include_router(dashboard.router)
     app.include_router(media.router)
@@ -100,10 +110,19 @@ def create_app() -> FastAPI:
     async def unhandled_exception_handler(request: Request, exc: Exception):
         # Never leak a stack trace to a client. The request id in the response
         # is what ties a user's report back to the logged trace.
-        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        request_id = getattr(request.state, "request_id", None) or "-"
+        token = request_id_var.set(request_id)
+        try:
+            logger.exception(
+                "Unhandled error on %s %s", request.method, request.url.path
+            )
+        finally:
+            request_id_var.reset(token)
         return JSONResponse(
             status_code=500,
-            content={"detail": "Internal server error"},
+            # Quoted back in a support request, this finds the trace.
+            content={"detail": "Internal server error", "request_id": request_id},
+            headers={"X-Request-ID": request_id},
         )
 
     return app

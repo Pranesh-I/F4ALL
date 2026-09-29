@@ -16,9 +16,17 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import date
+from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -47,6 +55,7 @@ from ..schemas import (
     PersonalBest,
     RegistrationResponse,
     TestHistoryItem,
+    TestHistoryPage,
     TokenResponse,
     YourStanding,
 )
@@ -359,25 +368,77 @@ def my_summary(
         .order_by(TestResult.created_at.desc())
     ).all()
 
-    history = [
-        TestHistoryItem(
-            result_id=result.id,
-            test_type=test.code,
-            unit=test.unit,
-            status=_value(result.status),
-            provisional_score=_as_float(result.provisional_score),
-            server_score=_as_float(result.server_score),
-            final_score=_as_float(result.final_score),
-            created_at=result.created_at,
-        )
-        for result, test in rows
-    ]
+    history = [_history_item(result, test) for result, test in rows]
 
     return AthleteSummaryResponse(
         profile=_profile(db, athlete, age_on(athlete.dob)),
         personal_bests=_personal_bests(rows),
         history=history,
         total_tests=len(history),
+    )
+
+
+@router.get("/me/history", response_model=TestHistoryPage)
+def my_history(
+    test_type: str | None = Query(default=None, max_length=40),
+    before: datetime | None = Query(
+        default=None, description="Only results submitted before this time"
+    ),
+    limit: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    athlete: Athlete = Depends(require_athlete),
+):
+    """Official results, newest first, a page at a time.
+
+    `/me/summary` returns everything at once, which is fine for a new athlete
+    and not for one with two years of sessions on a prepaid data pack.
+    """
+    query = (
+        select(TestResult, Test)
+        .join(Test, Test.id == TestResult.test_id)
+        .where(TestResult.athlete_id == athlete.id)
+    )
+    if test_type:
+        query = query.where(Test.code == test_type.strip().upper())
+    if before is not None:
+        query = query.where(TestResult.created_at < before)
+
+    rows = db.execute(
+        query.order_by(TestResult.created_at.desc(), TestResult.id).limit(limit + 1)
+    ).all()
+
+    page = rows[:limit]
+    return TestHistoryPage(
+        items=[_history_item(result, test) for result, test in page],
+        next_before=page[-1][0].created_at if len(rows) > limit else None,
+    )
+
+
+@router.get("/me/personal-bests", response_model=list[PersonalBest])
+def my_personal_bests(
+    db: Session = Depends(get_db),
+    athlete: Athlete = Depends(require_athlete),
+):
+    """Best trusted score per test — see `_personal_bests` for what counts."""
+    rows = db.execute(
+        select(TestResult, Test)
+        .join(Test, Test.id == TestResult.test_id)
+        .where(TestResult.athlete_id == athlete.id)
+    ).all()
+    return _personal_bests(rows)
+
+
+def _history_item(result: TestResult, test: Test) -> TestHistoryItem:
+    return TestHistoryItem(
+        result_id=result.id,
+        test_type=test.code,
+        unit=test.unit,
+        status=_value(result.status),
+        provisional_score=_as_float(result.provisional_score),
+        server_score=_as_float(result.server_score),
+        final_score=_as_float(result.final_score),
+        created_at=result.created_at,
+        session_id=result.session_id,
     )
 
 
@@ -404,7 +465,12 @@ def _personal_bests(rows) -> list[PersonalBest]:
             continue
 
         current = best.get(test.code)
-        if current is None or score > current.score:
+        # Timed tests are won by the lowest number.
+        better = (
+            current is None
+            or (score > current.score if test.higher_is_better else score < current.score)
+        )
+        if better:
             best[test.code] = PersonalBest(
                 test_type=test.code,
                 unit=test.unit,

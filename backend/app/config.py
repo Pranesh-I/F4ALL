@@ -7,6 +7,9 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Published in this repository, so production refuses it (production_problems).
+DEVELOPMENT_JWT_SECRET = "dev-only-insecure-secret-change-me"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -33,7 +36,7 @@ class Settings(BaseSettings):
     # Sprint 7 replaces this with real OTP-issued tokens. The secret MUST come
     # from the environment in any deployed setting; a default this guessable is
     # only tolerable because nothing real is protected by it yet.
-    jwt_secret: str = "dev-only-insecure-secret-change-me"
+    jwt_secret: str = DEVELOPMENT_JWT_SECRET
     jwt_algorithm: str = "HS256"
 
     # An access token cannot be withdrawn before it expires, so it is kept
@@ -140,6 +143,39 @@ class Settings(BaseSettings):
     def unauthenticated_allowed(self) -> bool:
         """Auth bypass is a development affordance and nothing else."""
         return self.allow_unauthenticated and not self.is_production
+
+    def production_problems(self) -> list[str]:
+        """Settings that are fine on a laptop and wrong in production.
+
+        Checked at startup so a misconfigured deployment refuses to start,
+        instead of starting and quietly signing tokens with a published secret
+        or storing children's videos on a container's disk.
+        """
+        if not self.is_production:
+            return []
+
+        problems = []
+        if self.jwt_secret == DEVELOPMENT_JWT_SECRET or len(self.jwt_secret) < 32:
+            problems.append("JWT_SECRET must be set to a random value of 32+ characters")
+        if not self.identity_encryption_key:
+            problems.append(
+                "IDENTITY_ENCRYPTION_KEY must be set (python -m app.cli identity-key)"
+            )
+        if self.storage_backend.lower() != "s3" or not self.s3_bucket:
+            problems.append("STORAGE_BACKEND must be 's3' with S3_BUCKET set")
+        if self.sms_backend != "http" or not self.sms_api_url:
+            problems.append("SMS_BACKEND must be 'http' with SMS_API_URL set")
+        if self.debug:
+            problems.append("DEBUG must be false")
+        if not self.public_base_url.startswith("https://"):
+            problems.append("PUBLIC_BASE_URL must be an https:// address")
+        if any(
+            origin == "*" or "localhost" in origin or "127.0.0.1" in origin
+            for origin in self.cors_origins
+        ):
+            problems.append("CORS_ORIGINS must list only the dashboard's real origin")
+        return problems
+
 
 
 @lru_cache

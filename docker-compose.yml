@@ -42,5 +42,57 @@ services:
       timeout: 5s
       retries: 5
 
+  # ------------------------------------------------------------------
+  # The backend itself. Behind the "app" profile, so `docker compose up`
+  # still starts only the databases for running the API from a virtualenv;
+  # `docker compose --profile app up --build` runs the whole stack.
+  # ------------------------------------------------------------------
+
+  # Applies migrations once, then exits. The API and worker wait for it.
+  migrate:
+    profiles: ["app"]
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    environment: &backend_env
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg://f4all_user:f4all_password@postgres:5432/f4all_db
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_LOCAL_PATH: /app/var/storage
+      UPLOAD_STAGING_PATH: /app/var/uploads
+      PUBLIC_BASE_URL: http://localhost:${F4ALL_API_PORT:-8000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    profiles: ["app"]
+    build: ./backend
+    environment: *backend_env
+    ports:
+      - "${F4ALL_API_PORT:-8000}:8000"
+    volumes:
+      - f4all_storage:/app/var
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # Server-side re-verification. Shares the API's storage so it can read the
+  # uploaded videos; in production both use S3 instead.
+  worker:
+    profiles: ["app"]
+    build: ./backend
+    command: ["celery", "-A", "app.worker:celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+    environment: *backend_env
+    volumes:
+      - f4all_storage:/app/var
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
 volumes:
   f4all_postgres_data:
+  f4all_storage:
