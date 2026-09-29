@@ -7,7 +7,7 @@ import { defineConfig } from "vitest/config";
 // the deployed API, which allows this origin explicitly.
 //
 // F4ALL_API_URL overrides the proxy target for a backend on another port.
-const apiTarget = process.env.F4ALL_API_URL ?? "http://localhost:8000";
+const apiTarget = process.env.F4ALL_API_URL ?? "http://localhost:8010";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

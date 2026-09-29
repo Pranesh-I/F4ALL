@@ -1,0 +1,113 @@
+PS C:\SIH> Get-ChildItem .\mobile\app\src\main -Recurse -File -Include *.kt |
+>> Select-String -Pattern "sendOtp|verifyOtp|otp|phone|/api/|F4allApi"
+
+mobile\app\src\main\java\com\sai\sports\analyzer\AnalyzerThresholds.kt:78:     * UP band. Anything quicker is the phone being     
+shaken or the pose estimator
+mobile\app\src\main\java\com\sai\sports\analyzer\AnalyzerThresholds.kt:88:     * the phone produces.
+mobile\app\src\main\java\com\sai\sports\analyzer\PoseMath.kt:37:        val dotProduct = firstX * secondX + firstY * secondY      
+mobile\app\src\main\java\com\sai\sports\analyzer\PoseMath.kt:46:        val cosine = (dotProduct / (firstMagnitude * 
+secondMagnitude))
+mobile\app\src\main\java\com\sai\sports\analyzer\SitUpAnalyzer.kt:24: *    .SITUP_MIN_REP_DURATION_MS]. Usually a shaken phone    
+or the pose model
+mobile\app\src\main\java\com\sai\sports\api\ApiModels.kt:40:data class OtpRequested(
+mobile\app\src\main\java\com\sai\sports\api\ApiModels.kt:138:    /** Stable code, translated on the phone — never display text    
+from the server. */
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:22:class F4allApi(
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:30:    fun requestOtp(phone: String): ApiResult<OtpRequested> =
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:31:        post("/api/auth/request-otp", JSONObject().put("phone",        
+phone), auth = false) {
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:32:            OtpRequested(
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:37:    fun verifyOtp(phone: String, otp: String): ApiResult<TokenPair> =  
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:39:            "/api/auth/verify-otp",
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:40:            JSONObject().put("phone", phone).put("otp", otp),
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:47:            "/api/auth/refresh",
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:55:            "/api/auth/logout",
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:63:     * that authorised this call names a phone, not an athlete; the    
+server revokes
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:68:            "/api/athletes/register",
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:84:        get("/api/athletes/me", parse = ::athleteProfile)
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:97:            request("/api/athletes/me/photo", auth =
+true).post(body).build()
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:110:            request("/api/athletes/me", auth = true)
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:118:        get("/api/athletes/me/badges") { json ->
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:135:        get("/api/athletes/leaderboard/$testType?scope=$scope") {     
+json ->
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:162:        get("/api/athletes/me/summary") { json ->
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:197:            "/api/tests/submit",
+mobile\app\src\main\java\com\sai\sports\api\F4allApi.kt:206:        get("/api/results/$resultId") { json ->
+mobile\app\src\main\java\com\sai\sports\auth\AppServices.kt:4:import com.sai.sports.api.F4allApi
+mobile\app\src\main\java\com\sai\sports\auth\AppServices.kt:27:                val refreshApi = F4allApi(baseUrl = 
+SyncConfig.baseUrl(appContext))
+mobile\app\src\main\java\com\sai\sports\auth\AppServices.kt:36:    fun api(context: Context): F4allApi {
+mobile\app\src\main\java\com\sai\sports\auth\AppServices.kt:39:        return F4allApi(
+mobile\app\src\main\java\com\sai\sports\auth\AuthSession.kt:19:    /** Null while the phone is verified but no profile exists     
+yet. */
+mobile\app\src\main\java\com\sai\sports\auth\EncryptedTokenStorage.kt:12: * A refresh token lives on the phone for months and     
+mints sessions on a
+mobile\app\src\main\java\com\sai\sports\auth\EncryptedTokenStorage.kt:14: * read the app's data directory — a rooted phone, an    
+adb backup, a careless
+mobile\app\src\main\java\com\sai\sports\auth\EncryptedTokenStorage.kt:20: * and a crash on first launch after a phone upgrade.    
+mobile\app\src\main\java\com\sai\sports\auth\EncryptedTokenStorage.kt:49:            // death would leave the phone holding one   
+the server already
+mobile\app\src\main\java\com\sai\sports\data\local\F4allDatabase.kt:35: * waiting on a phone with no signal — survives untouched 
+and simply reads as
+mobile\app\src\main\java\com\sai\sports\data\local\TestAttemptEntity.kt:12: * This table is the offline queue. On a phone in a    
+village with no signal it
+mobile\app\src\main\java\com\sai\sports\data\SyncRepository.kt:169:        // large one filling a phone that may only have a few  
+GB free.
+mobile\app\src\main\java\com\sai\sports\sync\SyncWorker.kt:53:            // Nothing is lost by waiting: the queue stays on the 
+phone. Sending
+mobile\app\src\main\java\com\sai\sports\sync\UploadClient.kt:122:        val request = 
+requestBuilder("$baseUrl/api/videos/upload/init")
+mobile\app\src\main\java\com\sai\sports\sync\UploadClient.kt:154:        val request =
+requestBuilder("$baseUrl/api/videos/upload/$uploadId")
+mobile\app\src\main\java\com\sai\sports\sync\UploadClient.kt:233:            "$baseUrl/api/videos/upload/$uploadId/chunks/$index" 
+mobile\app\src\main\java\com\sai\sports\sync\UploadClient.kt:248:        val request =
+requestBuilder("$baseUrl/api/videos/upload/$uploadId/complete")
+mobile\app\src\main\java\com\sai\sports\sync\UploadClient.kt:256:            // phone, and no amount of retrying the same
+corrupt source fixes
+mobile\app\src\main\java\com\sai\sports\sync\VideoCompressor.kt:36: *  - It transcodes through MediaCodec, i.e. the phone's       
+hardware video encoder.
+mobile\app\src\main\java\com\sai\sports\sync\VideoCompressor.kt:177:         * server's landmarks get noisier than the phone's    
+were, which shows up
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:46: * Phone number, then the code sent to it.
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:61:    var phone by rememberSaveable { mutableStateOf("") }        
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:77:        val digits = phone.filter { it.isDigit() }
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:78:        if (!LoginRules.isPlausiblePhone(digits)) {
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:79:            error = R.string.login_error_phone
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:85:            val result = withContext(Dispatchers.IO) {
+api.requestOtp(digits) }
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:109:            val digits = phone.filter { it.isDigit() }
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:110:            val result = withContext(Dispatchers.IO) {
+api.verifyOtp(digits, code) }
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:119:                        // account too. Best effort; the       
+phone's choice stands.
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:148:            value = phone,
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:149:            onValueChange = { phone = it.filter { c ->
+c.isDigit() || c == '+' || c == ' ' }.take(16) },
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:150:            label = { 
+Text(stringResource(R.string.login_phone_label)) },
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:153:            keyboardOptions = KeyboardOptions(keyboardType =   
+KeyboardType.Phone),
+mobile\app\src\main\java\com\sai\sports\ui\auth\LoginScreen.kt:211:    fun isPlausiblePhone(digits: String): Boolean =
+mobile\app\src\main\java\com\sai\sports\ui\auth\RegistrationScreen.kt:118:                        // phone rather than an
+athlete, the server has revoked
+mobile\app\src\main\java\com\sai\sports\ui\instructions\InstructionsScreen.kt:40: * not fully in frame, or the phone moving — so 
+setup is shown for every test.
+mobile\app\src\main\java\com\sai\sports\ui\onboarding\OnboardingScreen.kt:50: * anything: what the app is for, that the phone's 
+score is not the official one,
+mobile\app\src\main\java\com\sai\sports\ui\onboarding\OnboardingStore.kt:5:/** Whether this phone has been through the first-run  
+introduction. */
+mobile\app\src\main\java\com\sai\sports\ui\profile\ServerResultScreen.kt:42: * The benchmark is only shown for a score SAI has    
+measured itself. A phone's own
+mobile\app\src\main\java\com\sai\sports\ui\profile\ServerResultScreen.kt:103:
+R.string.result_phone_counted,
+mobile\app\src\main\java\com\sai\sports\ui\results\ResultsScreen.kt:195: * rate the device actually managed — which on a low-end  
+phone is part of what
+mobile\app\src\main\java\com\sai\sports\ui\results\ResultsScreen.kt:403: * their phone showed.
+mobile\app\src\main\java\com\sai\sports\ui\sync\SyncStatusScreen.kt:48: * on the phone, and the failure mode of guessing wrong    
+is travelling somewhere
+mobile\app\src\main\java\com\sai\sports\MainActivity.kt:16:        // language of a phone that may be shared with the family.
+
+
+PS C:\SIH> 
