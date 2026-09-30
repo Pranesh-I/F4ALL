@@ -164,7 +164,7 @@ def test_admin_creates_athlete_sees_submits_once_and_is_blocked(
 
     after = active(client, athlete, settings)[0]["tests"][0]
     assert after["submitted"] is True
-    assert after["result_status"] == "processing"
+    assert after["result_status"] == "uploaded"
 
     second = submit(client, headers, session["id"])
     assert second.status_code == 409

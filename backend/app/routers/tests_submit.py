@@ -13,9 +13,12 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
 from ..database import get_db
+from ..errors import ApiError
 from ..models import (
+    FINAL_REVIEW_ACTIONS,
     AssessmentSession,
     Athlete,
+    FlagSource,
     IdentityCheck,
     ReviewActionRecord,
     Test,
@@ -35,6 +38,7 @@ from ..schemas import (
 from ..security import current_athlete
 from ..services import benchmarks as benchmark_service
 from ..services import sessions as session_rules
+from ..verification import finalization
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +99,7 @@ def submit_test(
                 detail="Unknown video_id",
             )
 
-        _assert_video_owner(db, video, athlete)
+        upload = _assert_video_owner(db, video, athlete)
 
         if video.test_result_id is not None:
             # Idempotent on the video. A phone on a bad network routinely loses
@@ -112,6 +116,16 @@ def submit_test(
                 return SubmitTestResponse(
                     result_id=existing.id, status=_value(existing.status)
                 )
+
+        # The video was uploaded as one test; it cannot be scored as another.
+        # Checked after the idempotent return, so a retry is never refused.
+        if upload is not None and upload.test_code.upper() != test.code:
+            raise ApiError(
+                status.HTTP_400_BAD_REQUEST,
+                "test_type_mismatch",
+                f"This video was uploaded for {upload.test_code.upper()}, "
+                f"not {test.code}",
+            )
 
     session = _session_for(db, payload, test, athlete_id, settings)
     identity_check = _identity_check_for(db, payload, athlete_id)
@@ -133,9 +147,16 @@ def submit_test(
         identity_check_id=identity_check.id if identity_check else None,
         attempt_number=attempt_number,
         provisional_score=payload.provisional_score,
-        # processing, never verified. The device's number is provisional until
-        # the server has independently re-scored the video.
-        status=TestResultStatus.processing,
+        # The phone's claim, recorded as it arrived. Compared, never trusted.
+        mobile_result=finalization.mobile_snapshot(
+            test_code=test.code,
+            unit=test.unit,
+            provisional_score=payload.provisional_score,
+            form_score=payload.provisional_form_score,
+        ),
+        # uploaded, never verified. The device's number is provisional until
+        # a worker has claimed the job and independently re-scored the video.
+        status=TestResultStatus.uploaded,
     )
     db.add(result)
     db.flush()
@@ -158,16 +179,16 @@ def submit_test(
         ) from None
     db.refresh(result)
 
-    if video is not None:
-        _enqueue_verification(
-            result_id=str(result.id),
-            athlete_height_cm=_height_for(athlete, payload),
-            settings=settings,
-        )
-    else:
-        logger.warning(
-            "Result %s submitted with no video; it cannot be verified", result.id
-        )
+    # Queued even without a video: the worker records that as an explicit
+    # `rejected` verdict (video_not_submitted), where it used to sit in
+    # `processing` forever with only a log line to say why.
+    if video is None:
+        logger.warning("Result %s submitted with no video", result.id)
+    _enqueue_verification(
+        result_id=str(result.id),
+        athlete_height_cm=_height_for(athlete, payload),
+        settings=settings,
+    )
 
     return SubmitTestResponse(result_id=result.id, status=result.status.value)
 
@@ -258,25 +279,31 @@ def _session_for(
     return session
 
 
-def _assert_video_owner(db: Session, video: Video, athlete: Athlete | None) -> None:
+def _assert_video_owner(
+    db: Session, video: Video, athlete: Athlete | None
+) -> UploadSession | None:
     """A video can only be submitted by the athlete who uploaded it.
 
     Ownership is recorded on the upload session. Without this check any athlete
     holding another's video id could claim that recording as their own test.
     It answers exactly as for an id that does not exist, so the endpoint cannot
     be used to confirm whose videos exist.
-    """
-    if athlete is None:
-        return
 
+    Returns the upload session, which also records the test it was uploaded for.
+    """
     session = db.execute(
         select(UploadSession).where(UploadSession.video_id == video.id)
     ).scalar_one_or_none()
 
-    if session is not None and session.athlete_id not in (None, athlete.id):
+    if (
+        athlete is not None
+        and session is not None
+        and session.athlete_id not in (None, athlete.id)
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown video_id"
         )
+    return session
 
 
 def _value(value) -> str:
@@ -300,7 +327,7 @@ def _enqueue_verification(
 ) -> None:
     """Hand the result to Celery, or run nothing if the broker is unreachable.
 
-    A broker outage must not lose the submission. The row stays in `processing`
+    A broker outage must not lose the submission. The row stays `uploaded`
     and the reconciliation command (`python -m app.cli reverify-pending`) picks
     it up, rather than the athlete's test silently disappearing.
     """
@@ -317,7 +344,7 @@ def _enqueue_verification(
         logger.info("Queued verification for result %s", result_id)
     except Exception:  # pragma: no cover - depends on broker availability
         logger.exception(
-            "Could not queue verification for %s; it stays in processing and "
+            "Could not queue verification for %s; it stays uploaded and "
             "will be picked up by `python -m app.cli reverify-pending`",
             result_id,
         )
@@ -369,9 +396,12 @@ def get_result(
     test = db.get(Test, result.test_id)
     comparison, unavailable = _benchmark_for(db, result, test, athlete)
 
+    # Decisions only. A reviewer's `flagged` action is an internal note to the
+    # next reviewer, not something to show the athlete (Sprint 14).
     latest = db.execute(
         select(ReviewActionRecord)
         .where(ReviewActionRecord.test_result_id == result.id)
+        .where(ReviewActionRecord.action.in_(FINAL_REVIEW_ACTIONS))
         .order_by(ReviewActionRecord.created_at.desc())
     ).scalars().first()
 
@@ -420,6 +450,9 @@ def get_result(
                 created_at=flag.created_at,
             )
             for flag in result.flags
+            # A reviewer's own flag carries internal notes; the athlete sees
+            # the automatic findings and, later, the decision.
+            if _value(flag.source) != FlagSource.manual.value
         ],
     )
 

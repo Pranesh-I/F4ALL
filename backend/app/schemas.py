@@ -93,6 +93,11 @@ class SubmitTestRequest(BaseModel):
     provisional_score: float
     video_id: uuid.UUID | None = None
 
+    # The phone's own form score (FormSummary.scorePercent, 0..100) for rep
+    # tests. Optional: app versions before Sprint 11 do not send it. Stored
+    # with the submission and shown beside the server's; never trusted.
+    provisional_form_score: int | None = Field(default=None, ge=0, le=100)
+
     # The assessment session this official attempt was made for, and when the
     # phone recorded it. The recording, not the upload, must fall inside the
     # session: phones record offline and send days later.
@@ -120,6 +125,8 @@ class SubmitTestResponse(BaseModel):
 
 
 class FlagResponse(BaseModel):
+    # `reason` is the flag type (a stable code such as "looped_frames");
+    # `detail` explains it for a reviewer; `created_at` is when it was detected.
     reason: str
     detail: str | None = None
     severity: str
@@ -127,6 +134,14 @@ class FlagResponse(BaseModel):
     created_at: datetime
     resolution: str | None = None
     resolved_at: datetime | None = None
+
+    # Sprint 12, officials only (left null in athlete-facing responses).
+    flag_id: uuid.UUID | None = None
+    # "open" until a reviewer resolves it, then "confirmed" or "dismissed".
+    status: str | None = None
+    # The measurements behind the flag and the limit they crossed.
+    evidence: dict | None = None
+    reviewed_by: uuid.UUID | None = None
 
 
 class LatestReview(BaseModel):
@@ -193,6 +208,35 @@ class ReviewItemResponse(BaseModel):
     unit: str = ""
 
 
+class SubmissionItemResponse(ReviewItemResponse):
+    """A row of the admin submission list (Sprint 13): every submission, not
+    only those awaiting a decision, with the session it was made in."""
+
+    athlete_id: uuid.UUID
+    final_score: float | None = None
+    verified_at: datetime | None = None
+    # Why the server settled it without scoring (Sprint 11), when it did.
+    verification_reason: str | None = None
+    session_id: uuid.UUID | None = None
+    session_name: str | None = None
+    # Sprint 14: the machine's verdict, the reviewer-facing state, and how
+    # many integrity flags are still unresolved.
+    verification_verdict: str | None = None
+    review_status: str | None = None
+    open_flag_count: int = 0
+
+
+class TestInfoResponse(BaseModel):
+    """One test the backend can assess, for session set-up and filters."""
+
+    __test__ = False  # not a pytest class
+
+    code: str
+    name: str
+    unit: str
+    higher_is_better: bool
+
+
 class ReviewQueuePage(BaseModel):
     items: list[ReviewItemResponse]
     total: int
@@ -211,6 +255,11 @@ class ReviewHistoryItem(BaseModel):
     notes: str | None
     official_name: str
     created_at: datetime
+    # Sprint 14 audit fields; null on actions recorded before them.
+    official_id: uuid.UUID | None = None
+    reason: str | None = None
+    previous_status: str | None = None
+    new_status: str | None = None
 
 
 class ReviewDetailResponse(BaseModel):
@@ -245,11 +294,25 @@ class ReviewDetailResponse(BaseModel):
     benchmark: BenchmarkComparisonResponse | None = None
     review_history: list[ReviewHistoryItem] = Field(default_factory=list)
 
+    # The assessment session it was submitted to (Sprint 13); None for a
+    # submission made outside any session.
+    session_id: uuid.UUID | None = None
+    session_name: str | None = None
+
+    # Sprint 14. Where it stands for a reviewer (see dashboard.review_status),
+    # what the automated check concluded, and a counter of review actions that
+    # a decision must quote back (`expected_version`).
+    review_status: str | None = None
+    verification_verdict: str | None = None
+    verification_reason: str | None = None
+    review_version: int = 0
+
     # Which actions this official may take on this result right now.
     allowed_actions: list[str] = Field(default_factory=list)
 
 
 class ReviewActionRequest(BaseModel):
+    # approved | rejected | requested_resubmission | flagged
     action: str
     notes: str | None = Field(default=None, max_length=2000)
 
@@ -258,12 +321,23 @@ class ReviewActionRequest(BaseModel):
     # trail as theirs, never passed off as a measurement.
     final_score: float | None = Field(default=None, ge=0, le=10000)
 
+    # Sprint 14. A ReviewReason value; required for every action but approve.
+    reason: str | None = Field(default=None, max_length=40)
+    # Only for `flagged`: how serious the reviewer's concern is (default medium).
+    severity: str | None = Field(default=None, max_length=10)
+    # The `review_version` the reviewer was looking at. When given and the
+    # result has moved on since, the action is refused with 409 rather than
+    # applied over a decision the reviewer never saw.
+    expected_version: int | None = Field(default=None, ge=0)
+
 
 class ReviewActionResponse(BaseModel):
     result_id: uuid.UUID
     action: str
     status: str
     message: str
+    review_status: str | None = None
+    review_version: int | None = None
 
 
 class LeaderboardEntry(BaseModel):
@@ -462,6 +536,32 @@ class TestHistoryItem(BaseModel):
     session_id: uuid.UUID | None = None
 
 
+class VerificationComparison(BaseModel):
+    """The phone's claim beside the server's measurement, per quantity.
+
+    ``rep_count`` for rep tests, ``measurement`` (cm) for the jump; the other
+    is null. ``difference`` and ``tolerance`` are for officials only — telling
+    an athlete how far a claim may drift before it is flagged is telling them
+    how far to inflate it.
+    """
+
+    mobile_rep_count: int | None = None
+    server_rep_count: int | None = None
+    mobile_measurement: float | None = None
+    server_measurement: float | None = None
+    mobile_form_score: int | None = None
+    server_form_score: int | None = None
+    difference: float | None = None
+    tolerance: float | None = None
+
+
+class VerificationCheckResponse(BaseModel):
+    name: str
+    outcome: str
+    code: str | None = None
+    detail: str | None = None
+
+
 class VerificationStatusResponse(BaseModel):
     result_id: uuid.UUID
     test_type: str
@@ -472,6 +572,27 @@ class VerificationStatusResponse(BaseModel):
     final_score: float | None = None
     submitted_at: datetime
     verified_at: datetime | None = None
+
+    # Sprint 11 lifecycle timing. processing_completed_at is verified_at
+    # under the name the lifecycle uses; kept both for older clients.
+    processing_started_at: datetime | None = None
+    processing_completed_at: datetime | None = None
+    processing_duration_ms: int | None = None
+
+    # Why the machine decided as it did. Athletes see it only for a rejection,
+    # where it names what to fix (e.g. "video_unreadable").
+    verification_reason: str | None = None
+    comparison: VerificationComparison | None = None
+
+    # Officials only.
+    pipeline_version: str | None = None
+    verification_attempts: int | None = None
+    checks: list[VerificationCheckResponse] | None = None
+    mobile_result: dict | None = None
+    server_result: dict | None = None
+    # What every integrity (anti-cheat) check measured, flagged or not:
+    # person, identity, frames, timing, movement, duplicates. Sprint 12.
+    integrity: dict | None = None
     # While still in `processing`: how long it has waited, against the target.
     waiting_seconds: int | None = None
     sla_seconds: int

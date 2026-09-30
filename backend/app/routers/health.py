@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
 from ..database import get_db
-from ..models import TestResult, TestResultStatus
+from ..models import AWAITING_VERIFICATION, TestResult
 from ..schemas import HealthResponse, ReadinessResponse
 
 logger = logging.getLogger(__name__)
@@ -91,14 +91,14 @@ def verification_backlog(
     pending = db.execute(
         select(func.count())
         .select_from(TestResult)
-        .where(TestResult.status == TestResultStatus.processing)
+        .where(TestResult.status.in_(AWAITING_VERIFICATION))
     ).scalar_one()
 
     breaching = db.execute(
         select(func.count())
         .select_from(TestResult)
         .where(
-            TestResult.status == TestResultStatus.processing,
+            TestResult.status.in_(AWAITING_VERIFICATION),
             TestResult.created_at < cutoff,
         )
     ).scalar_one()
@@ -108,4 +108,63 @@ def verification_backlog(
         "pending": pending,
         "breaching_sla": breaching,
         "healthy": breaching == 0,
+        "recent": _recent_timings(db, settings),
     }
+
+
+RECENT_WINDOW = timedelta(hours=24)
+RECENT_LIMIT = 1000
+
+
+def _recent_timings(db: Session, settings: Settings) -> dict:
+    """Measured, not assumed: how long finished verifications actually took.
+
+    ``turnaround`` is submission to verdict — what the SLA promises the
+    athlete, queue wait included. ``processing`` is the worker's own time.
+    Computed in Python over at most RECENT_LIMIT rows so it reads the same on
+    SQLite and Postgres.
+    """
+    since = datetime.now(UTC) - RECENT_WINDOW
+    rows = db.execute(
+        select(
+            TestResult.created_at,
+            TestResult.verified_at,
+            TestResult.processing_duration_ms,
+        )
+        .where(
+            TestResult.verified_at.is_not(None),
+            TestResult.processing_started_at.is_not(None),
+            TestResult.verified_at >= since,
+        )
+        .order_by(TestResult.verified_at.desc())
+        .limit(RECENT_LIMIT)
+    ).all()
+
+    turnaround = sorted(
+        (_aware(done) - _aware(created)).total_seconds() for created, done, _ in rows
+    )
+    processing = sorted(ms / 1000 for _, _, ms in rows if ms is not None)
+    sla = settings.verification_sla_seconds
+
+    return {
+        "window_hours": int(RECENT_WINDOW.total_seconds() // 3600),
+        "completed": len(rows),
+        "turnaround_p50_seconds": _percentile(turnaround, 0.5),
+        "turnaround_p95_seconds": _percentile(turnaround, 0.95),
+        "processing_p50_seconds": _percentile(processing, 0.5),
+        "processing_p95_seconds": _percentile(processing, 0.95),
+        "within_sla": sum(1 for seconds in turnaround if seconds <= sla),
+    }
+
+
+def _percentile(ordered: list[float], fraction: float) -> float | None:
+    """Nearest-rank percentile; None when there is nothing to measure."""
+    if not ordered:
+        return None
+    index = min(len(ordered) - 1, max(0, round(fraction * len(ordered)) - 1))
+    return round(ordered[index], 2)
+
+
+def _aware(value: datetime) -> datetime:
+    # SQLite hands back naive datetimes; everything stored is UTC.
+    return value if value.tzinfo else value.replace(tzinfo=UTC)

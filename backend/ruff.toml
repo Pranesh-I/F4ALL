@@ -24,6 +24,13 @@ ignore = [
 "alembic/env.py" = ["E402"]
 # Alembic autogenerates these; reformatting them creates noisy diffs.
 "alembic/versions/*.py" = ["E501", "I001", "UP"]
+# Imports the Sprint 11 verification fixtures by name, which is how pytest
+# shares fixtures between two test modules; every test parameter then reads
+# as a redefinition. (A conftest override would change the upload chunk size
+# for every other test.)
+"tests/test_anti_cheat.py" = ["F811"]
+# Same pattern: Sprint 14 review tests reuse the Sprint 11 worker fixtures.
+"tests/test_review_workflow.py" = ["F811"]
 
 [lint.isort]
 known-first-party = ["app"]

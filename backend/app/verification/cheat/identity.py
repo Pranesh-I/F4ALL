@@ -11,8 +11,63 @@ attention, never an athlete's place.
 
 from __future__ import annotations
 
+from enum import Enum
+
 from ...models import IdentityCheckOutcome
-from .findings import CheatCheck, CheatFinding, Severity
+from .findings import CheatCheck, CheatFinding, FaceOutcome, FaceVerdict, Severity
+
+
+class IdentityOutcome(str, Enum):
+    IDENTITY_MATCH = "IDENTITY_MATCH"
+    # "Not obviously the same person — a human must compare", never "not the
+    # athlete": neither matcher is validated enough to say that (face.py).
+    IDENTITY_MISMATCH = "IDENTITY_MISMATCH"
+    IDENTITY_UNCERTAIN = "IDENTITY_UNCERTAIN"
+
+
+def identity_summary(
+    *,
+    official: bool,
+    pre_test: IdentityCheckOutcome | None,
+    face: FaceOutcome | None,
+    face_skipped: str | None,
+) -> dict:
+    """One identity outcome from the two checks the platform already runs.
+
+    * the photo taken before an official test (``routers/identity.py``);
+    * the test video's face against the registration photo (``face.py``).
+
+    Any "does not match" from either is a mismatch for a human to compare;
+    otherwise any match is a match; with neither (no photo on file, no face
+    found, models missing, no pre-test photo) it is uncertain — never a match
+    by default. Only outcomes and the similarity already stored in
+    ``face_verifications`` are recorded; no image or embedding is kept.
+    """
+    mismatch = pre_test is IdentityCheckOutcome.no_match or (
+        face is not None and face.verdict is not FaceVerdict.PASS
+    )
+    match = pre_test is IdentityCheckOutcome.match or (
+        face is not None and face.verdict is FaceVerdict.PASS
+    )
+    if mismatch:
+        outcome = IdentityOutcome.IDENTITY_MISMATCH
+    elif match:
+        outcome = IdentityOutcome.IDENTITY_MATCH
+    else:
+        outcome = IdentityOutcome.IDENTITY_UNCERTAIN
+
+    return {
+        "outcome": outcome.value,
+        "official": official,
+        "pre_test_check": pre_test.value if pre_test is not None else None,
+        "video_face_check": face.verdict.value if face is not None else None,
+        "video_face_similarity": (
+            round(face.similarity, 4)
+            if face is not None and face.similarity is not None
+            else None
+        ),
+        "video_face_not_run": face_skipped if face is None else None,
+    }
 
 _DETAIL = {
     None: (

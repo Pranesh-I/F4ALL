@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
 from ..database import get_db
+from ..errors import ApiError
 from ..models import Athlete, Video
 from ..schemas import (
     UploadChunkResponse,
@@ -31,7 +32,7 @@ router = APIRouter(prefix="/api/videos/upload", tags=["Videos"])
 
 
 def _as_http(error: uploads.UploadError) -> HTTPException:
-    return HTTPException(status_code=error.status_code, detail=error.message)
+    return ApiError(error.status_code, error.code, error.message)
 
 
 def _session_response(session) -> UploadSessionResponse:

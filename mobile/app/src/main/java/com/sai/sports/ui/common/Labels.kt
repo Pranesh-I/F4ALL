@@ -78,7 +78,8 @@ object Labels {
 
     @StringRes
     fun resultStatus(status: String): Int = when (status) {
-        "processing" -> R.string.status_processing
+        // Queued for a worker vs claimed by one: the same wait to the athlete.
+        "uploaded", "processing" -> R.string.status_processing
         "verified" -> R.string.status_verified
         "flagged" -> R.string.status_flagged
         "approved" -> R.string.status_approved

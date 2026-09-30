@@ -9,9 +9,11 @@ Two readers of the same status:
 * **An official** (region-scoped, as everywhere on the dashboard) sees all of
   it: flags, verification errors, the identity and face checks.
 
-Re-running is for a submission stuck in `processing` — the broker was down,
-a worker died. It is not a way to re-roll a verdict: once verification has
-finished, the answer belongs to the reviewer, not to a second machine run.
+Re-running is for a submission stuck awaiting verification (`uploaded` or
+`processing`) — the broker was down, a worker died. It is not a way to re-roll
+a verdict: once verification has finished, the answer belongs to the reviewer,
+not to a second machine run. A re-run racing a live one is safe: only the
+latest claim may write a verdict (tasks.py).
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from sqlalchemy.orm import Session
 from ..config import Settings, get_settings
 from ..database import get_db
 from ..models import (
+    AWAITING_VERIFICATION,
     Athlete,
     FaceVerification,
     IdentityCheck,
@@ -36,7 +39,11 @@ from ..models import (
     TestResult,
     TestResultStatus,
 )
-from ..schemas import VerificationStatusResponse
+from ..schemas import (
+    VerificationCheckResponse,
+    VerificationComparison,
+    VerificationStatusResponse,
+)
 from ..security import (
     OFFICIAL_ROLES,
     _bearer_token,
@@ -61,9 +68,9 @@ class Caller:
 
     @property
     def is_official(self) -> bool:
-        # No caller at all only happens with the development auth bypass,
-        # where every dashboard endpoint behaves as an unrestricted official.
-        return self.athlete is None
+        # Only a signed-in official. An anonymous caller under the development
+        # auth bypass used to get the official view of every submission.
+        return self.official is not None
 
 
 def caller(
@@ -99,7 +106,7 @@ def reprocess(
     settings: Settings = Depends(get_settings),
     official: Official | None = Depends(current_official),
 ):
-    """Queue verification again for a submission stuck in `processing`."""
+    """Queue verification again for a submission still awaiting a verdict."""
     if official is None:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
@@ -112,7 +119,7 @@ def reprocess(
 
     result, _, test = _load_scoped(db, result_id, official)
 
-    if _value(result.status) != TestResultStatus.processing.value:
+    if result.status not in AWAITING_VERIFICATION:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "Only a submission still waiting for verification can be re-run; "
@@ -140,6 +147,9 @@ def _load_for(db: Session, result_id: uuid.UUID, who: Caller) -> tuple[TestResul
         result, _, test = _load_scoped(db, result_id, who.official)
         return result, test
 
+    if who.athlete is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Authentication required")
+
     row = db.execute(
         select(TestResult, Test)
         .join(Test, Test.id == TestResult.test_id)
@@ -160,7 +170,7 @@ def _status(
     official_view: bool,
 ) -> VerificationStatusResponse:
     submitted_at = _aware(result.created_at)
-    waiting = _value(result.status) == TestResultStatus.processing.value
+    waiting = result.status in AWAITING_VERIFICATION
     waiting_seconds = (
         int((datetime.now(UTC) - submitted_at).total_seconds()) if waiting else None
     )
@@ -179,10 +189,35 @@ def _status(
         sla_seconds=settings.verification_sla_seconds,
         overdue=waiting_seconds is not None
         and waiting_seconds > settings.verification_sla_seconds,
+        processing_started_at=(
+            _aware(result.processing_started_at)
+            if result.processing_started_at
+            else None
+        ),
+        processing_completed_at=(
+            _aware(result.verified_at) if result.verified_at else None
+        ),
+        processing_duration_ms=result.processing_duration_ms,
+        comparison=_comparison(result, official_view=official_view),
     )
 
     if not official_view:
+        # A rejection names what to fix; any other reason describes a check.
+        if result.status is TestResultStatus.rejected:
+            response.verification_reason = result.verification_reason
         return response
+
+    response.verification_reason = result.verification_reason
+    response.pipeline_version = result.pipeline_version
+    response.verification_attempts = result.verification_attempts
+    response.checks = (
+        [VerificationCheckResponse(**check) for check in result.verification_checks]
+        if result.verification_checks
+        else None
+    )
+    response.mobile_result = result.mobile_result
+    response.server_result = result.server_result
+    response.integrity = (result.server_result or {}).get("integrity")
 
     identity = (
         db.get(IdentityCheck, result.identity_check_id)
@@ -200,6 +235,28 @@ def _status(
     response.identity_check = _value(identity.outcome) if identity else None
     response.face_check = _value(face.verification_status) if face else None
     return response
+
+
+def _comparison(
+    result: TestResult, *, official_view: bool
+) -> VerificationComparison | None:
+    """Mobile beside server, from the snapshots stored with the verdict."""
+    mobile = result.mobile_result or {}
+    server = result.server_result or {}
+    if not mobile and not server:
+        return None
+
+    compared = server.get("comparison") or {}
+    return VerificationComparison(
+        mobile_rep_count=mobile.get("rep_count"),
+        server_rep_count=server.get("rep_count"),
+        mobile_measurement=mobile.get("measurement"),
+        server_measurement=server.get("measurement"),
+        mobile_form_score=mobile.get("form_score"),
+        server_form_score=server.get("form_score"),
+        difference=compared.get("difference") if official_view else None,
+        tolerance=compared.get("tolerance") if official_view else None,
+    )
 
 
 def _aware(value: datetime) -> datetime:

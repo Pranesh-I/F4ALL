@@ -33,6 +33,7 @@
 | provisional_score | DECIMAL(10,2) | NULL | On-device |
 | server_score | DECIMAL(10,2) | NULL | Server re-verified |
 | final_score | DECIMAL(10,2) | NULL | Set only after official approval |
+| verification_verdict | VARCHAR(20) | NULL | Sprint 14. The machine's verdict (verified / flagged / rejected), written once by the worker and never changed by a review decision |
 | status | VARCHAR(30) | NOT NULL, CHECK IN ('pending_sync','processing','verified','flagged','approved','rejected') | |
 | created_at | TIMESTAMP | NOT NULL | |
 | updated_at | TIMESTAMP | NOT NULL | |
@@ -88,9 +89,14 @@
 | id | UUID | PRIMARY KEY | |
 | test_result_id | UUID | NOT NULL, FK → test_results.id | |
 | official_id | UUID | NOT NULL, FK → officials.id | |
-| action | VARCHAR(30) | NOT NULL, CHECK IN ('approved','rejected','requested_resubmission') | |
-| notes | TEXT | NULL | |
+| action | VARCHAR(30) | NOT NULL; one of 'approved','rejected','requested_resubmission','flagged' | `flagged` (Sprint 14) raises a concern without deciding |
+| notes | TEXT | NULL | Shown to the athlete for decisions; internal for `flagged` |
+| reason | VARCHAR(40) | NULL | Sprint 14. Review reason code; required for every action but approve |
+| previous_status | VARCHAR(30) | NULL | Sprint 14. The result's status before this action |
+| new_status | VARCHAR(30) | NULL | Sprint 14. The result's status after this action |
 | created_at | TIMESTAMP | NOT NULL | |
+
+Index `ix_review_actions_test_result` (Sprint 14). Rows are append-only; see docs/SPRINT-14.md.
 
 ## 9. benchmarks  [NEW]
 | Column | Type | Constraints | Description |

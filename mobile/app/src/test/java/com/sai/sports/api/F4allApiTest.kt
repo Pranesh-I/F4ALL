@@ -48,6 +48,18 @@ class F4allApiTest {
     }
 
     @Test
+    fun `a submission carries the phone's form score only when it has one`() {
+        server.enqueue(json(201, """{"result_id":"r-9","status":"uploaded"}"""))
+        server.enqueue(json(201, """{"result_id":"r-10","status":"uploaded"}"""))
+
+        api.submitTest("SQUATS", 15.0, "video-9", null, provisionalFormScore = 80)
+        api.submitTest("VERTICAL_JUMP", 41.0, "video-10", 170.0)
+
+        assertEquals(80, JSONObject(server.takeRequest().body.readUtf8()).getInt("provisional_form_score"))
+        assertFalse(JSONObject(server.takeRequest().body.readUtf8()).has("provisional_form_score"))
+    }
+
+    @Test
     fun `an official submission names the photo check taken before it`() {
         server.enqueue(json(201, """{"result_id":"r-9","status":"processing"}"""))
 

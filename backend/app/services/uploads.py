@@ -26,9 +26,10 @@ logger = logging.getLogger(__name__)
 
 
 class UploadError(Exception):
-    """Base for upload failures, carrying the HTTP status to surface."""
+    """Base for upload failures, carrying the HTTP status and a stable code."""
 
     status_code = 400
+    code = "upload_invalid"
 
     def __init__(self, message: str) -> None:
         super().__init__(message)
@@ -37,24 +38,34 @@ class UploadError(Exception):
 
 class UploadTooLarge(UploadError):
     status_code = 413
+    code = "video_too_large"
+
+
+class UnsupportedMediaType(UploadError):
+    status_code = 415
+    code = "unsupported_format"
 
 
 class UploadNotFound(UploadError):
     status_code = 404
+    code = "upload_not_found"
 
 
 class ChunkOutOfRange(UploadError):
     status_code = 409
+    code = "chunk_out_of_range"
 
 
 class UploadIncomplete(UploadError):
     status_code = 400
+    code = "upload_incomplete"
 
 
 class ChecksumMismatch(UploadError):
     # 422, matching what UploadClient.kt treats as permanently non-retryable:
     # re-sending the same corrupt source cannot fix it.
     status_code = 422
+    code = "checksum_mismatch"
 
 
 def _chunk_path(staging_dir: Path, index: int) -> Path:
@@ -84,6 +95,14 @@ def create_session(
     if file_size_bytes > settings.upload_max_file_bytes:
         raise UploadTooLarge(
             f"File exceeds the {settings.upload_max_file_bytes} byte limit"
+        )
+
+    # Refused before a single byte is sent. The bytes themselves are checked
+    # again by the verification worker, which does not trust this label.
+    if content_type.lower() not in settings.upload_allowed_content_types:
+        raise UnsupportedMediaType(
+            f"Unsupported video type '{content_type}'; expected one of "
+            + ", ".join(settings.upload_allowed_content_types)
         )
 
     # The server decides the chunk size. The client proposes one, but honouring

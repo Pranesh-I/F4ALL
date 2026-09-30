@@ -262,7 +262,9 @@ class F4allApi(
         heightCm: Double?,
         sessionId: String? = null,
         recordedAtMs: Long? = null,
-        identityCheckId: String? = null
+        identityCheckId: String? = null,
+        // FormSummary.scorePercent; the server compares it with its own.
+        provisionalFormScore: Int? = null
     ): ApiResult<String> =
         post(
             "/api/tests/submit",
@@ -274,6 +276,7 @@ class F4allApi(
                 .putOpt("session_id", sessionId)
                 .putOpt("recorded_at_ms", recordedAtMs)
                 .putOpt("identity_check_id", identityCheckId)
+                .putOpt("provisional_form_score", provisionalFormScore)
         ) { it.getString("result_id") }
 
     // -- assessment sessions ------------------------------------------------

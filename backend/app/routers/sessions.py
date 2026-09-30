@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -155,11 +155,23 @@ def _athlete_view(
 
 @admin_router.get("", response_model=list[AssessmentSessionResponse])
 def list_sessions(
+    status_filter: str | None = Query(
+        default=None,
+        alias="status",
+        description="Comma-separated: disabled, scheduled, active, ended",
+    ),
     db: Session = Depends(get_db),
     official: Official | None = Depends(current_official),
 ):
     """Every session, newest window first. A regional reviewer sees national
-    sessions and their own region's."""
+    sessions and their own region's.
+
+    ``status`` filters on the state the server computes from ``enabled`` and
+    the window against its own clock — the dashboard asks "which are active"
+    rather than working it out from a browser's clock.
+    """
+    wanted = _parse_statuses(status_filter)
+
     query = select(AssessmentSession).order_by(AssessmentSession.starts_at.desc())
     if official is not None and not _is_admin(official):
         query = query.where(
@@ -167,7 +179,12 @@ def list_sessions(
             | (AssessmentSession.region == official.region)
         )
     sessions = list(db.execute(query).scalars())
-    counts = _submission_counts(db, [session.id for session in sessions])
+    if wanted:
+        # Filtered with status_of itself, so the list and each session's own
+        # status can never disagree about what "active" means.
+        now = _now()
+        sessions = [s for s in sessions if rules.status_of(s, now) in wanted]
+    counts = _submission_counts(db, [session.id for session in sessions], official)
     return [_response(session, counts.get(session.id, 0)) for session in sessions]
 
 
@@ -186,7 +203,7 @@ def get_session(
         and session.region != official.region
     ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
-    counts = _submission_counts(db, [session.id])
+    counts = _submission_counts(db, [session.id], official)
     return _response(session, counts.get(session.id, 0))
 
 
@@ -270,6 +287,38 @@ def update_session(
     return _response(session, submissions)
 
 
+@admin_router.post("/{session_id}/end", response_model=AssessmentSessionResponse)
+def end_session(
+    session_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    official: Official | None = Depends(current_official),
+):
+    """Close an active session now, by the server's clock.
+
+    Different from disabling it: an ended session still accepts recordings
+    made before it closed that arrive within the grace period (the offline
+    athlete), while a disabled one accepts nothing. Only an active session can
+    be ended — a scheduled one has not opened, so disable it instead.
+    """
+    admin = _require_admin(official)
+    session = _load(db, session_id)
+    now = _now()
+
+    if rules.status_of(session, now) is not rules.SessionStatus.ACTIVE:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Only an active session can be ended; this one is "
+            f"{rules.status_of(session, now).value}",
+        )
+
+    session.ends_at = now
+    session.updated_by = admin.id
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return _response(session, _submission_counts(db, [session.id]).get(session.id, 0))
+
+
 @admin_router.delete("/{session_id}", response_model=MessageResponse)
 def delete_session(
     session_id: uuid.UUID,
@@ -347,6 +396,22 @@ def _validated_region(value: str | None) -> str | None:
     return region
 
 
+def _parse_statuses(value: str | None) -> set[rules.SessionStatus]:
+    if not value:
+        return set()
+    wanted = set()
+    for part in (piece.strip().lower() for piece in value.split(",")):
+        if not part:
+            continue
+        try:
+            wanted.add(rules.SessionStatus(part))
+        except ValueError as exc:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, f"Unknown session status: {part}"
+            ) from exc
+    return wanted
+
+
 def _check_window(session: AssessmentSession) -> None:
     if rules.aware(session.ends_at) <= rules.aware(session.starts_at):
         raise HTTPException(
@@ -354,14 +419,28 @@ def _check_window(session: AssessmentSession) -> None:
         )
 
 
-def _submission_counts(db: Session, session_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+def _submission_counts(
+    db: Session, session_ids: list[uuid.UUID], viewer: Official | None = None
+) -> dict[uuid.UUID, int]:
+    """Submissions per session.
+
+    With a regional reviewer as ``viewer``, only their region's athletes count
+    — the same scoping as the submission list, so a national session does not
+    report submissions the reviewer can never open. Admin-only rules (delete,
+    removing a test) pass no viewer and see the true total.
+    """
     if not session_ids:
         return {}
-    rows = db.execute(
-        select(TestResult.session_id, func.count())
-        .where(TestResult.session_id.in_(session_ids))
-        .group_by(TestResult.session_id)
-    ).all()
+    query = select(TestResult.session_id, func.count()).where(
+        TestResult.session_id.in_(session_ids)
+    )
+    if viewer is not None and not _is_admin(viewer):
+        if not viewer.region:
+            return {}
+        query = query.join(Athlete, Athlete.id == TestResult.athlete_id).where(
+            Athlete.region == viewer.region
+        )
+    rows = db.execute(query.group_by(TestResult.session_id)).all()
     return {session_id: count for session_id, count in rows}
 
 

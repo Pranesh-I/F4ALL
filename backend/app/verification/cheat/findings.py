@@ -36,6 +36,12 @@ class CheatCheck(str, Enum):
     FACE_NOT_FOUND = "face_not_found"
     # The athlete did not pass the photo check before an official test.
     IDENTITY_UNCONFIRMED = "identity_unconfirmed"
+    # Sprint 12.
+    DUPLICATE_FRAMES = "duplicate_frames"
+    TIMESTAMP_ANOMALY = "timestamp_anomaly"
+    PLAYBACK_SPEED_SUSPICIOUS = "playback_speed_suspicious"
+    IMPOSSIBLE_MOVEMENT = "impossible_movement"
+    DUPLICATE_SUBMISSION = "duplicate_submission"
 
 
 class Severity(str, Enum):
@@ -57,9 +63,11 @@ class CheatFinding:
     # "looped frames" has to watch all of it; given a timestamp, they do not.
     at_ms: int | None = None
 
-    # Raw numbers behind the finding, for tuning thresholds against pilot data
-    # in Sprint 13-14.
-    evidence: dict[str, float] = field(default_factory=dict)
+    # The measurements behind the finding, persisted with the flag (Sprint 12)
+    # so a reviewer can see what was measured and thresholds can be tuned
+    # against pilot data. JSON-serialisable values only. Contains thresholds,
+    # so it is shown to officials, never to athletes.
+    evidence: dict[str, object] = field(default_factory=dict)
 
 
 class FaceVerdict(str, Enum):
@@ -108,15 +116,30 @@ class CheatReport:
     # presented to a reviewer as "we looked and found nothing".
     skipped: dict[str, str] = field(default_factory=dict)
 
+    # Checks that crashed. Unlike `skipped` (not applicable: no photo on file),
+    # a crash means the video was never examined for that problem, so it must
+    # not end in a clean verdict (finalization.py flags it).
+    errors: dict[str, str] = field(default_factory=dict)
+
+    # What each area of checks measured, whether or not it found anything —
+    # "person", "identity", "frames", "timing", "movement", "duplicates".
+    # Persisted with the verdict, so a clean result is auditable too.
+    summaries: dict[str, dict] = field(default_factory=dict)
+
     def add(self, finding: CheatFinding) -> None:
         self.findings.append(finding)
 
     def skip(self, check: CheatCheck, reason: str) -> None:
         self.skipped[check.value] = reason
 
+    def summarise(self, area: str, summary: dict) -> None:
+        self.summaries[area] = summary
+
     def extend(self, other: CheatReport) -> None:
         self.findings.extend(other.findings)
         self.skipped.update(other.skipped)
+        self.errors.update(other.errors)
+        self.summaries.update(other.summaries)
         if other.face is not None:
             self.face = other.face
 

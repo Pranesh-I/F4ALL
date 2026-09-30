@@ -650,29 +650,53 @@ paths:
       summary: List Sessions
       description: 'Every session, newest window first. A regional reviewer sees national
 
-        sessions and their own region''s.'
+        sessions and their own region''s.
+
+
+        ``status`` filters on the state the server computes from ``enabled`` and
+
+        the window against its own clock — the dashboard asks "which are active"
+
+        rather than working it out from a browser''s clock.'
       operationId: list_sessions_api_dashboard_sessions_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Comma-separated: disabled, scheduled, active, ended'
+          title: Status
+        description: 'Comma-separated: disabled, scheduled, active, ended'
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
+                type: array
                 items:
                   $ref: '#/components/schemas/AssessmentSessionResponse'
-                type: array
                 title: Response List Sessions Api Dashboard Sessions Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     post:
       tags:
       - Dashboard
       summary: Create Session
       operationId: create_session_api_dashboard_sessions_post
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AssessmentSessionCreate'
-        required: true
       responses:
         '201':
           description: Successful Response
@@ -771,6 +795,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/dashboard/sessions/{session_id}/end:
+    post:
+      tags:
+      - Dashboard
+      summary: End Session
+      description: 'Close an active session now, by the server''s clock.
+
+
+        Different from disabling it: an ended session still accepts recordings
+
+        made before it closed that arrive within the grace period (the offline
+
+        athlete), while a disabled one accepts nothing. Only an active session can
+
+        be ended — a scheduled one has not opened, so disable it instead.'
+      operationId: end_session_api_dashboard_sessions__session_id__end_post
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentSessionResponse'
         '422':
           description: Validation Error
           content:
@@ -978,7 +1039,7 @@ paths:
       tags:
       - Verification
       summary: Reprocess
-      description: Queue verification again for a submission stuck in `processing`.
+      description: Queue verification again for a submission still awaiting a verdict.
       operationId: reprocess_api_verification__result_id__process_post
       parameters:
       - name: result_id
@@ -1064,6 +1125,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OfficialProfileResponse'
+  /api/dashboard/auth/logout:
+    post:
+      tags:
+      - Dashboard auth
+      summary: Logout
+      description: 'Revoke this browser''s refresh token, or every one the official
+        holds.
+
+
+        Clearing the tab''s storage alone leaves a refresh token that still works
+
+        for 90 days if it was copied, and these accounts approve children''s
+
+        results. The access token lapses on its own within the hour.'
+      operationId: logout_api_dashboard_auth_logout_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/dashboard/reviews:
     get:
       tags:
@@ -1079,9 +1174,16 @@ paths:
         severity nobody should be starved by newer submissions.
 
 
-        The total count is in `X-Total-Count` so the body stays the list the
+        With no status filter it shows work waiting for a human decision:
 
-        contract already describes.'
+        ``needs_review`` (flagged) and ``invalid`` (the machine could not verify
+
+        it and nobody has asked for a new recording yet). Results still being
+
+        verified are not decidable, so they are not in the default view.
+
+
+        The total count is in `X-Total-Count` so the body stays a plain list.'
       operationId: review_queue_api_dashboard_reviews_get
       parameters:
       - name: status
@@ -1092,6 +1194,18 @@ paths:
           - type: string
           - type: 'null'
           title: Status
+      - name: review_status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Comma-separated: awaiting_upload, awaiting_verification, needs_review,
+            awaiting_approval, invalid, approved, rejected, resubmission_requested'
+          title: Review Status
+        description: 'Comma-separated: awaiting_upload, awaiting_verification, needs_review,
+          awaiting_approval, invalid, approved, rejected, resubmission_requested'
       - name: test_type
         in: query
         required: false
@@ -1108,6 +1222,54 @@ paths:
           - type: string
           - type: 'null'
           title: Region
+      - name: session_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+      - name: athlete
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 150
+          - type: 'null'
+          description: Athlete id, or part of the name
+          title: Athlete
+        description: Athlete id, or part of the name
+      - name: flags
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: open | none | low | medium | high (at least)
+          title: Flags
+        description: open | none | low | medium | high (at least)
+      - name: submitted_from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Submitted From
+      - name: submitted_to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Submitted To
       - name: limit
         in: query
         required: false
@@ -1133,7 +1295,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ReviewItemResponse'
+                  $ref: '#/components/schemas/SubmissionItemResponse'
                 title: Response Review Queue Api Dashboard Reviews Get
         '422':
           description: Validation Error
@@ -1141,6 +1303,166 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/dashboard/submissions:
+    get:
+      tags:
+      - Dashboard
+      summary: Submissions
+      description: 'Every submission this official may see, newest first (Sprint 13).
+
+
+        The review queue answers "what needs a decision, most urgent first"; this
+
+        answers "what has been submitted" — any status unless filtered. Both take
+
+        the same filters and are region-scoped and paged the same way, with the
+
+        total in `X-Total-Count`.'
+      operationId: submissions_api_dashboard_submissions_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: review_status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Comma-separated: awaiting_upload, awaiting_verification, needs_review,
+            awaiting_approval, invalid, approved, rejected, resubmission_requested'
+          title: Review Status
+        description: 'Comma-separated: awaiting_upload, awaiting_verification, needs_review,
+          awaiting_approval, invalid, approved, rejected, resubmission_requested'
+      - name: test_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Test Type
+      - name: region
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Region
+      - name: session_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+      - name: athlete
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 150
+          - type: 'null'
+          description: Athlete id, or part of the name
+          title: Athlete
+        description: Athlete id, or part of the name
+      - name: flags
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: open | none | low | medium | high (at least)
+          title: Flags
+        description: open | none | low | medium | high (at least)
+      - name: submitted_from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Submitted From
+      - name: submitted_to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Submitted To
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 25
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubmissionItemResponse'
+                title: Response Submissions Api Dashboard Submissions Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/dashboard/tests:
+    get:
+      tags:
+      - Dashboard
+      summary: Tests Catalog
+      description: 'The tests the backend can assess, in battery order.
+
+
+        Driven by the scorer registry (`TestType`) — the same list session
+
+        creation validates against — so the dashboard never offers a test the
+
+        server cannot score. Names come from the `tests` table where it has been
+
+        seeded (`python -m app.cli seed`).'
+      operationId: tests_catalog_api_dashboard_tests_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/TestInfoResponse'
+                type: array
+                title: Response Tests Catalog Api Dashboard Tests Get
   /api/dashboard/reviews/{result_id}:
     get:
       tags:
@@ -1205,6 +1527,18 @@ paths:
       tags:
       - Dashboard
       summary: Review Action
+      description: 'Record an official''s decision, or a concern (`flagged`).
+
+
+        What may happen from each state is decided here and only here
+
+        (`_allowed_actions`); the dashboard shows what this allows. Every action
+
+        appends one audit row with the reviewer, the reason, and the status either
+
+        side. The automated evidence (scores, snapshots, checks, flags and the
+
+        machine verdict) is never changed by a decision.'
       operationId: review_action_api_dashboard_reviews__result_id__action_post
       parameters:
       - name: result_id
@@ -2106,6 +2440,29 @@ components:
             format: date-time
           - type: 'null'
           title: Resolved At
+        flag_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Flag Id
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        evidence:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Evidence
+        reviewed_by:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Reviewed By
       type: object
       required:
       - reason
@@ -2652,6 +3009,24 @@ components:
             minimum: 0.0
           - type: 'null'
           title: Final Score
+        reason:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Reason
+        severity:
+          anyOf:
+          - type: string
+            maxLength: 10
+          - type: 'null'
+          title: Severity
+        expected_version:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Expected Version
       type: object
       required:
       - action
@@ -2671,6 +3046,16 @@ components:
         message:
           type: string
           title: Message
+        review_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review Status
+        review_version:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Review Version
       type: object
       required:
       - result_id
@@ -2791,6 +3176,36 @@ components:
             $ref: '#/components/schemas/ReviewHistoryItem'
           type: array
           title: Review History
+        session_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+        session_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Session Name
+        review_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review Status
+        verification_verdict:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Verification Verdict
+        verification_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Verification Reason
+        review_version:
+          type: integer
+          title: Review Version
+          default: 0
         allowed_actions:
           items:
             type: string
@@ -2828,6 +3243,27 @@ components:
           type: string
           format: date-time
           title: Created At
+        official_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Official Id
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+        previous_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Previous Status
+        new_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: New Status
       type: object
       required:
       - action
@@ -2835,7 +3271,29 @@ components:
       - official_name
       - created_at
       title: ReviewHistoryItem
-    ReviewItemResponse:
+    SessionTestStatus:
+      properties:
+        test_type:
+          type: string
+          title: Test Type
+        unit:
+          type: string
+          title: Unit
+        submitted:
+          type: boolean
+          title: Submitted
+        result_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Status
+      type: object
+      required:
+      - test_type
+      - unit
+      - submitted
+      title: SessionTestStatus
+    SubmissionItemResponse:
       properties:
         result_id:
           type: string
@@ -2883,6 +3341,51 @@ components:
           type: string
           title: Unit
           default: ''
+        athlete_id:
+          type: string
+          format: uuid
+          title: Athlete Id
+        final_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Final Score
+        verified_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Verified At
+        verification_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Verification Reason
+        session_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+        session_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Session Name
+        verification_verdict:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Verification Verdict
+        review_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review Status
+        open_flag_count:
+          type: integer
+          title: Open Flag Count
+          default: 0
       type: object
       required:
       - result_id
@@ -2894,29 +3397,12 @@ components:
       - server_score
       - flag_count
       - created_at
-      title: ReviewItemResponse
-    SessionTestStatus:
-      properties:
-        test_type:
-          type: string
-          title: Test Type
-        unit:
-          type: string
-          title: Unit
-        submitted:
-          type: boolean
-          title: Submitted
-        result_status:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Result Status
-      type: object
-      required:
-      - test_type
-      - unit
-      - submitted
-      title: SessionTestStatus
+      - athlete_id
+      title: SubmissionItemResponse
+      description: 'A row of the admin submission list (Sprint 13): every submission,
+        not
+
+        only those awaiting a decision, with the session it was made in.'
     SubmitTestRequest:
       properties:
         test_id:
@@ -2931,6 +3417,13 @@ components:
             format: uuid
           - type: 'null'
           title: Video Id
+        provisional_form_score:
+          anyOf:
+          - type: integer
+            maximum: 100.0
+            minimum: 0.0
+          - type: 'null'
+          title: Provisional Form Score
         session_id:
           anyOf:
           - type: string
@@ -3039,6 +3532,28 @@ components:
           title: Next Before
       type: object
       title: TestHistoryPage
+    TestInfoResponse:
+      properties:
+        code:
+          type: string
+          title: Code
+        name:
+          type: string
+          title: Name
+        unit:
+          type: string
+          title: Unit
+        higher_is_better:
+          type: boolean
+          title: Higher Is Better
+      type: object
+      required:
+      - code
+      - name
+      - unit
+      - higher_is_better
+      title: TestInfoResponse
+      description: One test the backend can assess, for session set-up and filters.
     TokenResponse:
       properties:
         access_token:
@@ -3178,6 +3693,83 @@ components:
       - msg
       - type
       title: ValidationError
+    VerificationCheckResponse:
+      properties:
+        name:
+          type: string
+          title: Name
+        outcome:
+          type: string
+          title: Outcome
+        code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+      type: object
+      required:
+      - name
+      - outcome
+      title: VerificationCheckResponse
+    VerificationComparison:
+      properties:
+        mobile_rep_count:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Mobile Rep Count
+        server_rep_count:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Server Rep Count
+        mobile_measurement:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Mobile Measurement
+        server_measurement:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Server Measurement
+        mobile_form_score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Mobile Form Score
+        server_form_score:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Server Form Score
+        difference:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Difference
+        tolerance:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Tolerance
+      type: object
+      title: VerificationComparison
+      description: 'The phone''s claim beside the server''s measurement, per quantity.
+
+
+        ``rep_count`` for rep tests, ``measurement`` (cm) for the jump; the other
+
+        is null. ``difference`` and ``tolerance`` are for officials only — telling
+
+        an athlete how far a claim may drift before it is flagged is telling them
+
+        how far to inflate it.'
     VerificationStatusResponse:
       properties:
         result_id:
@@ -3218,6 +3810,67 @@ components:
             format: date-time
           - type: 'null'
           title: Verified At
+        processing_started_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Processing Started At
+        processing_completed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Processing Completed At
+        processing_duration_ms:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Processing Duration Ms
+        verification_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Verification Reason
+        comparison:
+          anyOf:
+          - $ref: '#/components/schemas/VerificationComparison'
+          - type: 'null'
+        pipeline_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pipeline Version
+        verification_attempts:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Verification Attempts
+        checks:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/VerificationCheckResponse'
+            type: array
+          - type: 'null'
+          title: Checks
+        mobile_result:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Mobile Result
+        server_result:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Server Result
+        integrity:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Integrity
         waiting_seconds:
           anyOf:
           - type: integer

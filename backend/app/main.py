@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import get_settings
+from .errors import ApiError, api_error_handler
 from .logging_config import RequestIdMiddleware, configure_logging, request_id_var
 from .routers import (
     athletes,
@@ -105,6 +106,8 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_auth.router)
     app.include_router(dashboard.router)
     app.include_router(media.router)
+
+    app.add_exception_handler(ApiError, api_error_handler)
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):

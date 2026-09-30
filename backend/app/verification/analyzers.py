@@ -57,6 +57,16 @@ class AttemptStatus(str, Enum):
     INVALID = "INVALID"
 
 
+_REFUSED_REP_LABELS = frozenset(
+    {
+        "rep_rejected_partial",
+        "rep_rejected_too_fast",
+        "rep_rejected_form",
+        "rep_rejected_wrong_arm",
+    }
+)
+
+
 @dataclass(frozen=True)
 class AnalyzerEvent:
     timestamp_ms: int
@@ -76,9 +86,36 @@ class AnalyzerResult:
     invalid_reason: str | None = None
     events: list[AnalyzerEvent] = field(default_factory=list)
 
+    # Vertical jump only: (height_cm, flight_ms) for every jump that was
+    # measured. Server-side, for the playback-speed physics check; not part of
+    # the score and not in the mobile parity contract.
+    jumps: list[tuple[float, int]] = field(default_factory=list)
+
     @property
     def is_usable(self) -> bool:
         return self.status is AttemptStatus.COMPLETE
+
+    @property
+    def form_score(self) -> int | None:
+        """0..100: the share of attempted reps done with good form.
+
+        A port of ``FormSummary.scorePercent`` in the mobile app, including its
+        integer division, so the device's and the server's numbers are the
+        same measurement. None when there were no reps to judge (a jump, or
+        nothing recorded).
+        """
+        counted = sum(1 for event in self.events if event.label == "rep_counted")
+        refused = sum(1 for event in self.events if event.label in _REFUSED_REP_LABELS)
+        attempted = counted + refused
+        if attempted == 0:
+            return None
+        # Warnings share their rep's timestamp, so distinct timestamps are the
+        # counted reps that had at least one.
+        warned = len(
+            {event.timestamp_ms for event in self.events if event.label == "form_warning"}
+        )
+        good = max(counted - warned, 0)
+        return good * 100 // attempted
 
     @classmethod
     def invalid(
@@ -384,6 +421,7 @@ class VerticalJumpAnalyzer:
         self._current_peak_units = 0.0
         self._best_jump_cm = 0.0
         self._jump_count = 0
+        self._jumps: list[tuple[float, int]] = []
         self._frames_analyzed = 0
         self._frames_rejected = 0
         self._consecutive_rejected = 0
@@ -546,6 +584,7 @@ class VerticalJumpAnalyzer:
             return
 
         self._jump_count += 1
+        self._jumps.append((jump_cm, elapsed_ms))
         self._best_jump_cm = max(self._best_jump_cm, jump_cm)
         self._events.append(
             AnalyzerEvent(
@@ -658,6 +697,7 @@ class VerticalJumpAnalyzer:
             frames_analyzed=self._frames_analyzed,
             frames_rejected=self._frames_rejected,
             events=list(self._events),
+            jumps=list(self._jumps),
         )
 
     def _confidence(self) -> float:

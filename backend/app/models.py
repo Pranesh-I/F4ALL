@@ -93,14 +93,34 @@ class TestResultStatus(str, enum.Enum):
     ``approved`` means a human official signed it off. They are deliberately
     distinct: the system's credibility rests on a machine result never being
     presented as an official one.
+
+    The machine half of the lifecycle (Sprint 11):
+
+        uploaded -> processing -> verified | flagged | rejected
+
+    ``uploaded`` is a stored video waiting for a worker; ``processing`` means a
+    worker has claimed it. Before the submission exists, the upload itself is
+    tracked on ``upload_sessions`` (created, then chunks arriving, then
+    completed). ``rejected`` is set by the machine only for a submission that
+    cannot be verified by anyone — no video, a file that is not a video — and
+    by an official after review. Anything about the athlete's performance is
+    ``flagged`` for a human, never rejected by the machine.
     """
 
     pending_sync = "pending_sync"
+    uploaded = "uploaded"
     processing = "processing"
     verified = "verified"
     flagged = "flagged"
     approved = "approved"
     rejected = "rejected"
+
+
+# Submitted but without a machine verdict yet: queued, or claimed by a worker.
+# What the SLA is measured against and what re-queueing picks up.
+AWAITING_VERIFICATION = frozenset(
+    {TestResultStatus.uploaded, TestResultStatus.processing}
+)
 
 
 class FlagSource(str, enum.Enum):
@@ -134,6 +154,32 @@ class ReviewAction(str, enum.Enum):
     approved = "approved"
     rejected = "rejected"
     requested_resubmission = "requested_resubmission"
+    # Sprint 14: a reviewer raises a concern without deciding. The result goes
+    # (or stays) `flagged` with a manual flag, and remains open for a decision.
+    flagged = "flagged"
+
+
+# Actions that settle a result. `flagged` does not: it asks for another look.
+FINAL_REVIEW_ACTIONS = frozenset(
+    {ReviewAction.approved, ReviewAction.rejected, ReviewAction.requested_resubmission}
+)
+
+
+class ReviewReason(str, enum.Enum):
+    """Why a reviewer rejected, asked for a resubmission, or flagged (Sprint 14).
+
+    Stored on the audit row beside the free-text notes, so decisions can be
+    counted and audited by cause rather than read one note at a time.
+    """
+
+    identity_mismatch = "identity_mismatch"
+    multiple_people = "multiple_people"
+    invalid_video = "invalid_video"
+    score_discrepancy = "score_discrepancy"
+    technical_issue = "technical_issue"
+    form_issue = "form_issue"
+    duplicate_submission = "duplicate_submission"
+    other = "other"
 
 
 class ConsentPurpose(str, enum.Enum):
@@ -277,11 +323,43 @@ class TestResult(TimestampMixin, Base):
         default=TestResultStatus.pending_sync,
     )
 
-    # Set when the verification job finishes, for SLA reporting.
+    # Set when the verification job finishes, for SLA reporting. This is the
+    # processing-completed time; the API also exposes it under that name.
     verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     verification_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- Sprint 11: enough to reproduce the machine verdict later ----------
+    # When a worker claimed the job, and how long the verification itself took
+    # (queue wait is created_at -> processing_started_at).
+    processing_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    processing_duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Machine-readable code for the deciding check (verification/finalization.py).
+    verification_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # The machine's own verdict — verified, flagged or rejected — written once
+    # by the worker and never by a reviewer (Sprint 14). `status` moves on when
+    # an official decides; this keeps what the automated check concluded.
+    verification_verdict: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    pipeline_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+    # What the phone claimed and what the server measured, as snapshots, plus
+    # every check the verdict was built from. Separate from the score columns
+    # above, which stay the queryable numbers.
+    mobile_result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    server_result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    verification_checks: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+    # Duplicate-processing guard. Every run claims the result under a fresh id,
+    # and only the run holding the latest claim may write the verdict, so a
+    # redelivered or re-queued job cannot add a second set of flags.
+    verification_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    verification_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     athlete: Mapped[Athlete] = relationship(back_populates="results")
     test: Mapped[Test] = relationship()
@@ -309,7 +387,7 @@ class TestResult(TimestampMixin, Base):
             sqlite_where=text("session_id IS NOT NULL AND status <> 'pending_sync'"),
         ),
         CheckConstraint(
-            "status IN ('pending_sync','processing','verified','flagged',"
+            "status IN ('pending_sync','uploaded','processing','verified','flagged',"
             "'approved','rejected')",
             name="ck_test_results_status",
         ),
@@ -341,13 +419,22 @@ class Video(Base):
     # measurement saw, and the device's landmarks are the ones not to trust.
     pose_sequence_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # 16 sampled 16x16 greyscale frames, written during verification, so a
+    # later submission of the same footage can be recognised
+    # (verification/cheat/duplicates.py). Too coarse to show a face.
+    fingerprint: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
 
     test_result: Mapped[TestResult | None] = relationship(back_populates="videos")
 
-    __table_args__ = (Index("ix_videos_test_result", "test_result_id"),)
+    __table_args__ = (
+        Index("ix_videos_test_result", "test_result_id"),
+        # Duplicate-submission lookups search every video by its bytes' hash.
+        Index("ix_videos_checksum", "checksum_sha256"),
+    )
 
 
 class Flag(Base):
@@ -362,9 +449,15 @@ class Flag(Base):
     )
 
     # Stores WHY, not just that. A dashboard reviewer given "flagged" with no
-    # reason cannot do anything useful with it.
+    # reason cannot do anything useful with it. `reason` is the flag type (a
+    # stable code); `detail` is the reviewer-facing explanation.
     reason: Mapped[str] = mapped_column(String(255), nullable=False)
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # The measurements behind the flag and the limit they crossed (Sprint 12):
+    # where in the video, how much, against what. Null for flags raised before
+    # it existed, and for manual flags. Officials only — it names thresholds.
+    evidence: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     severity: Mapped[FlagSeverity] = mapped_column(
         enum_column(FlagSeverity, 20), nullable=False
@@ -447,6 +540,7 @@ class ReviewActionRecord(Base):
     """Append-only audit trail. Rows are never updated or deleted."""
 
     __tablename__ = "review_actions"
+    __table_args__ = (Index("ix_review_actions_test_result", "test_result_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_new_uuid)
     test_result_id: Mapped[uuid.UUID] = mapped_column(
@@ -459,6 +553,12 @@ class ReviewActionRecord(Base):
         enum_column(ReviewAction, 30), nullable=False
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Sprint 14. A ReviewReason value; null on rows from before it existed and
+    # on approvals, which need no reason.
+    reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # The result's status either side of this action. Null on older rows.
+    previous_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    new_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )

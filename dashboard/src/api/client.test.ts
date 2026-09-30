@@ -120,12 +120,135 @@ describe("DashboardApi", () => {
     expect(url).toContain("offset=25");
   });
 
+  it("lists submissions with filters and the total from X-Total-Count", async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+      json(200, [{ result_id: "r1" }], { "X-Total-Count": "31" }),
+    );
+    const api = new DashboardApi("", memoryStore({ access: "a", refresh: "r" }), () => {}, fetchImpl as typeof fetch);
+
+    const page = await api.submissions({ status: "approved,rejected", sessionId: "s 1", offset: 25 });
+
+    expect(page.total).toBe(31);
+    const url = new URL(String(fetchImpl.mock.calls[0]![0]), "http://x");
+    expect(url.pathname).toBe("/api/dashboard/submissions");
+    expect(url.searchParams.get("status")).toBe("approved,rejected");
+    expect(url.searchParams.get("session_id")).toBe("s 1");
+    expect(url.searchParams.get("limit")).toBe("25");
+    expect(url.searchParams.get("offset")).toBe("25");
+  });
+
+  it("asks the server for sessions by status, and ends one by id", async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => json(200, []));
+    const api = new DashboardApi("", memoryStore({ access: "a", refresh: "r" }), () => {}, fetchImpl as typeof fetch);
+
+    await api.sessions({ status: ["active", "scheduled"] });
+    await api.sessions();
+    await api.endSession("s1");
+
+    expect(String(fetchImpl.mock.calls[0]![0])).toBe("/api/dashboard/sessions?status=active,scheduled");
+    expect(String(fetchImpl.mock.calls[1]![0])).toBe("/api/dashboard/sessions");
+    expect(String(fetchImpl.mock.calls[2]![0])).toBe("/api/dashboard/sessions/s1/end");
+    expect(fetchImpl.mock.calls[2]![1]!.method).toBe("POST");
+  });
+
+  it("revokes the refresh token on sign-out and forgets both tokens at once", async () => {
+    const store = memoryStore({ access: "a1", refresh: "r1" });
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => json(200, { message: "Signed out" }));
+    const api = new DashboardApi("", store, () => {}, fetchImpl as typeof fetch);
+
+    const done = api.logout();
+    // Already gone before the server answers.
+    expect(store.get()).toBeNull();
+    await done;
+
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(String(url)).toBe("/api/dashboard/auth/logout");
+    expect(JSON.parse(String(init!.body))).toEqual({ refresh_token: "r1" });
+    expect((init!.headers as Record<string, string>).Authorization).toBe("Bearer a1");
+  });
+
+  it("still revokes on sign-out when the access token has lapsed", async () => {
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith("/auth/refresh")) {
+        return json(200, { access_token: "a2", refresh_token: "r2", token_type: "bearer", expires_in: 3600, official });
+      }
+      const auth = (init?.headers as Record<string, string>).Authorization;
+      return auth === "Bearer a2" ? json(200, { message: "Signed out" }) : json(401, { detail: "Token expired" });
+    });
+    const api = new DashboardApi("", memoryStore({ access: "old", refresh: "r1" }), () => {}, fetchImpl as typeof fetch);
+
+    await api.logout();
+
+    const last = fetchImpl.mock.calls.at(-1)!;
+    expect(String(last[0])).toBe("/api/dashboard/auth/logout");
+    expect(JSON.parse(String(last[1]!.body))).toEqual({ refresh_token: "r2" });
+  });
+
+  it("signs out even with no network", async () => {
+    const store = memoryStore({ access: "a1", refresh: "r1" });
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    const api = new DashboardApi("", store, () => {}, fetchImpl as typeof fetch);
+
+    await expect(api.logout()).resolves.toBeUndefined();
+    expect(store.get()).toBeNull();
+  });
+
+  it("sends a decision with its reason, severity and the version it was made against", async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+      json(200, { result_id: "r1", action: "flagged", status: "flagged", message: "ok", review_status: "needs_review", review_version: 3 }),
+    );
+    const api = new DashboardApi("", memoryStore({ access: "a", refresh: "r" }), () => {}, fetchImpl as typeof fetch);
+
+    await api.act("r1", { action: "flagged", reason: "form_issue", notes: "  hips drop  ", severity: "high", expectedVersion: 2 });
+
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(String(url)).toBe("/api/dashboard/reviews/r1/action");
+    expect(JSON.parse(String(init!.body))).toEqual({
+      action: "flagged",
+      reason: "form_issue",
+      notes: "hips drop",
+      severity: "high",
+      expected_version: 2,
+    });
+  });
+
+  it("puts every queue filter in the query string for the server to apply", async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => json(200, [], { "X-Total-Count": "0" }));
+    const api = new DashboardApi("", memoryStore({ access: "a", refresh: "r" }), () => {}, fetchImpl as typeof fetch);
+
+    await api.reviewQueue({
+      reviewStatus: "needs_review,invalid",
+      sessionId: "s1",
+      athlete: "Asha K",
+      flags: "high",
+      submittedFrom: "2026-10-01T00:00:00.000Z",
+      submittedTo: "2026-10-02T00:00:00.000Z",
+    });
+
+    const url = new URL(String(fetchImpl.mock.calls[0]![0]), "http://x");
+    expect(url.pathname).toBe("/api/dashboard/reviews");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      review_status: "needs_review,invalid",
+      session_id: "s1",
+      athlete: "Asha K",
+      flags: "high",
+      submitted_from: "2026-10-01T00:00:00.000Z",
+      submitted_to: "2026-10-02T00:00:00.000Z",
+      limit: "25",
+      offset: "0",
+    });
+  });
+
   it("surfaces validation messages from the server", async () => {
     const fetchImpl = vi.fn(async () =>
       json(422, { detail: "Explain the decision in the notes — the athlete will see them" }),
     );
     const api = new DashboardApi("", memoryStore({ access: "a", refresh: "r" }), () => {}, fetchImpl as typeof fetch);
 
-    await expect(api.act("id", "rejected", "")).rejects.toThrow("Explain the decision");
+    await expect(api.act("id", { action: "rejected", reason: "other", notes: "" })).rejects.toThrow(
+      "Explain the decision",
+    );
   });
 });

@@ -174,7 +174,11 @@ def test_the_sprint_8_journey(client, db, settings, seeded_tests):
     # 4. Decide.
     action = client.post(
         f"/api/dashboard/reviews/{result.id}/action",
-        json={"action": "rejected", "notes": "The same reps are shown twice."},
+        json={
+            "action": "rejected",
+            "reason": "duplicate_submission",
+            "notes": "The same reps are shown twice.",
+        },
         headers=headers,
     )
     assert action.status_code == 200, action.text
@@ -547,6 +551,7 @@ def test_requesting_resubmission_is_visible_to_the_athlete(
         token_for(reviewer, settings),
         result,
         action="requested_resubmission",
+        reason="form_issue",
         notes="Your knees were out of frame.",
     )
 

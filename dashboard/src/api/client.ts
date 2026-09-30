@@ -1,5 +1,6 @@
 import type {
   AssessmentSession,
+  AssessmentSessionChanges,
   DashboardStats,
   Leaderboard,
   OfficialProfile,
@@ -8,8 +9,13 @@ import type {
   PoseSequence,
   ReviewActionName,
   ReviewDetail,
-  ReviewItem,
-  ReviewQueuePage,
+  ReviewReason,
+  ReviewStatus,
+  SessionStatus,
+  SubmissionItem,
+  SubmissionPage,
+  TestInfo,
+  VerificationStatus,
 } from "./types";
 
 export class ApiError extends Error {
@@ -53,12 +59,48 @@ export const sessionTokenStore: TokenStore = {
 
 type Fetch = typeof fetch;
 
-export interface QueueFilters {
+/** Filters shared by the review queue and the submission list; all applied by the server. */
+export interface SubmissionFilters {
+  /** Comma-separated result statuses; every status when omitted. */
   status?: string;
+  /** Comma-separated review statuses (the queue defaults to work awaiting a decision). */
+  reviewStatus?: string;
   testType?: string;
   region?: string;
+  sessionId?: string;
+  /** An athlete id, or part of the name. */
+  athlete?: string;
+  /** open | none | low | medium | high (at least that severity, unresolved). */
+  flags?: string;
+  /** ISO instants: from inclusive, to exclusive. */
+  submittedFrom?: string;
+  submittedTo?: string;
   limit?: number;
   offset?: number;
+}
+
+export type QueueFilters = SubmissionFilters;
+
+/** One review action as the reviewer chose it; the server decides whether it is allowed. */
+export interface ReviewDecision {
+  action: ReviewActionName;
+  reason?: ReviewReason;
+  notes: string;
+  /** Only when approving a result the server could not score. */
+  finalScore?: number;
+  /** Only for `flagged`. */
+  severity?: "low" | "medium" | "high";
+  /** The review_version the reviewer was looking at; a stale one is refused with 409. */
+  expectedVersion?: number;
+}
+
+export interface ReviewActionResult {
+  result_id: string;
+  action: ReviewActionName;
+  status: string;
+  message: string;
+  review_status: ReviewStatus | null;
+  review_version: number | null;
 }
 
 export interface LeaderboardFilters {
@@ -96,7 +138,32 @@ export class DashboardApi {
     return this.send("GET", "/api/dashboard/auth/me");
   }
 
-  logout(): void {
+  /**
+   * Revoke this tab's refresh token on the server, then forget both tokens.
+   *
+   * The tokens are dropped before the first await, so signing straight back
+   * in cannot be undone by this call finishing late. Never throws: signing out
+   * must work offline too, and an unrevoked access token lapses within the hour.
+   */
+  async logout(): Promise<void> {
+    const session = this.tokens.get();
+    this.tokens.clear();
+    if (!session) return;
+    try {
+      const response = await this.postLogout(session);
+      if (response.status === 401) {
+        // The access token lapsed. Exchange the refresh token once so the
+        // revocation can be authorised; rotating it has already retired it.
+        const renewed = await this.exchange(session.refresh);
+        if (renewed) await this.postLogout(renewed);
+      }
+    } catch {
+      // Offline. Nothing else to do.
+    }
+  }
+
+  /** Forget the tokens without telling the server (they are already invalid). */
+  clearSession(): void {
     this.tokens.clear();
   }
 
@@ -106,38 +173,45 @@ export class DashboardApi {
 
   // -- reviews -------------------------------------------------------------
 
-  async reviewQueue(filters: QueueFilters): Promise<ReviewQueuePage> {
-    const params = new URLSearchParams();
-    if (filters.status) params.set("status", filters.status);
-    if (filters.testType) params.set("test_type", filters.testType);
-    if (filters.region) params.set("region", filters.region);
-    params.set("limit", String(filters.limit ?? 25));
-    params.set("offset", String(filters.offset ?? 0));
+  async reviewQueue(filters: QueueFilters): Promise<SubmissionPage> {
+    const response = await this.request("GET", `/api/dashboard/reviews?${listParams(filters)}`);
+    const items = (await response.json()) as SubmissionItem[];
+    return { items, total: totalCount(response, items.length) };
+  }
 
-    const response = await this.request("GET", `/api/dashboard/reviews?${params}`);
-    const items = (await response.json()) as ReviewItem[];
-    const total = Number(response.headers.get("X-Total-Count") ?? items.length);
-    return { items, total: Number.isFinite(total) ? total : items.length };
+  // -- submissions (Sprint 13) -----------------------------------------------
+
+  async submissions(filters: SubmissionFilters = {}): Promise<SubmissionPage> {
+    const response = await this.request("GET", `/api/dashboard/submissions?${listParams(filters)}`);
+    const items = (await response.json()) as SubmissionItem[];
+    return { items, total: totalCount(response, items.length) };
+  }
+
+  /** The tests the backend can assess — never a hard-coded list. */
+  tests(): Promise<TestInfo[]> {
+    return this.send("GET", "/api/dashboard/tests");
   }
 
   review(resultId: string): Promise<ReviewDetail> {
     return this.send("GET", `/api/dashboard/reviews/${encodeURIComponent(resultId)}`);
   }
 
+  verification(resultId: string): Promise<VerificationStatus> {
+    return this.send("GET", `/api/verification/${encodeURIComponent(resultId)}`);
+  }
+
   poseSequence(resultId: string): Promise<PoseSequence> {
     return this.send("GET", `/api/dashboard/reviews/${encodeURIComponent(resultId)}/pose`);
   }
 
-  act(
-    resultId: string,
-    action: ReviewActionName,
-    notes: string,
-    finalScore?: number,
-  ): Promise<{ status: string; message: string }> {
+  act(resultId: string, decision: ReviewDecision): Promise<ReviewActionResult> {
     return this.send("POST", `/api/dashboard/reviews/${encodeURIComponent(resultId)}/action`, {
-      action,
-      notes: notes.trim() || null,
-      ...(finalScore !== undefined ? { final_score: finalScore } : {}),
+      action: decision.action,
+      notes: decision.notes.trim() || null,
+      ...(decision.reason ? { reason: decision.reason } : {}),
+      ...(decision.finalScore !== undefined ? { final_score: decision.finalScore } : {}),
+      ...(decision.severity ? { severity: decision.severity } : {}),
+      ...(decision.expectedVersion !== undefined ? { expected_version: decision.expectedVersion } : {}),
     });
   }
 
@@ -156,19 +230,27 @@ export class DashboardApi {
 
   // -- assessment sessions -------------------------------------------------
 
-  sessions(): Promise<AssessmentSession[]> {
-    return this.send("GET", "/api/dashboard/sessions");
+  /** `status` filters on the state the server computes, not the browser's clock. */
+  sessions(filters: { status?: SessionStatus[] } = {}): Promise<AssessmentSession[]> {
+    const query = filters.status?.length ? `?status=${filters.status.join(",")}` : "";
+    return this.send("GET", `/api/dashboard/sessions${query}`);
+  }
+
+  session(sessionId: string): Promise<AssessmentSession> {
+    return this.send("GET", `/api/dashboard/sessions/${encodeURIComponent(sessionId)}`);
   }
 
   createSession(session: NewAssessmentSession): Promise<AssessmentSession> {
     return this.send("POST", "/api/dashboard/sessions", session);
   }
 
-  updateSession(
-    sessionId: string,
-    changes: Partial<NewAssessmentSession>,
-  ): Promise<AssessmentSession> {
+  updateSession(sessionId: string, changes: AssessmentSessionChanges): Promise<AssessmentSession> {
     return this.send("PATCH", `/api/dashboard/sessions/${encodeURIComponent(sessionId)}`, changes);
+  }
+
+  /** Close an active session now, by the server's clock. */
+  endSession(sessionId: string): Promise<AssessmentSession> {
+    return this.send("POST", `/api/dashboard/sessions/${encodeURIComponent(sessionId)}/end`);
   }
 
   deleteSession(sessionId: string): Promise<{ message: string }> {
@@ -244,20 +326,63 @@ export class DashboardApi {
     const session = this.tokens.get();
     if (!session) return false;
 
+    const renewed = await this.exchange(session.refresh);
+    if (!renewed) return false;
+    this.tokens.set(renewed);
+    return true;
+  }
+
+  /** Trade a refresh token for a new pair; null when the server refuses. */
+  private async exchange(refreshToken: string): Promise<{ access: string; refresh: string } | null> {
     try {
       const response = await this.fetchImpl(`${this.baseUrl}/api/dashboard/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: session.refresh }),
+        body: JSON.stringify({ refresh_token: refreshToken }),
       });
-      if (!response.ok) return false;
+      if (!response.ok) return null;
       const body = (await response.json()) as OfficialTokens;
-      this.tokens.set({ access: body.access_token, refresh: body.refresh_token });
-      return true;
+      return { access: body.access_token, refresh: body.refresh_token };
     } catch {
-      return false;
+      return null;
     }
   }
+
+  private postLogout(session: { access: string; refresh: string }): Promise<Response> {
+    return this.fetchImpl(`${this.baseUrl}/api/dashboard/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access}` },
+      body: JSON.stringify({ refresh_token: session.refresh }),
+    });
+  }
+}
+
+function listParams(filters: SubmissionFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  const names: [keyof SubmissionFilters, string][] = [
+    ["status", "status"],
+    ["reviewStatus", "review_status"],
+    ["testType", "test_type"],
+    ["region", "region"],
+    ["sessionId", "session_id"],
+    ["athlete", "athlete"],
+    ["flags", "flags"],
+    ["submittedFrom", "submitted_from"],
+    ["submittedTo", "submitted_to"],
+  ];
+  for (const [key, name] of names) {
+    const value = filters[key];
+    if (value !== undefined && value !== "") params.set(name, String(value));
+  }
+  params.set("limit", String(filters.limit ?? 25));
+  params.set("offset", String(filters.offset ?? 0));
+  return params;
+}
+
+/** Paged lists keep the body a plain array and put the total in a header. */
+function totalCount(response: Response, fallback: number): number {
+  const total = Number(response.headers.get("X-Total-Count") ?? fallback);
+  return Number.isFinite(total) ? total : fallback;
 }
 
 async function errorMessage(response: Response): Promise<string> {

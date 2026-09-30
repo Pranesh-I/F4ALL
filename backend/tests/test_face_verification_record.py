@@ -184,7 +184,7 @@ def test_task_helpers_accept_the_string_ids_celery_delivers(
     import contextlib
 
     import app.tasks as tasks
-    from app.models import Flag, FlagSeverity
+    from app.models import Flag
 
     @contextlib.contextmanager
     def scope():
@@ -197,12 +197,7 @@ def test_task_helpers_accept_the_string_ids_celery_delivers(
 
     monkeypatch.setattr(tasks, "session_scope", scope)
 
-    tasks._flag_and_finish(
-        str(result.id),
-        reason="server_could_not_score",
-        detail="boom",
-        severity=FlagSeverity.high,
-    )
+    tasks._flag_and_finish(str(result.id), detail="boom")
 
     db.expire_all()
     assert db.get(TestResult, result.id).status is TestResultStatus.flagged

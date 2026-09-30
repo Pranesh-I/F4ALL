@@ -1,7 +1,7 @@
 """Operational commands.
 
     python -m app.cli seed                 create the test battery rows
-    python -m app.cli reverify-pending     re-queue submissions stuck in processing
+    python -m app.cli reverify-pending     re-queue submissions awaiting verification
     python -m app.cli reverify <result_id> re-run one submission
     python -m app.cli sla                  report the verification backlog
     python -m app.cli seed-benchmarks      load age/gender norms
@@ -24,7 +24,7 @@ from sqlalchemy import select
 from .config import get_settings
 from .database import session_scope
 from .logging_config import configure_logging
-from .models import Test, TestResult, TestResultStatus
+from .models import AWAITING_VERIFICATION, Test, TestResult
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +207,7 @@ def reverify_pending(older_than_minutes: int = 10) -> int:
         stale = (
             db.execute(
                 select(TestResult).where(
-                    TestResult.status == TestResultStatus.processing,
+                    TestResult.status.in_(AWAITING_VERIFICATION),
                     TestResult.created_at < cutoff,
                 )
             )
@@ -248,7 +248,7 @@ def sla_report() -> int:
         pending = (
             db.execute(
                 select(TestResult).where(
-                    TestResult.status == TestResultStatus.processing
+                    TestResult.status.in_(AWAITING_VERIFICATION)
                 )
             )
             .scalars()

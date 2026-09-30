@@ -141,17 +141,20 @@ def current_official(
     request: Request,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-) -> Official | None:
+) -> Official:
     """Resolve the calling official for dashboard endpoints.
 
     Region scoping in Sprint 8 depends on this returning the right person: a
     regional reviewer must never see another region's athletes.
+
+    The development auth bypass does NOT apply here (Sprint 13). It exists so
+    the mobile app can reach a dev server before it has tokens; the dashboard
+    always signs in, and honouring the bypass meant an anonymous request to a
+    local server was treated as a national admin.
     """
     token = _bearer_token(request)
 
     if token is None:
-        if settings.unauthenticated_allowed:
-            return None
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",

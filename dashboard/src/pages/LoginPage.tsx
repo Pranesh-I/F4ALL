@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { paths } from "../routes";
 
 export function LoginPage() {
   const { official, login } = useAuth();
@@ -11,7 +12,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const from = (location.state as { from?: string } | null)?.from ?? "/reviews";
+  const from = (location.state as { from?: string } | null)?.from ?? paths.dashboard;
 
   if (official) return <Navigate to={from} replace />;
 
@@ -40,7 +41,7 @@ export function LoginPage() {
       >
         <div>
           <h1 className="text-xl font-semibold">Official sign in</h1>
-          <p className="mt-1 text-sm text-slate-600">SAI talent assessment review dashboard</p>
+          <p className="mt-1 text-sm text-slate-600">SAI talent assessment admin dashboard</p>
         </div>
 
         <label className="block text-sm">

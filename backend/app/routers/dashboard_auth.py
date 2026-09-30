@@ -19,6 +19,8 @@ from ..config import Settings, get_settings
 from ..database import get_db
 from ..models import Official, RefreshToken
 from ..schemas import (
+    LogoutRequest,
+    MessageResponse,
     OfficialLoginRequest,
     OfficialProfileResponse,
     OfficialTokenResponse,
@@ -130,10 +132,39 @@ def refresh(
 
 
 @router.get("/me", response_model=OfficialProfileResponse)
-def me(official: Official | None = Depends(current_official)):
-    if official is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Authentication required")
+def me(official: Official = Depends(current_official)):
     return official_profile(official)
+
+
+@router.post("/logout", response_model=MessageResponse)
+def logout(
+    payload: LogoutRequest,
+    db: Session = Depends(get_db),
+    official: Official = Depends(current_official),
+):
+    """Revoke this browser's refresh token, or every one the official holds.
+
+    Clearing the tab's storage alone leaves a refresh token that still works
+    for 90 days if it was copied, and these accounts approve children's
+    results. The access token lapses on its own within the hour.
+    """
+    if payload.all_devices:
+        revoked = token_service.revoke_all_for_subject(db, official.id)
+        return MessageResponse(message=f"Signed out of {revoked} session(s)")
+
+    if payload.refresh_token:
+        record = db.execute(
+            select(RefreshToken).where(
+                RefreshToken.token_hash
+                == token_service.hash_refresh_token(payload.refresh_token)
+            )
+        ).scalar_one_or_none()
+        # Only this official's own token; someone else's is left alone.
+        if record is not None and record.subject_id == official.id:
+            token_service.revoke_refresh_token(db, payload.refresh_token)
+
+    # Same answer whether or not the token was live, as for athletes.
+    return MessageResponse(message="Signed out")
 
 
 def _token_response(

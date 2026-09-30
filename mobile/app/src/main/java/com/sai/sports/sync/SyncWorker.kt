@@ -163,7 +163,8 @@ class SyncWorker(
                     // inside the session, however late the phone found signal.
                     sessionId = entity.sessionId,
                     recordedAtMs = entity.recordedAtMs,
-                    identityCheckId = identityCheckId
+                    identityCheckId = identityCheckId,
+                    provisionalFormScore = repository.formScore(entity.id)
                 )
             }
 

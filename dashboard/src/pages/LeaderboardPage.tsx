@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { ErrorState } from "../components/StateViews";
 import { REGIONS, TEST_NAMES, formatDateTime, formatScore } from "../lib/format";
 
 const AGE_GROUPS = [
@@ -78,9 +79,7 @@ export function LeaderboardPage() {
       </div>
 
       {board.isError && (
-        <p role="alert" className="text-red-700">
-          Could not load the leaderboard: {(board.error as Error).message}
-        </p>
+        <ErrorState title="Could not load the leaderboard" error={board.error} onRetry={() => board.refetch()} />
       )}
 
       <div className="overflow-x-auto rounded border border-slate-200 bg-white">

@@ -21,7 +21,9 @@ export function VideoWithSkeleton({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showSkeleton, setShowSkeleton] = useState(true);
-  const [failed, setFailed] = useState(false);
+  // The media error code, when the recording cannot play: 4 is a format the
+  // browser cannot decode, which reloading would not fix.
+  const [failed, setFailed] = useState<number | null>(null);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -101,10 +103,19 @@ export function VideoWithSkeleton({
     };
   }, [pose, showSkeleton]);
 
-  if (failed) {
+  if (failed !== null) {
     return (
-      <div className="flex aspect-[9/16] max-h-[70vh] items-center justify-center rounded bg-slate-900 p-6 text-center text-sm text-slate-200">
-        The recording could not be loaded. Its link may have expired — reload the page.
+      <div className="flex aspect-[9/16] max-h-[70vh] flex-col items-center justify-center gap-3 rounded bg-slate-900 p-6 text-center text-sm text-slate-200">
+        {failed === 4 ? (
+          <>
+            <p>This browser cannot play the recording&apos;s video format.</p>
+            <a href={src} className="underline" target="_blank" rel="noreferrer">
+              Open the recording to watch it in another player
+            </a>
+          </>
+        ) : (
+          <p>The recording could not be loaded. Its link may have expired — reload the page.</p>
+        )}
       </div>
     );
   }
@@ -118,7 +129,7 @@ export function VideoWithSkeleton({
           controls
           playsInline
           preload="metadata"
-          onError={() => setFailed(true)}
+          onError={(event) => setFailed(event.currentTarget.error?.code ?? 0)}
           className="mx-auto block max-h-[70vh] w-full object-contain"
         />
         <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />

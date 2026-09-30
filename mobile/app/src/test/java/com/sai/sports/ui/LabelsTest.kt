@@ -76,7 +76,7 @@ class LabelsTest {
 
     @Test
     fun `every server code the app can receive is translated`() {
-        listOf("processing", "verified", "flagged", "approved", "rejected", "pending_sync").forEach {
+        listOf("uploaded", "processing", "verified", "flagged", "approved", "rejected", "pending_sync").forEach {
             assertNotEquals(it, R.string.status_unknown, Labels.resultStatus(it))
         }
         listOf("first_test", "first_verified", "personal_best", "all_tests",

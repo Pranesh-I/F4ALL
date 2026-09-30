@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     upload_max_file_bytes: int = 200 * 1024 * 1024
     upload_session_ttl_hours: int = 72
     upload_staging_path: Path = Path("./var/uploads")
+    # The app transcodes every recording to H.264 MP4 before upload
+    # (VideoCompressor.kt), so that is the only type accepted.
+    upload_allowed_content_types: list[str] = ["video/mp4"]
 
     # --- Verification ---
     # Sprint 5's Definition of Done asks for an SLA. Five minutes from upload to
@@ -105,9 +108,37 @@ class Settings(BaseSettings):
     verification_sla_seconds: int = 300
 
     # A device score this far from the server's is auto-flagged for review.
-    # Both are absolute, in the test's own unit.
+    # Both are absolute, in the test's own unit, and a difference exactly at
+    # the tolerance is accepted.
+    #
+    # Why these values (Sprint 5, kept in Sprint 11): the Sprint 3 accuracy
+    # target is +/-1 rep and +/-3 cm against a human count
+    # (verification/thresholds.py TARGET_*). Two measurements that each meet
+    # the rep target can disagree by 2, so 2 reps never flags an in-spec pair.
+    # 5 cm is slightly stricter than the 6 cm two in-spec jump measurements
+    # could differ by; a flag only routes to a reviewer, never rejects.
+    # Neither has been calibrated against real recordings yet
+    # (docs/reference-videos is empty) — revisit once it is not.
     discrepancy_tolerance_reps: float = 2.0
     discrepancy_tolerance_cm: float = 5.0
+
+    # Scores that agree are still flagged when the server's tracking quality
+    # (the analyzer's confidence, 0..1) is below this. Moved here from a
+    # constant in verification/discrepancy.py in Sprint 11; value unchanged.
+    verification_min_confidence: float = 0.55
+
+    # --- Integrity (anti-cheat) limits, Sprint 12 ---
+    # None keeps the default documented beside each check in
+    # verification/cheat/ (with the measurement behind it); set one only to
+    # tune against pilot data. See verification/cheat/limits.py.
+    integrity_multi_person_fraction: float | None = None
+    integrity_min_subject_fraction: float | None = None
+    integrity_confident_subject_fraction: float | None = None
+    integrity_duplicate_frame_ratio: float | None = None
+    integrity_fast_rep_fraction: float | None = None
+    integrity_max_hip_speed: float | None = None
+    integrity_jump_time_scale_limit: float | None = None
+    integrity_near_duplicate_mae: float | None = None
 
     # --- Assessment sessions ---
     # An official attempt must be recorded inside its session's window, but may

@@ -108,7 +108,7 @@ def evaluate(
     # Scores agree, but the server barely saw the athlete. Accepting a
     # confident-looking number derived from mostly-unusable frames is how a bad
     # result reaches an official with nothing marking it as shaky.
-    if server_result.confidence < LOW_CONFIDENCE_THRESHOLD:
+    if server_result.confidence < settings.verification_min_confidence:
         return DiscrepancyOutcome(
             verdict=Verdict.FLAGGED,
             server_score=server_result.score,
@@ -131,6 +131,3 @@ def evaluate(
         difference=difference,
         tolerance=tolerance,
     )
-
-
-LOW_CONFIDENCE_THRESHOLD = 0.55

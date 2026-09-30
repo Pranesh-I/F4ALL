@@ -3,6 +3,7 @@ package com.sai.sports.data
 import android.content.Context
 import android.util.Log
 import com.sai.sports.analyzer.AttemptStatus
+import com.sai.sports.coach.FormSummary
 import com.sai.sports.data.local.F4allDatabase
 import com.sai.sports.data.local.SessionAttemptRow
 import com.sai.sports.data.local.TestAttemptDao
@@ -52,6 +53,14 @@ class SyncRepository(
         dao.sessionAttempts(athleteId, sessionId)
 
     suspend fun find(id: String): TestAttemptEntity? = dao.findById(id)
+
+    /**
+     * The attempt's form score, rebuilt from its stored analyzer trace. Null
+     * for a jump, or when the attempt's files are gone — the server then has
+     * only its own number, which is the one that counts anyway.
+     */
+    fun formScore(id: String): Int? =
+        attemptStore.load(id)?.let { FormSummary.from(it.result.events)?.scorePercent }
 
     suspend fun workQueue(athleteId: String): List<TestAttemptEntity> = dao.findWorkQueue(athleteId)
 

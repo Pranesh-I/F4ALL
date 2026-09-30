@@ -19,6 +19,7 @@ three times per submission, which multiplies straight into the verification SLA.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -58,7 +59,67 @@ SIGNATURE_SIZE = 16
 
 
 class ExtractionError(RuntimeError):
-    pass
+    """The pose pipeline could not run: missing model, missing native libraries.
+
+    An infrastructure failure. Retrying may help; the video is not at fault.
+    """
+
+
+class VideoUnreadableError(ExtractionError):
+    """The file itself cannot be decoded — corrupt, truncated, or not a video.
+
+    A property of the submission, not of the server. Retrying the same bytes
+    cannot fix it, so the worker must not treat it like ``ExtractionError``.
+    ``code`` is the validation code the verdict records.
+    """
+
+    def __init__(self, message: str, code: str = "video_unreadable") -> None:
+        super().__init__(message)
+        self.code = code
+
+
+@dataclass(frozen=True)
+class VideoProbe:
+    """What the container says, plus whether a first frame actually decodes."""
+
+    fps: float | None
+    declared_frame_count: int | None
+    width: int | None
+    height: int | None
+    first_frame_decoded: bool
+
+    @property
+    def duration_seconds(self) -> float | None:
+        if self.fps and self.declared_frame_count and self.fps > 0:
+            return self.declared_frame_count / self.fps
+        return None
+
+
+def probe_video(video_path: Path) -> VideoProbe:
+    """Open the video and decode one frame, without loading the pose model.
+
+    Cheap enough to run before the full pass, so an unreadable file is
+    reported as such instead of costing a model load first.
+    """
+    try:
+        import cv2
+    except ImportError as exc:  # pragma: no cover - depends on install
+        raise ExtractionError("opencv is required to read uploaded videos") from exc
+
+    capture = cv2.VideoCapture(str(video_path))
+    try:
+        if not capture.isOpened():
+            raise VideoUnreadableError(f"Could not open video {Path(video_path).name}")
+        ok, _ = capture.read()
+        return VideoProbe(
+            fps=capture.get(cv2.CAP_PROP_FPS) or None,
+            declared_frame_count=int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0) or None,
+            width=int(capture.get(cv2.CAP_PROP_FRAME_WIDTH) or 0) or None,
+            height=int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0) or None,
+            first_frame_decoded=bool(ok),
+        )
+    finally:
+        capture.release()
 
 
 @dataclass
@@ -76,7 +137,39 @@ class VideoAnalysis:
     # People detected per frame.
     pose_counts: list[int] = field(default_factory=list)
 
+    # Largest change in any cell of a 64x64 greyscale grid since the previous
+    # frame (None for the first). What duplicated-frame detection reads — the
+    # 16x16 signature averages away a small, slowly moving athlete.
+    frame_changes: list[float | None] = field(default_factory=list)
+
     metadata: VideoMetadata | None = None
+
+    # How the pass went, recorded with the verdict: frames the container
+    # declared against frames that decoded, and how long decoding took.
+    declared_frame_count: int | None = None
+    decode_ms: int | None = None
+
+    @property
+    def frames_with_subject(self) -> int:
+        return sum(1 for count in self.pose_counts if count > 0)
+
+    def processing_metadata(self) -> dict:
+        metadata = self.metadata
+        return {
+            "frames_decoded": len(self.frames),
+            "frames_declared": self.declared_frame_count,
+            "frames_with_subject": self.frames_with_subject,
+            "fps": metadata.fps if metadata else None,
+            "width": metadata.width if metadata else None,
+            "height": metadata.height if metadata else None,
+            "duration_seconds": (
+                round(metadata.duration_seconds, 2)
+                if metadata and metadata.duration_seconds is not None
+                else None
+            ),
+            "file_size_bytes": metadata.file_size_bytes if metadata else None,
+            "decode_ms": self.decode_ms,
+        }
 
 
 def model_path(models_dir: Path) -> Path:
@@ -121,6 +214,23 @@ def frame_signature(image_bgr) -> bytes:
     return bytes(resized.astype("uint8").ravel())
 
 
+CHANGE_GRID_SIZE = 64
+
+
+def change_grid(image_bgr):
+    """Greyscale 64x64 downsample used for frame-to-frame change."""
+    import cv2
+
+    grey = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    return cv2.resize(
+        grey, (CHANGE_GRID_SIZE, CHANGE_GRID_SIZE), interpolation=cv2.INTER_AREA
+    ).astype("int16")
+
+
+def largest_change(previous, current) -> float:
+    return float(abs(current - previous).max())
+
+
 def analyze_video(
     video_path: Path,
     models_dir: Path,
@@ -159,9 +269,10 @@ def analyze_video(
 
     capture = cv2.VideoCapture(str(video_path))
     if not capture.isOpened():
-        raise ExtractionError(f"Could not open video {video_path}")
+        raise VideoUnreadableError(f"Could not open video {Path(video_path).name}")
 
     analysis = VideoAnalysis()
+    started = time.perf_counter()
 
     try:
         declared_fps = capture.get(cv2.CAP_PROP_FPS) or 0.0
@@ -171,6 +282,7 @@ def analyze_video(
 
         with vision.PoseLandmarker.create_from_options(options) as landmarker:
             frame_index = 0
+            previous_grid = None
 
             while True:
                 ok, image = capture.read()
@@ -192,6 +304,13 @@ def analyze_video(
                 if collect_hashes:
                     analysis.frame_hashes.append(perceptual_hash(image))
                     analysis.frame_signatures.append(frame_signature(image))
+                    grid = change_grid(image)
+                    analysis.frame_changes.append(
+                        largest_change(previous_grid, grid)
+                        if previous_grid is not None
+                        else None
+                    )
+                    previous_grid = grid
 
                 rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
@@ -225,6 +344,17 @@ def analyze_video(
                 frame_index += 1
 
         actual_count = len(analysis.frames)
+
+        # The container opened but not one frame decoded: a corrupt or
+        # truncated file. An empty analysis here would reach the analyzers as
+        # "no athlete visible", which blames the athlete for a broken file.
+        if actual_count == 0 and max_frames != 0:
+            raise VideoUnreadableError(
+                f"No frames could be decoded from {Path(video_path).name}",
+                code="no_decodable_frames",
+            )
+
+        analysis.declared_frame_count = declared_count or None
         duration_seconds = None
 
         if declared_fps and declared_fps > 0:
@@ -250,11 +380,14 @@ def analyze_video(
     finally:
         capture.release()
 
+    analysis.decode_ms = int((time.perf_counter() - started) * 1000)
+
     logger.info(
-        "Analysed %s: %d frames, %d with a subject",
+        "Analysed %s: %d frames, %d with a subject, in %dms",
         Path(video_path).name,
         len(analysis.frames),
-        sum(1 for count in analysis.pose_counts if count > 0),
+        analysis.frames_with_subject,
+        analysis.decode_ms,
     )
 
     return analysis

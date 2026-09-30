@@ -41,7 +41,7 @@ def upload_a_video(client, test_type: str = "SIT_UPS") -> str:
     ).json()["video_id"]
 
 
-def test_submission_creates_a_processing_result(client, seeded_tests):
+def test_submission_creates_a_result_awaiting_verification(client, seeded_tests):
     video_id = upload_a_video(client)
 
     response = client.post(
@@ -58,8 +58,9 @@ def test_submission_creates_a_processing_result(client, seeded_tests):
     body = response.json()
 
     # Never "verified" on submission. The device's number is provisional until
-    # the server has independently re-scored the video.
-    assert body["status"] == "processing"
+    # the server has independently re-scored the video; `uploaded` until a
+    # worker claims it (Sprint 11 lifecycle).
+    assert body["status"] == "uploaded"
     assert body["result_id"]
 
 
@@ -162,6 +163,24 @@ def test_unknown_result_is_404(client, seeded_tests):
     assert client.get(f"/api/results/{uuid.uuid4()}").status_code == 404
 
 
+def admin_headers(client, db) -> dict[str, str]:
+    """The dashboard needs a signed-in official, even on a development server."""
+    from app.config import get_settings
+    from app.models import Official, OfficialRole
+    from app.security import create_access_token
+
+    admin = Official(
+        id=uuid.uuid4(), name="Admin", email="admin@sai.example",
+        role=OfficialRole.sai_admin,
+    )
+    db.add(admin)
+    db.commit()
+    token = create_access_token(
+        str(admin.id), client.app.dependency_overrides[get_settings](), role="sai_admin"
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_review_queue_defaults_to_work_needing_a_human(client, seeded_tests, db):
     flagged = client.post(
         "/api/tests/submit",
@@ -181,7 +200,9 @@ def test_review_queue_defaults_to_work_needing_a_human(client, seeded_tests, db)
         db.add(record)
     db.commit()
 
-    queue = client.get("/api/dashboard/reviews").json()
+    queue = client.get(
+        "/api/dashboard/reviews", headers=admin_headers(client, db)
+    ).json()
     ids = {item["result_id"] for item in queue}
 
     assert flagged["result_id"] in ids
@@ -203,7 +224,10 @@ def test_review_queue_filters_by_test_type(client, seeded_tests, db):
         db.add(record)
     db.commit()
 
-    queue = client.get("/api/dashboard/reviews?test_type=VERTICAL_JUMP").json()
+    queue = client.get(
+        "/api/dashboard/reviews?test_type=VERTICAL_JUMP",
+        headers=admin_headers(client, db),
+    ).json()
 
     assert len(queue) == 1
     assert queue[0]["test_type"] == "VERTICAL_JUMP"
@@ -267,9 +291,11 @@ def test_review_action_is_recorded_for_audit(client, seeded_tests, db, official)
     ).json()
 
     result = db.get(TestResult, uuid.UUID(submit["result_id"]))
+    # A decision needs the machine verdict first (Sprint 14).
+    result.status = TestResultStatus.flagged
     athlete = db.get(Athlete, result.athlete_id)
     athlete.region = official.region
-    db.add(athlete)
+    db.add_all([result, athlete])
     db.commit()
 
     token = create_access_token(
@@ -278,17 +304,24 @@ def test_review_action_is_recorded_for_audit(client, seeded_tests, db, official)
         role="regional_reviewer",
     )
 
-    client.post(
+    response = client.post(
         f"/api/dashboard/reviews/{submit['result_id']}/action",
-        json={"action": "rejected", "notes": "Wrong person in frame"},
+        json={
+            "action": "rejected",
+            "reason": "identity_mismatch",
+            "notes": "Wrong person in frame",
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
+    assert response.status_code == 200, response.text
 
     records = db.query(ReviewActionRecord).all()
 
     assert len(records) == 1
     assert records[0].official_id == official.id
     assert records[0].notes == "Wrong person in frame"
+    assert records[0].reason == "identity_mismatch"
+    assert (records[0].previous_status, records[0].new_status) == ("flagged", "rejected")
 
 
 def test_review_action_requires_an_identified_official(client, seeded_tests):

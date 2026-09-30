@@ -1,46 +1,43 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
-import { SeverityBadge, StatusBadge } from "../components/Badges";
+import { useTestCatalog } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
-import { REGIONS, TEST_NAMES, formatDateTime, formatScore, testName } from "../lib/format";
+import { PageHeader } from "../components/PageHeader";
+import { EmptyState, ErrorState, LoadingState } from "../components/StateViews";
+import { SubmissionFilters, useListFilters } from "../components/SubmissionFilters";
+import { SubmissionTable } from "../components/SubmissionTable";
+import { paths } from "../routes";
 
 const PAGE_SIZE = 25;
 
+/** Tabs are review states the server computes; the empty key is its default. */
 const TABS = [
-  { key: "", label: "Needs review", hint: "Flagged and still processing" },
-  { key: "verified", label: "Awaiting approval", hint: "Server agreed with the phone" },
-  { key: "approved,rejected,pending_sync", label: "Decided", hint: "Already acted on" },
+  { key: "", label: "Needs a decision", hint: "Flagged, or the server could not verify it" },
+  { key: "awaiting_approval", label: "Awaiting approval", hint: "The server agreed with the phone" },
+  { key: "awaiting_verification", label: "Being verified", hint: "Not decidable until the server's verdict is in" },
+  { key: "approved,rejected,resubmission_requested", label: "Decided", hint: "Already acted on" },
 ] as const;
 
+const EMPTY: Record<string, string> = {
+  "": "Nothing is waiting for a decision.",
+  awaiting_approval: "Nothing is waiting for approval.",
+  awaiting_verification: "Nothing is being verified right now.",
+  "approved,rejected,resubmission_requested": "Nothing has been decided yet.",
+};
+
+/**
+ * The reviewer's work queue: most severe unresolved flags first, then oldest.
+ * Filtering, ordering and paging all happen on the server.
+ */
 export function QueuePage() {
-  const { api, official } = useAuth();
-  const [params, setParams] = useSearchParams();
-
-  const status = params.get("status") ?? "";
-  const testType = params.get("test_type") ?? "";
-  const region = params.get("region") ?? "";
-  const page = Math.max(0, Number(params.get("page") ?? 0) || 0);
-
-  const update = (changes: Record<string, string>) => {
-    const next = new URLSearchParams(params);
-    for (const [key, value] of Object.entries(changes)) {
-      if (value) next.set(key, value);
-      else next.delete(key);
-    }
-    if (!("page" in changes)) next.delete("page");
-    setParams(next);
-  };
+  const { api } = useAuth();
+  const { nameOf } = useTestCatalog();
+  const filters = useListFilters();
+  const tab = filters.values.review_status;
+  const { page } = filters;
 
   const queue = useQuery({
-    queryKey: ["reviews", status, testType, region, page],
-    queryFn: () =>
-      api.reviewQueue({
-        status: status || undefined,
-        testType: testType || undefined,
-        region: region || undefined,
-        limit: PAGE_SIZE,
-        offset: page * PAGE_SIZE,
-      }),
+    queryKey: ["reviews", filters.api, page],
+    queryFn: () => api.reviewQueue({ ...filters.api, limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
     placeholderData: keepPreviousData,
   });
 
@@ -51,161 +48,80 @@ export function QueuePage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Review queue</h1>
-        {stats.data && (
-          <div className="flex flex-wrap gap-2 text-sm">
-            <Stat label="Flagged" value={stats.data.by_status.flagged} />
-            <Stat label="High severity" value={stats.data.flagged_high_severity} tone="red" />
-            <Stat label="Awaiting approval" value={stats.data.by_status.verified} />
-            <Stat
-              label="Over SLA"
-              value={stats.data.breaching_sla}
-              tone={stats.data.breaching_sla > 0 ? "red" : undefined}
-            />
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Review queue"
+        description="Most severe unresolved flags first, then oldest."
+        actions={
+          stats.data && (
+            <div className="flex flex-wrap gap-2 text-sm">
+              <Stat label="Flagged" value={stats.data.by_status.flagged} />
+              <Stat label="High severity" value={stats.data.flagged_high_severity} tone="red" />
+              <Stat label="Awaiting approval" value={stats.data.by_status.verified} />
+              <Stat label="Over SLA" value={stats.data.breaching_sla} tone="red" />
+            </div>
+          )
+        }
+      />
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200">
-        {TABS.map((tab) => (
+      <div className="flex flex-wrap gap-2 border-b border-slate-200" role="tablist" aria-label="Review state">
+        {TABS.map((item) => (
           <button
-            key={tab.key}
+            key={item.key}
             type="button"
-            title={tab.hint}
-            onClick={() => update({ status: tab.key })}
+            role="tab"
+            title={item.hint}
+            aria-selected={tab === item.key}
+            onClick={() => filters.update({ review_status: item.key })}
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
-              status === tab.key
-                ? "border-slate-900 text-slate-900"
-                : "border-transparent text-slate-500 hover:text-slate-800"
+              tab === item.key ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            {tab.label}
+            {item.label}
           </button>
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <select
-          aria-label="Test"
-          value={testType}
-          onChange={(event) => update({ test_type: event.target.value })}
-          className="rounded border border-slate-300 bg-white px-3 py-2 text-sm"
-        >
-          <option value="">All tests</option>
-          {Object.entries(TEST_NAMES).map(([code, name]) => (
-            <option key={code} value={code}>
-              {name}
-            </option>
-          ))}
-        </select>
+      <SubmissionFilters filters={filters} keepOnClear={["review_status"]} />
 
-        {official?.role === "sai_admin" && (
-          <select
-            aria-label="Region"
-            value={region}
-            onChange={(event) => update({ region: event.target.value })}
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
-            <option value="">All regions</option>
-            {REGIONS.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-
+      {queue.isLoading && <LoadingState label="Loading the queue…" />}
       {queue.isError && (
-        <p role="alert" className="text-red-700">
-          Could not load the queue: {(queue.error as Error).message}
-        </p>
+        <ErrorState title="Could not load the queue" error={queue.error} onRetry={() => queue.refetch()} />
+      )}
+      {queue.data?.items.length === 0 && (
+        <EmptyState title={filters.active ? "No submissions match these filters." : (EMPTY[tab] ?? "Nothing here.")}>
+          {filters.active ? "Try a different test, session, athlete or date." : "New submissions appear here once the server has verified them."}
+        </EmptyState>
       )}
 
-      <div className="overflow-x-auto rounded border border-slate-200 bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-600">
-            <tr>
-              <th className="px-3 py-2">Severity</th>
-              <th className="px-3 py-2">Athlete</th>
-              <th className="px-3 py-2">Test</th>
-              <th className="px-3 py-2 text-right">Phone</th>
-              <th className="px-3 py-2 text-right">Server</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Submitted</th>
-            </tr>
-          </thead>
-          <tbody>
-            {queue.isLoading && (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                  Loading…
-                </td>
-              </tr>
-            )}
-            {queue.data?.items.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                  Nothing here.
-                </td>
-              </tr>
-            )}
-            {queue.data?.items.map((item) => (
-              <tr key={item.result_id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-3 py-2">
-                  <SeverityBadge severity={item.max_severity} />
-                </td>
-                <td className="px-3 py-2">
-                  <Link to={`/reviews/${item.result_id}`} className="font-medium text-blue-700 hover:underline">
-                    {item.athlete_name}
-                  </Link>
-                  <div className="text-xs text-slate-500">{item.region}</div>
-                </td>
-                <td className="px-3 py-2">
-                  {testName(item.test_type)}
-                  <span className="text-xs text-slate-500"> · attempt {item.attempt_number}</span>
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {formatScore(item.provisional_score, item.unit)}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {formatScore(item.server_score, item.unit)}
-                </td>
-                <td className="px-3 py-2">
-                  <StatusBadge status={item.status} />
-                </td>
-                <td className="px-3 py-2 text-slate-600">{formatDateTime(item.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="flex items-center justify-between text-sm text-slate-600">
-        <span>{total} result(s)</span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={page === 0}
-            onClick={() => update({ page: String(page - 1) })}
-            className="rounded border border-slate-300 px-3 py-1 disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <span>
-            Page {page + 1} of {pages}
-          </span>
-          <button
-            type="button"
-            disabled={page + 1 >= pages}
-            onClick={() => update({ page: String(page + 1) })}
-            className="rounded border border-slate-300 px-3 py-1 disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      {queue.data && queue.data.items.length > 0 && (
+        <>
+          <SubmissionTable items={queue.data.items} nameOf={nameOf} variant="review" linkTo={paths.review} />
+          <div className="flex items-center justify-between text-sm text-slate-600">
+            <span>{total} submission(s)</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={page === 0}
+                onClick={() => filters.update({ page: String(page - 1) })}
+                className="rounded border border-slate-300 px-3 py-1 disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <span>
+                Page {page + 1} of {pages}
+              </span>
+              <button
+                type="button"
+                disabled={page + 1 >= pages}
+                onClick={() => filters.update({ page: String(page + 1) })}
+                className="rounded border border-slate-300 px-3 py-1 disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

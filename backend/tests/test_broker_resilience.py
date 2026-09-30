@@ -22,7 +22,7 @@ import uuid
 
 import pytest
 
-from app.models import TestResult, TestResultStatus
+from app.models import AWAITING_VERIFICATION, TestResult, TestResultStatus
 
 
 @pytest.fixture
@@ -72,7 +72,9 @@ def test_submission_succeeds_when_the_broker_is_unreachable(
     assert result.provisional_score is not None
 
 
-def test_unverified_submission_stays_in_processing(broker_down, seeded_tests, db):
+def test_unverified_submission_stays_awaiting_verification(
+    broker_down, seeded_tests, db
+):
     response = broker_down.post(
         "/api/tests/submit",
         json={"test_id": "SIT_UPS", "provisional_score": 22},
@@ -80,10 +82,11 @@ def test_unverified_submission_stays_in_processing(broker_down, seeded_tests, db
 
     result = db.get(TestResult, uuid.UUID(response.json()["result_id"]))
 
-    # `processing` is what `python -m app.cli reverify-pending` looks for. If it
-    # were marked verified or failed, the reconciliation sweep would skip it and
-    # the test would never be scored.
-    assert result.status == TestResultStatus.processing
+    # Awaiting verification is what `python -m app.cli reverify-pending` looks
+    # for. If it were marked verified or failed, the reconciliation sweep would
+    # skip it and the test would never be scored.
+    assert result.status == TestResultStatus.uploaded
+    assert result.status in AWAITING_VERIFICATION
     assert result.server_score is None
 
 
