@@ -1,5 +1,6 @@
 import type { ReviewDetail, VerificationStatus } from "../../api/types";
 import { formatScore, scoreDifference } from "../../lib/format";
+import { Stamp } from "../Trials";
 
 interface Row {
   label: string;
@@ -71,7 +72,7 @@ export function ResultComparison({
     <div className="space-y-3 text-sm">
       <table className="w-full">
         <caption className="sr-only">Phone and server results</caption>
-        <thead className="text-left text-slate-500">
+        <thead className="border-b-2 border-ink text-left text-xs [&_th]:label-caps">
           <tr>
             <th className="py-1 font-normal" />
             <th scope="col" className="py-1 text-right font-normal">
@@ -84,21 +85,22 @@ export function ResultComparison({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.label} className="border-t border-slate-100">
+            <tr key={row.label} className="border-t border-rule">
               <th scope="row" className="py-1.5 text-left font-normal">
                 {row.label}
               </th>
-              <td className="py-1.5 text-right tabular-nums">{row.phone}</td>
-              <td className="py-1.5 text-right tabular-nums">{row.server}</td>
+              {/* The phone's number in pencil; the server's, which counts, in ink. */}
+              <td className="numerals py-1.5 text-right text-lg text-pencil">{row.phone}</td>
+              <td className="numerals py-1.5 text-right text-lg">{row.server}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
       {difference === null ? (
-        <p className="text-slate-600">No comparison — the server has not scored this recording.</p>
+        <p className="text-pencil">No comparison — the server has not scored this recording.</p>
       ) : (
-        <p className={exceeded ? "font-medium text-red-700" : "text-slate-700"}>
+        <p className={exceeded ? "font-medium text-redpen" : "text-ink"}>
           Server minus phone: {difference > 0 ? "+" : ""}
           {formatScore(difference, unit)}
           {tolerance !== null && (
@@ -112,7 +114,7 @@ export function ResultComparison({
       )}
 
       {(confidence !== null || framesAnalyzed !== null || attempts || invalidReason) && (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-pencil">
           {confidence !== null && (
             <>
               <dt>Server tracking confidence</dt>
@@ -154,11 +156,14 @@ export function ResultComparison({
         </dl>
       )}
 
-      <p>
-        <span className="text-slate-500">Official score: </span>
-        <span className="font-medium">
-          {result.final_score !== null ? formatScore(result.final_score, unit) : "Not decided"}
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span>
+          <span className="text-pencil">Official score: </span>
+          <span className={result.final_score !== null ? "numerals text-2xl" : "font-medium"}>
+            {result.final_score !== null ? formatScore(result.final_score, unit) : "Not decided"}
+          </span>
         </span>
+        {result.final_score !== null && <Stamp caption="SAI" decorative />}
       </p>
     </div>
   );

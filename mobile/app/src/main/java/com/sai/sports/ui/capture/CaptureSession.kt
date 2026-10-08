@@ -52,6 +52,14 @@ class CaptureSession {
         private set
 
     /**
+     * Reps the analyzer saw but did not count in this attempt — too shallow,
+     * too fast, poor form. Drawn as red-pen crosses after the tally, so the
+     * athlete sees a rep was missed, not just that the number did not move.
+     */
+    var liveMissed by mutableStateOf(0)
+        private set
+
+    /**
      * Called on the pose thread with cues to say aloud. The coach has already
      * applied cooldowns; the listener only has to speak.
      */
@@ -121,6 +129,7 @@ class CaptureSession {
         coach = if (testType.countsReps) FormCoach() else null
         eventsSeen = 0
         liveCue = null
+        liveMissed = 0
 
         sequenceRecorder.clear()
         liveScore = 0.0
@@ -194,6 +203,7 @@ class CaptureSession {
 
         val newEvents = analyzer.eventsSince(eventsSeen)
         eventsSeen += newEvents.size
+        liveMissed += newEvents.count { it.label.startsWith(REJECTED_REP_PREFIX) }
 
         val update = coach.update(
             timestampMs = timestampMs,
@@ -257,6 +267,7 @@ class CaptureSession {
         liveCue = null
         coach?.reset()
         eventsSeen = 0
+        liveMissed = 0
     }
 
     data class Outcome(
@@ -277,3 +288,6 @@ sealed interface LiveHint {
     data object Airborne : LiveHint
     data object Failed : LiveHint
 }
+
+/** Every analyzer event for a rep that was not counted starts with this. */
+private const val REJECTED_REP_PREFIX = "rep_rejected"

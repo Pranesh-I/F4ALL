@@ -28,7 +28,7 @@ export function SessionCreatePage() {
         title="New assessment session"
         description="Sessions are created switched off unless you enable them. The server decides when an enabled session is active."
         back={
-          <Link to={paths.sessions} className="text-blue-700 hover:underline">
+          <Link to={paths.sessions} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
             ← Sessions
           </Link>
         }

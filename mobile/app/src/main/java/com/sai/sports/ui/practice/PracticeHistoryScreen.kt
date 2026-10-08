@@ -1,18 +1,13 @@
 package com.sai.sports.ui.practice
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,12 +18,9 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.analyzer.AttemptStatus
@@ -39,7 +31,12 @@ import com.sai.sports.data.Attempt
 import com.sai.sports.data.AttemptStore
 import com.sai.sports.data.PracticeStats
 import com.sai.sports.ui.common.Labels
-import com.sai.sports.ui.common.TitleBar
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.RegisterRow
+import com.sai.sports.ui.kit.SheetShape
+import com.sai.sports.ui.kit.TitleBar
+import com.sai.sports.ui.kit.TrialsChip
+import com.sai.sports.ui.theme.TrialsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
@@ -74,27 +71,22 @@ fun PracticeHistoryScreen(
     var filterName by rememberSaveable { mutableStateOf<String?>(null) }
     val filter = filterName?.let { name -> TestType.entries.firstOrNull { it.name == name } }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        TitleBar(stringResource(R.string.practice_history), onBack)
+    Page(scrollable = false, header = { TitleBar(stringResource(R.string.practice_history), onBack) }) {
 
         val attempts = all
         if (attempts == null) {
-            Text(stringResource(R.string.loading))
-            return@Column
+            Text(stringResource(R.string.loading), color = TrialsColors.Pencil)
+            return@Page
         }
 
         val practice = PracticeStats.practiceAttempts(attempts)
         if (practice.isEmpty()) {
             Text(
                 text = stringResource(R.string.history_empty),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                color = TrialsColors.Pencil
             )
-            return@Column
+            return@Page
         }
 
         // Only tests that have been practised; a chip that filters to nothing is noise.
@@ -104,16 +96,16 @@ fun PracticeHistoryScreen(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FilterChip(
+            TrialsChip(
                 selected = filter == null,
                 onClick = { filterName = null },
-                label = { Text(stringResource(R.string.history_all)) }
+                label = stringResource(R.string.history_all)
             )
             practisedTests.forEach { type ->
-                FilterChip(
+                TrialsChip(
                     selected = filter == type,
                     onClick = { filterName = type.name },
-                    label = { Text(stringResource(Labels.testName(type))) }
+                    label = stringResource(Labels.testName(type))
                 )
             }
         }
@@ -121,7 +113,7 @@ fun PracticeHistoryScreen(
         val bestIds = practisedTests.mapNotNull { PracticeStats.personalBest(attempts, it)?.id }.toSet()
         val shown = if (filter == null) practice else practice.filter { it.testType == filter }
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn {
             items(shown, key = { it.id }) { attempt ->
                 HistoryRow(
                     attempt = attempt,
@@ -140,51 +132,34 @@ private fun HistoryRow(attempt: Attempt, isPersonalBest: Boolean, onClick: () ->
     val recordedAt = remember(attempt.recordedAtMs) {
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(attempt.recordedAtMs))
     }
+    val scored = attempt.result.status == AttemptStatus.COMPLETE
+    val form = formScore?.let { stringResource(R.string.history_form, it) }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
+    RegisterRow(
+        label = stringResource(Labels.testName(attempt.testType)),
+        value = if (scored) {
+            "${attempt.result.formattedScore()} ${stringResource(Labels.unit(attempt.result.unit))}"
+        } else {
+            stringResource(R.string.history_not_scored)
+        },
+        // Practice is pencil; an attempt that was not scored is a red-pen note.
+        valueColor = if (scored) TrialsColors.Pencil else TrialsColors.RedPen,
+        detail = listOfNotNull(recordedAt, form).joinToString(" · "),
+        onClick = onClick,
+        trailing = if (isPersonalBest) {
+            {
+                // The marigold garland: this is the one to beat.
                 Text(
-                    text = stringResource(Labels.testName(attempt.testType)),
-                    style = MaterialTheme.typography.titleSmall
+                    text = stringResource(R.string.history_personal_best),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TrialsColors.Ink,
+                    modifier = Modifier
+                        .background(TrialsColors.Marigold, SheetShape)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
-                Text(text = recordedAt, style = MaterialTheme.typography.bodySmall)
-                formScore?.let {
-                    Text(
-                        text = stringResource(R.string.history_form, it),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                if (isPersonalBest) {
-                    Text(
-                        text = stringResource(R.string.history_personal_best),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF2E7D32)
-                    )
-                }
             }
-
-            Text(
-                text = if (attempt.result.status == AttemptStatus.COMPLETE) {
-                    "${attempt.result.formattedScore()} ${stringResource(Labels.unit(attempt.result.unit))}"
-                } else {
-                    stringResource(R.string.history_not_scored)
-                },
-                style = MaterialTheme.typography.titleMedium
-            )
+        } else {
+            null
         }
-    }
+    )
 }

@@ -3,6 +3,8 @@ import { Navigate, useLocation } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { paths } from "../routes";
+import { LaneLines } from "../components/Trials";
+import { ui } from "../lib/ui";
 
 export function LoginPage() {
   const { official, login } = useAuth();
@@ -34,14 +36,20 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    // The floodlit field: the officials' desk opens on ink, the form on paper.
+    <div className="on-ink flex min-h-screen flex-col items-center justify-center gap-6 bg-ink px-4 py-10">
+      <div className="w-full max-w-sm text-paper">
+        <div className="label-caps text-sm">SAI Talent Assessment</div>
+        <div className="label-caps text-xs text-marigold">Officials&apos; desk</div>
+        <LaneLines className="mt-3 text-marigold" />
+      </div>
       <form
         onSubmit={submit}
-        className="w-full max-w-sm space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+        className="w-full max-w-sm space-y-4 rounded-xs bg-paper p-6 text-ink [&_:focus-visible]:outline-ink"
       >
         <div>
-          <h1 className="text-xl font-semibold">Official sign in</h1>
-          <p className="mt-1 text-sm text-slate-600">SAI talent assessment admin dashboard</p>
+          <h1 className="text-3xl font-bold leading-tight [font-stretch:75%]">Official sign in</h1>
+          <p className="mt-1 text-sm text-pencil">SAI talent assessment admin dashboard</p>
         </div>
 
         <label className="block text-sm">
@@ -52,7 +60,7 @@ export function LoginPage() {
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+            className={`mt-1 ${ui.input}`}
           />
         </label>
 
@@ -64,12 +72,12 @@ export function LoginPage() {
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+            className={`mt-1 ${ui.input}`}
           />
         </label>
 
         {error && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-redpen">
             {error}
           </p>
         )}
@@ -77,7 +85,7 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded bg-slate-900 px-4 py-2 font-medium text-white disabled:opacity-60"
+          className={`w-full ${ui.buttonMarigold}`}
         >
           {busy ? "Signing in…" : "Sign in"}
         </button>

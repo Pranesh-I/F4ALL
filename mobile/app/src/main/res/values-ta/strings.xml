@@ -483,4 +483,16 @@
     <string name="sync_progress_mb">%2$s இல் %1$s MB</string>
     <string name="sync_failed_missing">பதிவு இனி இந்த போனில் இல்லை, எனவே அதை அனுப்ப முடியாது. சோதனையை மீண்டும் பதிவு செய்யுங்கள்.</string>
     <string name="sync_failed_sign_in">மீண்டும் உள்நுழைந்து, பிறகு மீண்டும் முயல் என்பதைத் தட்டவும்.</string>
+
+    <!-- Trials Day design: bib, tally, result slip. -->
+    <string name="bib_description">வீரர் எண் %1$s</string>
+    <string name="tally_description">%1$d கணக்கிடப்பட்டன, %2$d கணக்கிடப்படவில்லை</string>
+    <string name="tally_counted">கணக்கிடப்பட்டவை</string>
+    <string name="tally_missed">கணக்கிடப்படாதவை</string>
+    <string name="step_counted">உங்கள் தொலைபேசியில் கணக்கிடப்பட்டது</string>
+    <string name="step_checked">SAI சரிபார்த்தது</string>
+    <string name="step_approved">SAI அதிகாரி ஒப்புதல் அளித்தார்</string>
+    <string name="step_in_progress">நடைபெறுகிறது</string>
+    <string name="step_waiting">காத்திருக்கிறது</string>
+    <string name="practice_never_counts">தனிப்பட்டது · அதிகாரப்பூர்வ சோதனையாக ஒருபோதும் கணக்கிடப்படாது</string>
 </resources>

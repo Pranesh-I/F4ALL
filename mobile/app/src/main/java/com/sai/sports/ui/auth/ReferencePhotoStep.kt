@@ -8,18 +8,10 @@ import android.media.ExifInterface
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,16 +21,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.compose.ui.res.stringResource
+import androidx.core.content.FileProvider
 import com.sai.sports.R
 import com.sai.sports.api.ApiResult
 import com.sai.sports.api.ConsentPurpose
+import com.sai.sports.auth.AppServices
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
-import com.sai.sports.ui.common.ScreenTitle
-import com.sai.sports.auth.AppServices
+import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.PlainButton
+import com.sai.sports.ui.kit.TitleBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -133,14 +127,7 @@ fun ReferencePhotoStep(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        ScreenTitle(stringResource(R.string.photo_title))
+    Page(header = { TitleBar(stringResource(R.string.photo_title), onBack = null) }) {
 
         Text(
             stringResource(R.string.photo_body),
@@ -169,13 +156,13 @@ fun ReferencePhotoStep(
         if (busy) {
             CircularProgressIndicator()
         } else {
-            Button(onClick = ::takePhoto, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.photo_take))
-            }
+            InkButton(
+                text = stringResource(R.string.photo_take),
+                onClick = ::takePhoto,
+                modifier = Modifier.fillMaxWidth()
+            )
             onSkip?.let { skip ->
-                TextButton(onClick = skip) {
-                    Text(stringResource(R.string.photo_skip))
-                }
+                PlainButton(text = stringResource(R.string.photo_skip), onClick = skip)
             }
         }
     }

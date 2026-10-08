@@ -1,19 +1,13 @@
 package com.sai.sports.ui.profile
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,13 +18,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.api.ApiResult
@@ -41,8 +31,15 @@ import com.sai.sports.data.ProfileStatusStore
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
 import com.sai.sports.ui.common.LoadFailed
-import com.sai.sports.ui.common.SectionTitle
-import com.sai.sports.ui.common.TitleBar
+import com.sai.sports.ui.kit.Bib
+import com.sai.sports.ui.kit.BibNumber
+import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.PlainButton
+import com.sai.sports.ui.kit.RegisterRow
+import com.sai.sports.ui.kit.SectionRule
+import com.sai.sports.ui.kit.TitleBar
+import com.sai.sports.ui.theme.TrialsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -108,13 +105,7 @@ fun ProfileScreen(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        TitleBar(stringResource(R.string.profile_title), onBack)
+    Page(scrollable = false, header = { TitleBar(stringResource(R.string.profile_title), onBack) }) {
 
         val current = summary
         val failure = error
@@ -124,147 +115,128 @@ fun ProfileScreen(
 
             current == null -> LoadFailed(stringResource(failure!!)) { reload += 1 }
 
-            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            else -> LazyColumn {
                 item {
                     val profile = current.profile
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(profile.name, style = MaterialTheme.typography.titleLarge)
-                            Text(
-                                stringResource(
-                                    R.string.profile_summary_line,
-                                    profile.ageYears,
-                                    stringResource(Labels.gender(profile.gender)),
-                                    profile.region
-                                )
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Bib(
+                            number = BibNumber.of(profile.athleteId),
+                            name = profile.name,
+                            detail = stringResource(
+                                R.string.profile_summary_line,
+                                profile.ageYears,
+                                stringResource(Labels.gender(profile.gender)),
+                                profile.region
                             )
-                            profile.heightCm?.let {
-                                Text(
-                                    stringResource(
-                                        R.string.profile_height,
-                                        ResultPresentation.formatNumber(it)
-                                    )
-                                )
-                            }
-                            profile.city?.let { city ->
-                                Text(listOfNotNull(profile.place, city).joinToString(", "))
-                            }
-                            profile.achievements?.let {
-                                Text(
-                                    stringResource(R.string.profile_achievements, it),
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            if (!profile.complete) {
-                                ErrorText(stringResource(R.string.profile_incomplete))
-                                TextButton(onClick = onCompleteProfile) {
-                                    Text(stringResource(R.string.profile_complete_action))
-                                }
-                            } else if (profile.hasReferencePhoto) {
-                                TextButton(onClick = { confirmingRemoval = true }) {
-                                    Text(stringResource(R.string.profile_remove_photo))
-                                }
-                            }
+                        )
+                        profile.heightCm?.let {
+                            Text(
+                                stringResource(R.string.profile_height, ResultPresentation.formatNumber(it)),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        profile.city?.let { city ->
+                            Text(listOfNotNull(profile.place, city).joinToString(", "), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        profile.achievements?.let {
+                            Text(
+                                stringResource(R.string.profile_achievements, it),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TrialsColors.Pencil
+                            )
+                        }
+                        if (!profile.complete) {
+                            ErrorText(stringResource(R.string.profile_incomplete))
+                            InkButton(
+                                text = stringResource(R.string.profile_complete_action),
+                                onClick = onCompleteProfile
+                            )
+                        } else if (profile.hasReferencePhoto) {
+                            PlainButton(
+                                text = stringResource(R.string.profile_remove_photo),
+                                onClick = { confirmingRemoval = true },
+                                color = TrialsColors.RedPen
+                            )
                         }
                     }
                 }
 
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onBadges, modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.nav_badges))
-                        }
-                        OutlinedButton(onClick = onLeaderboard, modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.nav_leaderboard))
-                        }
+                    Column(Modifier.padding(top = 8.dp)) {
+                        RegisterRow(label = stringResource(R.string.nav_badges), onClick = onBadges)
+                        RegisterRow(label = stringResource(R.string.nav_leaderboard), onClick = onLeaderboard)
                     }
                 }
 
-                item { SectionTitle(stringResource(R.string.profile_bests)) }
+                item { SectionRule(stringResource(R.string.profile_bests), Modifier.padding(top = 24.dp)) }
 
                 if (current.personalBests.isEmpty()) {
-                    item {
-                        Text(
-                            stringResource(R.string.profile_bests_empty),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
+                    item { EmptyLine(stringResource(R.string.profile_bests_empty)) }
                 }
 
                 items(current.personalBests) { best ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(stringResource(Labels.testName(best.testType)), fontWeight = FontWeight.SemiBold)
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    "${ResultPresentation.formatNumber(best.score)} " +
-                                        stringResource(Labels.unit(best.unit))
-                                )
-                                Text(
-                                    stringResource(ResultPresentation.officialLabel(best.official)),
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-                    }
+                    RegisterRow(
+                        label = stringResource(Labels.testName(best.testType)),
+                        value = "${ResultPresentation.formatNumber(best.score)} " + stringResource(Labels.unit(best.unit)),
+                        // An approved best is in ink with the stamp's word; the rest are still pencil.
+                        valueColor = if (best.official) TrialsColors.Ink else TrialsColors.Pencil,
+                        detail = stringResource(ResultPresentation.officialLabel(best.official)),
+                        detailColor = if (best.official) TrialsColors.Stamp else TrialsColors.Pencil
+                    )
                 }
 
-                item { SectionTitle(stringResource(R.string.profile_results)) }
+                item { SectionRule(stringResource(R.string.profile_results), Modifier.padding(top = 24.dp)) }
 
                 if (current.history.isEmpty()) {
-                    item {
-                        Text(
-                            stringResource(R.string.profile_results_empty),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
+                    item { EmptyLine(stringResource(R.string.profile_results_empty)) }
                 }
 
                 items(current.history, key = { it.resultId }) { item ->
                     val (score, _) = ResultPresentation.headline(
                         item.provisionalScore, item.serverScore, item.finalScore
                     )
-                    val openLabel = stringResource(R.string.profile_open_result)
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onResultSelected(item.resultId) }
-                            // Names the action for screen readers, which would
-                            // otherwise announce only "double tap to activate".
-                            .semantics {
-                                onClick(label = openLabel) {
-                                    onResultSelected(item.resultId)
-                                    true
-                                }
-                            }
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(stringResource(Labels.testName(item.testType)), fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    "${ResultPresentation.formatNumber(score)} " +
-                                        stringResource(Labels.unit(item.unit))
-                                )
-                            }
-                            Text(
-                                stringResource(Labels.resultStatus(item.status)),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
+                    val writing = ResultPresentation.writing(
+                        item.status, item.provisionalScore, item.serverScore, item.finalScore
+                    )
+                    RegisterRow(
+                        label = stringResource(Labels.testName(item.testType)),
+                        value = "${ResultPresentation.formatNumber(score)} " + stringResource(Labels.unit(item.unit)),
+                        valueColor = when (writing) {
+                            ResultPresentation.Writing.PENCIL -> TrialsColors.Pencil
+                            ResultPresentation.Writing.STRUCK -> TrialsColors.RedPen
+                            else -> TrialsColors.Ink
+                        },
+                        detail = stringResource(Labels.resultStatus(item.status)),
+                        detailColor = when (writing) {
+                            ResultPresentation.Writing.STAMPED -> TrialsColors.Stamp
+                            ResultPresentation.Writing.STRUCK -> TrialsColors.RedPen
+                            else -> TrialsColors.Pencil
+                        },
+                        // Names the action for screen readers, which would
+                        // otherwise announce only "double tap to activate".
+                        onClickLabel = stringResource(R.string.profile_open_result),
+                        onClick = { onResultSelected(item.resultId) }
+                    )
                 }
 
                 item {
-                    OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.nav_settings))
-                    }
+                    RegisterRow(
+                        label = stringResource(R.string.nav_settings),
+                        onClick = onSettings,
+                        modifier = Modifier.padding(top = 24.dp)
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun EmptyLine(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = TrialsColors.Pencil,
+        modifier = Modifier.padding(vertical = 12.dp)
+    )
 }

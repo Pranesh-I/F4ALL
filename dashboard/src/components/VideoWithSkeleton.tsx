@@ -69,24 +69,35 @@ export function VideoWithSkeleton({
         y: rect.top + point.y * rect.height,
       }));
 
-      context.lineWidth = 3;
-      context.strokeStyle = "rgba(34, 211, 238, 0.9)";
-      for (const [from, to] of SKELETON_CONNECTIONS) {
-        const a = points[from];
-        const b = points[to];
-        if (!a || !b || !a.visible || !b.visible) continue;
-        context.beginPath();
-        context.moveTo(a.x, a.y);
-        context.lineTo(b.x, b.y);
-        context.stroke();
+      // The athlete app's skeleton: chalk-white limbs over an ink edge, so it
+      // reads on a bright wall and a dark room alike; marigold joints.
+      context.lineCap = "round";
+      for (const [width, colour] of [
+        [6, "rgba(23, 21, 18, 0.6)"],
+        [3, "rgba(255, 255, 255, 0.95)"],
+      ] as const) {
+        context.lineWidth = width;
+        context.strokeStyle = colour;
+        for (const [from, to] of SKELETON_CONNECTIONS) {
+          const a = points[from];
+          const b = points[to];
+          if (!a || !b || !a.visible || !b.visible) continue;
+          context.beginPath();
+          context.moveTo(a.x, a.y);
+          context.lineTo(b.x, b.y);
+          context.stroke();
+        }
       }
 
-      context.fillStyle = "rgba(250, 204, 21, 0.95)";
+      context.fillStyle = "#f2a900";
+      context.strokeStyle = "#171512";
+      context.lineWidth = 1.5;
       for (const point of points) {
         if (!point.visible) continue;
         context.beginPath();
-        context.arc(point.x, point.y, 3.5, 0, Math.PI * 2);
+        context.arc(point.x, point.y, 4, 0, Math.PI * 2);
         context.fill();
+        context.stroke();
       }
     };
 
@@ -105,7 +116,7 @@ export function VideoWithSkeleton({
 
   if (failed !== null) {
     return (
-      <div className="flex aspect-[9/16] max-h-[70vh] flex-col items-center justify-center gap-3 rounded bg-slate-900 p-6 text-center text-sm text-slate-200">
+      <div className="flex aspect-[9/16] max-h-[70vh] flex-col items-center justify-center gap-3 rounded-xs bg-ink p-6 text-center text-sm text-paper">
         {failed === 4 ? (
           <>
             <p>This browser cannot play the recording&apos;s video format.</p>
@@ -122,7 +133,7 @@ export function VideoWithSkeleton({
 
   return (
     <div className="space-y-2">
-      <div className="relative mx-auto max-h-[70vh] w-full overflow-hidden rounded bg-black">
+      <div className="relative mx-auto max-h-[70vh] w-full overflow-hidden rounded-xs bg-black">
         <video
           ref={videoRef}
           src={src}
@@ -134,7 +145,7 @@ export function VideoWithSkeleton({
         />
         <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
       </div>
-      <label className="flex items-center gap-2 text-sm text-slate-700">
+      <label className="flex items-center gap-2 text-sm text-ink">
         <input
           type="checkbox"
           checked={showSkeleton}

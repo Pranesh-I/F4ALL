@@ -1,19 +1,11 @@
 package com.sai.sports.ui.auth
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.api.ApiFailure
 import com.sai.sports.api.ApiResult
@@ -37,7 +28,10 @@ import com.sai.sports.sync.PracticeSyncWorker
 import com.sai.sports.sync.SyncScheduler
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
-import com.sai.sports.ui.common.ScreenTitle
+import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.PlainButton
+import com.sai.sports.ui.kit.TitleBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -136,14 +130,7 @@ fun LoginScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        ScreenTitle(stringResource(R.string.login_title))
+    Page(header = { TitleBar(stringResource(R.string.login_title), onBack = null) }) {
 
         Text(stringResource(R.string.login_body), style = MaterialTheme.typography.bodyMedium)
 
@@ -178,29 +165,34 @@ fun LoginScreen(
         if (busy) {
             CircularProgressIndicator()
         } else if (!codeSent) {
-            Button(onClick = ::sendCode, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.login_send_code))
-            }
+            InkButton(
+                text = stringResource(R.string.login_send_code),
+                onClick = ::sendCode,
+                modifier = Modifier.fillMaxWidth()
+            )
         } else {
-            Button(onClick = ::verify, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.login_verify))
-            }
+            InkButton(
+                text = stringResource(R.string.login_verify),
+                onClick = ::verify,
+                modifier = Modifier.fillMaxWidth()
+            )
 
-            TextButton(onClick = ::sendCode, enabled = resendIn == 0) {
-                Text(
-                    if (resendIn > 0) stringResource(R.string.login_resend_in, resendIn)
-                    else stringResource(R.string.login_resend)
-                )
-            }
+            PlainButton(
+                text = if (resendIn > 0) stringResource(R.string.login_resend_in, resendIn)
+                    else stringResource(R.string.login_resend),
+                onClick = ::sendCode,
+                enabled = resendIn == 0
+            )
 
-            TextButton(onClick = {
+            PlainButton(
+                text = stringResource(R.string.login_change_number),
+                onClick = {
                 codeSent = false
                 code = ""
                 developmentCode = null
                 error = null
-            }) {
-                Text(stringResource(R.string.login_change_number))
             }
+            )
         }
     }
 }

@@ -34,13 +34,13 @@ export function LeaderboardPage() {
       }),
   });
 
-  const select = "rounded border border-slate-300 bg-white px-3 py-2 text-sm";
+  const select = "rounded-xs border border-line bg-paper px-3 py-2 text-sm";
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-semibold">Leaderboard</h1>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-pencil">
           Approved results only, best attempt per athlete. Unreviewed scores never appear here.
         </p>
       </div>
@@ -82,9 +82,9 @@ export function LeaderboardPage() {
         <ErrorState title="Could not load the leaderboard" error={board.error} onRetry={() => board.refetch()} />
       )}
 
-      <div className="overflow-x-auto rounded border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-xs border border-ink bg-paper">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-600">
+          <thead className="bg-ground text-left text-pencil">
             <tr>
               <th className="px-3 py-2">#</th>
               <th className="px-3 py-2">Athlete</th>
@@ -97,20 +97,20 @@ export function LeaderboardPage() {
           <tbody>
             {board.isLoading && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                <td colSpan={6} className="px-3 py-6 text-center text-pencil">
                   Loading…
                 </td>
               </tr>
             )}
             {board.data?.entries.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                <td colSpan={6} className="px-3 py-6 text-center text-pencil">
                   No approved results match these filters.
                 </td>
               </tr>
             )}
             {board.data?.entries.map((entry) => (
-              <tr key={entry.athlete_id} className="border-t border-slate-100">
+              <tr key={entry.athlete_id} className="border-t border-rule">
                 <td className="px-3 py-2 font-semibold tabular-nums">{entry.rank}</td>
                 <td className="px-3 py-2">{entry.athlete_name}</td>
                 <td className="px-3 py-2">{entry.region}</td>
@@ -120,7 +120,7 @@ export function LeaderboardPage() {
                 <td className="px-3 py-2 text-right font-medium tabular-nums">
                   {formatScore(entry.score, entry.unit)}
                 </td>
-                <td className="px-3 py-2 text-slate-600">{formatDateTime(entry.achieved_at)}</td>
+                <td className="px-3 py-2 text-pencil">{formatDateTime(entry.achieved_at)}</td>
               </tr>
             ))}
           </tbody>

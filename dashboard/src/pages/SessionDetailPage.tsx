@@ -76,7 +76,7 @@ export function SessionDetailPage() {
   });
 
   const back = (
-    <Link to={paths.sessions} className="text-blue-700 hover:underline">
+    <Link to={paths.sessions} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
       ← Sessions
     </Link>
   );
@@ -139,7 +139,7 @@ export function SessionDetailPage() {
                     message: current.enabled ? "Session disabled." : "Session enabled.",
                   })
                 }
-                className="rounded border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-50"
+                className="rounded-xs border border-line bg-paper px-3 py-2 text-sm hover:bg-paper-shade disabled:opacity-50"
               >
                 {current.enabled ? "Disable" : "Enable"}
               </button>
@@ -152,7 +152,7 @@ export function SessionDetailPage() {
                       end.mutate();
                     }
                   }}
-                  className="rounded border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-50"
+                  className="rounded-xs border border-line bg-paper px-3 py-2 text-sm hover:bg-paper-shade disabled:opacity-50"
                 >
                   End now
                 </button>
@@ -164,7 +164,7 @@ export function SessionDetailPage() {
                   setNotice(null);
                   setEditing(true);
                 }}
-                className="rounded border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-50"
+                className="rounded-xs border border-line bg-paper px-3 py-2 text-sm hover:bg-paper-shade disabled:opacity-50"
               >
                 Edit
               </button>
@@ -176,7 +176,7 @@ export function SessionDetailPage() {
                   onClick={() => {
                     if (window.confirm(`Delete "${current.name}"?`)) remove.mutate();
                   }}
-                  className="rounded border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  className="rounded-xs border border-redpen bg-paper px-3 py-2 text-sm text-redpen hover:bg-redpen-tint disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -203,7 +203,7 @@ export function SessionDetailPage() {
           }}
         />
       ) : (
-        <dl className="grid gap-x-6 gap-y-3 rounded border border-slate-200 bg-white p-4 text-sm sm:grid-cols-2">
+        <dl className="grid gap-x-6 gap-y-3 rounded-xs border border-ink bg-paper p-4 text-sm sm:grid-cols-2">
           <Detail label="Opens">{formatDateTime(current.starts_at)}</Detail>
           <Detail label="Closes">{formatDateTime(current.ends_at)}</Detail>
           <Detail label="Tests">
@@ -226,10 +226,10 @@ export function SessionDetailPage() {
       )}
 
       <section className="space-y-3">
-        <div className="flex items-end justify-between gap-3">
-          <h2 className="text-lg font-semibold">Submissions in this session</h2>
+        <div className="flex items-end justify-between gap-3 border-b-2 border-ink pb-1">
+          <h2 className="label-caps text-sm">Submissions in this session</h2>
           {(submissions.data?.total ?? 0) > RECENT && (
-            <Link to={`${paths.submissions}?session_id=${current.id}`} className="text-sm text-blue-700 hover:underline">
+            <Link to={`${paths.submissions}?session_id=${current.id}`} className="text-sm font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
               View all {submissions.data?.total}
             </Link>
           )}
@@ -258,7 +258,7 @@ export function SessionDetailPage() {
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <dt className="text-slate-500">{label}</dt>
+      <dt className="text-pencil">{label}</dt>
       <dd className="mt-0.5">{children}</dd>
     </div>
   );

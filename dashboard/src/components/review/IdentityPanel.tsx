@@ -9,9 +9,9 @@ export function IdentityPanel({ result }: { result: ReviewDetail }) {
     <Panel title="Identity">
       <div className="flex gap-4">
         {result.reference_photo_url ? (
-          <img src={result.reference_photo_url} alt="Registration photo" className="h-32 w-24 rounded object-cover" />
+          <img src={result.reference_photo_url} alt="Registration photo" className="h-32 w-24 rounded-xs object-cover" />
         ) : (
-          <div className="flex h-32 w-24 items-center justify-center rounded bg-slate-100 p-2 text-center text-xs text-slate-500">
+          <div className="flex h-32 w-24 items-center justify-center rounded-xs bg-paper-shade p-2 text-center text-xs text-pencil">
             No registration photo
           </div>
         )}
@@ -25,13 +25,13 @@ export function IdentityPanel({ result }: { result: ReviewDetail }) {
                 </strong>
                 {face.similarity_score !== null && ` (similarity ${face.similarity_score.toFixed(2)})`}
               </p>
-              <p className="text-slate-600">
+              <p className="text-pencil">
                 This check is approximate and unreliable in poor light. Compare the photo with the recording
                 yourself.
               </p>
             </>
           ) : (
-            <p className="text-slate-600">The identity check did not run for this submission — this is not a pass.</p>
+            <p className="text-pencil">The identity check did not run for this submission — this is not a pass.</p>
           )}
           <p>
             Photo check before the test: <strong>{identityCheckLabel(result.identity_check)}</strong>
@@ -52,13 +52,13 @@ export function BenchmarkPanel({ result }: { result: ReviewDetail }) {
         <strong>{benchmark.label}</strong>
         {benchmark.percentile !== null && ` · around the ${benchmark.percentile}th percentile`}
       </p>
-      <p className="mt-1 text-xs text-slate-600">
+      <p className="mt-1 text-xs text-pencil">
         {benchmark.cohort}: median {formatScore(benchmark.percentile_50, benchmark.unit)}, top 25%{" "}
         {formatScore(benchmark.percentile_75, benchmark.unit)}, top 10%{" "}
         {formatScore(benchmark.percentile_90, benchmark.unit)}
       </p>
       {benchmark.provisional && (
-        <p className="mt-2 rounded bg-amber-50 p-2 text-xs text-amber-900">
+        <p className="mt-2 rounded-xs bg-marigold-tint p-2 text-xs text-ink">
           Provisional norms — not an official SAI standard. Do not use for selection.
         </p>
       )}

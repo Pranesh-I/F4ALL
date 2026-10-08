@@ -14,20 +14,13 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -54,7 +47,12 @@ import com.sai.sports.data.IdentityPassStore
 import com.sai.sports.data.IdentityPhotos
 import com.sai.sports.data.ProfileStatusStore
 import com.sai.sports.ui.common.ErrorText
-import com.sai.sports.ui.common.TitleBar
+import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.LineButton
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.SheetShape
+import com.sai.sports.ui.kit.TitleBar
+import com.sai.sports.ui.theme.TrialsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -146,14 +144,7 @@ fun IdentityCheckScreen(
 
     if (!ready) return
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        TitleBar(stringResource(R.string.identity_title), onBack)
+    Page(header = { TitleBar(stringResource(R.string.identity_title), onBack = onBack) }) {
 
         val current = step
         val showCamera = hasCamera && (current is IdentityStep.Ready ||
@@ -168,50 +159,60 @@ fun IdentityCheckScreen(
             FrontCamera(onReady = { imageCapture = it })
         } else if (!hasCamera && current !is IdentityStep.NeedsProfile) {
             ErrorText(stringResource(R.string.identity_camera_needed))
-            Button(onClick = { permission.launch(Manifest.permission.CAMERA) }) {
-                Text(stringResource(R.string.camera_permission_allow))
-            }
+            InkButton(
+                text = stringResource(R.string.camera_permission_allow),
+                onClick = { permission.launch(Manifest.permission.CAMERA) }
+            )
         }
 
         StepMessage(current)
 
         when (current) {
-            IdentityStep.Ready, IdentityStep.Failed -> Button(
+            IdentityStep.Ready, IdentityStep.Failed -> InkButton(
+                text = stringResource(R.string.identity_take_photo),
                 onClick = ::takePhoto,
                 enabled = imageCapture != null,
                 modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(R.string.identity_take_photo)) }
+            )
 
             IdentityStep.Checking -> CircularProgressIndicator()
 
             is IdentityStep.TryAgain -> {
-                Button(onClick = ::takePhoto, enabled = imageCapture != null, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.identity_retake))
-                }
+                InkButton(
+                    text = stringResource(R.string.identity_retake),
+                    onClick = ::takePhoto,
+                    enabled = imageCapture != null,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 if (current.mayContinue) {
-                    OutlinedButton(
+                    LineButton(
+                        text = stringResource(R.string.identity_continue_anyway),
                         onClick = { proceed(current.lastCheckId, null, confirmed = false) },
                         modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.identity_continue_anyway)) }
+                    )
                 }
             }
 
-            is IdentityStep.CouldNotCheck -> Button(
+            is IdentityStep.CouldNotCheck -> InkButton(
+                text = stringResource(R.string.identity_continue),
                 onClick = { proceed(current.checkId, null, confirmed = false) },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(R.string.identity_continue)) }
+            )
 
-            IdentityStep.CheckLater -> Button(
+            IdentityStep.CheckLater -> InkButton(
+                text = stringResource(R.string.identity_continue),
                 onClick = {
                     val saved = photo?.let { IdentityPhotos.save(context.filesDir, it) }
                     proceed(null, saved, confirmed = false)
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(R.string.identity_continue)) }
+            )
 
-            IdentityStep.NeedsProfile -> Button(onClick = onCompleteProfile, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.profile_complete_action))
-            }
+            IdentityStep.NeedsProfile -> InkButton(
+                text = stringResource(R.string.profile_complete_action),
+                onClick = onCompleteProfile,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             is IdentityStep.Passed -> CircularProgressIndicator()
         }
@@ -285,7 +286,8 @@ private fun FrontCamera(onReady: (ImageCapture) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(3f / 4f)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(SheetShape)
+            .border(2.dp, TrialsColors.Ink, SheetShape)
     ) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
     }

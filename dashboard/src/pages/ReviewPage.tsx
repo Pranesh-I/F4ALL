@@ -18,6 +18,8 @@ import { VerificationSummary } from "../components/review/VerificationSummary";
 import { ErrorState, LoadingState, SuccessNotice } from "../components/StateViews";
 import { VideoWithSkeleton } from "../components/VideoWithSkeleton";
 import { paths } from "../routes";
+import { Bib } from "../components/Trials";
+import { ui } from "../lib/ui";
 
 /**
  * Everything the verification used, and the decision. What is shown comes
@@ -54,7 +56,7 @@ export function ReviewPage() {
   });
 
   const back = (
-    <Link to={paths.reviews} className="text-blue-700 hover:underline">
+    <Link to={paths.reviews} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
       ← Review queue
     </Link>
   );
@@ -84,18 +86,19 @@ export function ReviewPage() {
           </span>
         }
         actions={
-          <Link
-            to={paths.submission(result.result_id)}
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100"
-          >
-            Submission summary
-          </Link>
+          <div className="flex flex-wrap items-end gap-3">
+            {/* The same chest number the athlete sees on their phone. */}
+            {result.athlete_id && <Bib athleteId={result.athlete_id} detail={result.region} />}
+            <Link to={paths.submission(result.result_id)} className={ui.buttonLine}>
+              Submission summary
+            </Link>
+          </div>
         }
       />
 
       {outcome && <SuccessNotice>{outcome.message}</SuccessNotice>}
       {conflict && (
-        <div role="alert" className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div role="alert" className="rounded-xs border border-marigold bg-marigold-tint px-4 py-3 text-sm text-ink">
           <p className="font-medium">Your decision was not recorded — another official acted on this submission first.</p>
           <p>{conflict}</p>
           <p>The page below shows its current state and who decided it.</p>
@@ -108,15 +111,15 @@ export function ReviewPage() {
             {result.video_url ? (
               <VideoWithSkeleton src={result.video_url} pose={pose.data ?? null} seekToMs={seekToMs} />
             ) : (
-              <div className="rounded bg-slate-100 p-6 text-sm text-slate-600">
+              <div className="rounded-xs bg-paper-shade p-6 text-sm text-pencil">
                 No recording is attached to this submission.
               </div>
             )}
             {pose.isError && (
-              <p className="mt-2 text-sm text-amber-800">The server&apos;s tracking data could not be loaded.</p>
+              <p className="mt-2 text-sm text-ink">The server&apos;s tracking data could not be loaded.</p>
             )}
             {result.video_url && (
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-pencil">
                 Streamed through a short-lived signed link. The skeleton is the server&apos;s own tracking.
               </p>
             )}
@@ -181,7 +184,7 @@ function NoDecision({ result }: { result: ReviewDetail }) {
         ? "The recording has not been uploaded yet."
         : "This submission has been decided. The review history above shows who decided it, when and why.";
   return (
-    <div className="rounded border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700" role="status">
+    <div className="rounded-xs border border-ink bg-ground p-4 text-sm text-ink" role="status">
       {text}
     </div>
   );

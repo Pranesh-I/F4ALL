@@ -4,10 +4,10 @@ import { ApiError } from "../api/client";
 /** Shown while the server is being asked. Never a blank screen. */
 export function LoadingState({ label = "Loading…" }: { label?: string }) {
   return (
-    <div role="status" aria-live="polite" className="flex items-center gap-2 px-3 py-6 text-sm text-slate-500">
+    <div role="status" aria-live="polite" className="flex items-center gap-2 px-3 py-6 text-sm text-pencil">
       <span
         aria-hidden="true"
-        className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"
+        className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-ink"
       />
       {label}
     </div>
@@ -25,9 +25,9 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded border border-dashed border-slate-300 bg-white px-4 py-8 text-center">
-      <p className="font-medium text-slate-700">{title}</p>
-      {children && <p className="mx-auto mt-1 max-w-prose text-sm text-slate-500">{children}</p>}
+    <div className="rounded-xs border border-dashed border-line bg-paper px-4 py-8 text-center">
+      <p className="font-medium text-ink">{title}</p>
+      {children && <p className="mx-auto mt-1 max-w-prose text-sm text-pencil">{children}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -56,14 +56,14 @@ export function ErrorState({
 }) {
   const retryable = !(error instanceof ApiError && [403, 404].includes(error.status));
   return (
-    <div role="alert" className="rounded border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+    <div role="alert" className="rounded-xs border border-redpen bg-redpen-tint px-4 py-3 text-redpen">
       <p className="font-medium">{title}</p>
       <p className="text-sm">{describeError(error)}</p>
       {onRetry && retryable && (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-2 rounded border border-red-300 bg-white px-3 py-1 text-sm hover:bg-red-100"
+          className="mt-2 rounded-xs border border-redpen bg-paper px-3 py-1 text-sm font-semibold hover:bg-redpen-tint"
         >
           Try again
         </button>
@@ -75,7 +75,7 @@ export function ErrorState({
 /** Signed in, but this page is for another role. The API refuses it regardless. */
 export function NotPermitted({ children }: { children?: ReactNode }) {
   return (
-    <div role="alert" className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+    <div role="alert" className="rounded-xs border border-marigold bg-marigold-tint px-4 py-3 text-ink">
       <p className="font-medium">You do not have permission to open this page.</p>
       {children && <p className="text-sm">{children}</p>}
     </div>
@@ -85,7 +85,7 @@ export function NotPermitted({ children }: { children?: ReactNode }) {
 /** Confirmation after something worked. */
 export function SuccessNotice({ children }: { children: ReactNode }) {
   return (
-    <div role="status" className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+    <div role="status" className="rounded-xs border-2 border-ink bg-paper px-4 py-3 text-sm font-medium text-ink">
       {children}
     </div>
   );

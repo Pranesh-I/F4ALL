@@ -85,6 +85,15 @@ export function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
+/**
+ * The athlete's chest number: the short ID, upper-cased and split in two —
+ * exactly what the athlete app prints on the athlete's bib.
+ */
+export function bibNumber(athleteId: string): string {
+  const code = athleteId.replace(/[^0-9a-z]/gi, "").slice(0, 8).toUpperCase();
+  return code.length > 4 ? `${code.slice(0, 4)}·${code.slice(4)}` : code;
+}
+
 export const STATUS_LABELS: Record<ResultStatus, string> = {
   uploaded: "Queued for verification",
   processing: "Processing",

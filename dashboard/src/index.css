@@ -1,1 +1,74 @@
 @import "tailwindcss";
+
+/*
+ * "Trials Day": the materials of a district sports trial, shared with the
+ * athlete app. Each colour is one object with one job:
+ *   ink       text, structure, the official field
+ *   paper     the scoresheet; ground is what it lies on
+ *   marigold  the one action colour, and highlights
+ *   pencil    the phone's provisional numbers, secondary text
+ *   redpen    corrections, flags, refusals
+ *   stamp     an official approval, and nothing else
+ */
+@theme {
+  --font-sans: "Anek Latin", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink: #171512;
+  --color-ink-raised: #2a2621;
+  --color-ink-muted: #b9b5aa;
+  --color-paper: #ffffff;
+  --color-ground: #f4f3ee;
+  --color-paper-shade: #eceae3;
+  --color-rule: #d9d6cc;
+  --color-line: #8c887e;
+  --color-pencil: #6b6b6b;
+  --color-marigold: #f2a900;
+  --color-marigold-tint: #fdf3d6;
+  --color-redpen: #c81e1e;
+  --color-redpen-dark: #a01818;
+  --color-redpen-tint: #fbe9e7;
+  --color-stamp: #463c9e;
+  --color-stamp-tint: #eceaf7;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-ground);
+    color: var(--color-ink);
+  }
+
+  ::selection {
+    background-color: var(--color-marigold);
+    color: var(--color-ink);
+  }
+
+  /* A visible ink ring on paper; marigold where the surface is ink. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  .on-ink :focus-visible {
+    outline-color: var(--color-marigold);
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--color-ink);
+  }
+}
+
+/* Numbers set like a chest number: narrow, heavy, every digit the same width. */
+@utility numerals {
+  font-stretch: 75%;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Short capitalised labels: section heads, tags. */
+@utility label-caps {
+  font-stretch: 75%;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}

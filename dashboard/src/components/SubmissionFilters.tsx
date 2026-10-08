@@ -88,7 +88,7 @@ export function SubmissionFilters({
   const [athlete, setAthlete] = useState(values.athlete);
   useEffect(() => setAthlete(values.athlete), [values.athlete]);
 
-  const select = "rounded border border-slate-300 bg-white px-3 py-2 text-sm";
+  const select = "rounded-xs border border-line bg-paper px-3 py-2 text-sm";
 
   function searchAthlete(event?: FormEvent) {
     event?.preventDefault();
@@ -153,31 +153,31 @@ export function SubmissionFilters({
           onChange={(e) => setAthlete(e.target.value)}
           onBlur={() => searchAthlete()}
           maxLength={150}
-          className="w-48 rounded border border-slate-300 bg-white px-3 py-2 text-sm"
+          className="w-48 rounded-xs border border-line bg-paper px-3 py-2 text-sm"
         />
       </form>
 
-      <label className="text-xs text-slate-600">
+      <label className="text-xs text-pencil">
         Submitted from
         <input
           type="date"
           value={values.from}
           onChange={(e) => update({ from: e.target.value })}
-          className="mt-0.5 block rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
+          className="mt-0.5 block rounded-xs border border-line bg-paper px-2 py-1.5 text-sm"
         />
       </label>
-      <label className="text-xs text-slate-600">
+      <label className="text-xs text-pencil">
         Submitted to
         <input
           type="date"
           value={values.to}
           onChange={(e) => update({ to: e.target.value })}
-          className="mt-0.5 block rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
+          className="mt-0.5 block rounded-xs border border-line bg-paper px-2 py-1.5 text-sm"
         />
       </label>
 
       {active && (
-        <button type="button" onClick={() => clear(keepOnClear)} className="rounded px-3 py-2 text-sm text-blue-700 hover:underline">
+        <button type="button" onClick={() => clear(keepOnClear)} className="rounded-xs px-3 py-2 text-sm font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
           Clear filters
         </button>
       )}

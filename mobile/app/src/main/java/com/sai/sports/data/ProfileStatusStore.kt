@@ -22,7 +22,19 @@ class ProfileStatusStore(private val preferences: SharedPreferences) {
     fun save(profile: AthleteProfile) {
         preferences.edit()
             .putString(key(profile.athleteId), JSONArray(profile.missing).toString())
+            .putString(nameKey(profile.athleteId), profile.name)
+            .putString(regionKey(profile.athleteId), profile.region)
             .apply()
+    }
+
+    /**
+     * The name and state on the athlete's chest number, as this phone last
+     * saw them — so the home screen can show who is signed in with no signal.
+     * Null when the phone has never loaded the profile.
+     */
+    fun card(athleteId: String): AthleteCard? {
+        val name = preferences.getString(nameKey(athleteId), null) ?: return null
+        return AthleteCard(name = name, region = preferences.getString(regionKey(athleteId), null))
     }
 
     /** What is missing, or null when this phone has never seen the profile. */
@@ -35,8 +47,13 @@ class ProfileStatusStore(private val preferences: SharedPreferences) {
         }
 
     private fun key(athleteId: String) = "missing.$athleteId"
+    private fun nameKey(athleteId: String) = "name.$athleteId"
+    private fun regionKey(athleteId: String) = "region.$athleteId"
 
     private companion object {
         const val PREFERENCES = "profile_status"
     }
 }
+
+/** Who a chest number belongs to. */
+data class AthleteCard(val name: String, val region: String?)

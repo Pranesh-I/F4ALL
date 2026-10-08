@@ -13,7 +13,7 @@ export function SubmissionFacts({ result, nameOf }: { result: ReviewDetail; name
       </Fact>
       <Fact label="Athlete">
         {result.athlete_name}
-        <div className="text-xs text-slate-500">
+        <div className="text-xs text-pencil">
           {[
             result.region,
             result.athlete_age_years !== null ? `${result.athlete_age_years} years` : null,
@@ -24,12 +24,12 @@ export function SubmissionFacts({ result, nameOf }: { result: ReviewDetail; name
             .join(" · ")}
         </div>
         {result.athlete_id && (
-          <div className="break-all font-mono text-[11px] text-slate-400">ID {result.athlete_id}</div>
+          <div className="break-all font-mono text-[11px] text-pencil">ID {result.athlete_id}</div>
         )}
       </Fact>
       <Fact label="Session">
         {result.session_id ? (
-          <Link to={paths.session(result.session_id)} className="text-blue-700 hover:underline">
+          <Link to={paths.session(result.session_id)} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
             {result.session_name}
           </Link>
         ) : (

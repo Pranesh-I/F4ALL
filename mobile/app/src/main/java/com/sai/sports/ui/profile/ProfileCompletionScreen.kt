@@ -1,13 +1,6 @@
 package com.sai.sports.ui.profile
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -24,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.api.ApiResult
 import com.sai.sports.api.AthleteProfile
@@ -38,7 +30,9 @@ import com.sai.sports.ui.auth.ReferencePhotoStep
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
 import com.sai.sports.ui.common.LoadFailed
-import com.sai.sports.ui.common.TitleBar
+import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.TitleBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -85,23 +79,18 @@ fun ProfileCompletionScreen(onBack: () -> Unit, onDone: () -> Unit) {
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        TitleBar(stringResource(R.string.complete_profile_title), onBack)
+    Page(header = { TitleBar(stringResource(R.string.complete_profile_title), onBack = onBack) }) {
 
         when {
             current == null && error == null -> CircularProgressIndicator()
             current == null -> LoadFailed(stringResource(error!!)) { reload += 1 }
             next == null -> {
                 Text(stringResource(R.string.complete_profile_done), style = MaterialTheme.typography.titleMedium)
-                Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.action_done))
-                }
+                InkButton(
+                    text = stringResource(R.string.action_done),
+                    onClick = onDone,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
             next == CITY -> WhereStep(current) { updated -> profile = updated; statusStore.save(updated) }
             else -> RegistrationConsentStep(current) { updated -> profile = updated; statusStore.save(updated) }
@@ -148,11 +137,12 @@ private fun WhereStep(profile: AthleteProfile, onSaved: (AthleteProfile) -> Unit
     if (busy) {
         CircularProgressIndicator()
     } else {
-        Button(
+        InkButton(
+            text = stringResource(R.string.action_save),
             onClick = {
                 if (city.isBlank()) {
                     problem = R.string.register_error_city
-                    return@Button
+                    return@InkButton
                 }
                 busy = true
                 scope.launch {
@@ -167,7 +157,7 @@ private fun WhereStep(profile: AthleteProfile, onSaved: (AthleteProfile) -> Unit
                 }
             },
             modifier = Modifier.fillMaxWidth()
-        ) { Text(stringResource(R.string.action_save)) }
+        )
     }
 }
 
@@ -198,11 +188,12 @@ private fun RegistrationConsentStep(profile: AthleteProfile, onSaved: (AthletePr
     if (busy) {
         CircularProgressIndicator()
     } else {
-        Button(
+        InkButton(
+            text = stringResource(R.string.action_save),
             onClick = {
                 val grant = ConsentRules.grant(agreed, minor, guardianName).getOrElse { missing ->
                     problem = (missing as ConsentRules.ConsentMissing).messageRes
-                    return@Button
+                    return@InkButton
                 }
                 busy = true
                 scope.launch {
@@ -217,7 +208,7 @@ private fun RegistrationConsentStep(profile: AthleteProfile, onSaved: (AthletePr
                 }
             },
             modifier = Modifier.fillMaxWidth()
-        ) { Text(stringResource(R.string.action_save)) }
+        )
     }
 }
 

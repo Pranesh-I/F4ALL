@@ -7,6 +7,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { REVIEW_REASONS, formatScore, reviewReasonLabel, shortId } from "../../lib/format";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { describeError } from "../StateViews";
+import { ui } from "../../lib/ui";
 
 interface ActionSpec {
   value: ReviewActionName;
@@ -182,8 +183,8 @@ export function DecisionPanel({
     : formatScore(result.server_score, result.unit);
 
   return (
-    <form onSubmit={review} aria-label="Decision" className="space-y-4 rounded border border-slate-300 bg-white p-4">
-      <h2 className="font-semibold">Decision</h2>
+    <form onSubmit={review} aria-label="Decision" className="space-y-4 rounded-xs border-2 border-ink bg-paper p-4">
+      <h2 className="label-caps border-b-2 border-ink pb-1 text-sm">Decision</h2>
 
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Decision">
         {allowed.map((candidate) => (
@@ -196,12 +197,14 @@ export function DecisionPanel({
               setAction(candidate.value);
               setProblem(null);
             }}
-            className={`rounded border-2 px-4 py-2 text-sm font-medium ${
+            className={`rounded-xs border-2 px-4 py-2 text-sm font-semibold ${
               action === candidate.value
-                ? candidate.tone === "danger"
-                  ? "border-red-600 bg-red-50 text-red-800"
-                  : "border-slate-900 bg-slate-50 text-slate-900"
-                : "border-slate-200 text-slate-700 hover:border-slate-400"
+                ? candidate.value === "approved"
+                  ? "border-stamp bg-stamp-tint text-stamp"
+                  : candidate.tone === "danger"
+                    ? "border-redpen bg-redpen-tint text-redpen"
+                    : "border-ink bg-ink text-paper"
+                : "border-line text-ink hover:border-ink"
             }`}
           >
             {candidate.label}
@@ -209,7 +212,7 @@ export function DecisionPanel({
         ))}
       </div>
 
-      {spec && <p className="text-sm text-slate-600">{spec.outcome}</p>}
+      {spec && <p className="text-sm text-pencil">{spec.outcome}</p>}
 
       {needsReason && (
         <label className="block text-sm">
@@ -217,7 +220,7 @@ export function DecisionPanel({
           <select
             value={reason}
             onChange={(event) => setReason(event.target.value as ReviewReason | "")}
-            className="mt-1 block w-full max-w-sm rounded border border-slate-300 bg-white px-3 py-2"
+            className={`mt-1 block max-w-sm ${ui.select} w-full`}
           >
             <option value="">Choose a reason…</option>
             {REVIEW_REASONS.map((item) => (
@@ -235,7 +238,7 @@ export function DecisionPanel({
           <select
             value={severity}
             onChange={(event) => setSeverity(event.target.value as Severity)}
-            className="mt-1 block w-40 rounded border border-slate-300 bg-white px-3 py-2"
+            className={`mt-1 block w-40 ${ui.select}`}
           >
             <option value="low">Low</option>
             <option value="medium">Medium</option>
@@ -253,7 +256,7 @@ export function DecisionPanel({
             step="any"
             value={manualScore}
             onChange={(event) => setManualScore(event.target.value)}
-            className="mt-1 block w-40 rounded border border-slate-300 px-3 py-2"
+            className="numerals mt-1 block w-40 rounded-xs border border-line bg-paper px-3 py-1.5 text-lg focus-visible:border-ink"
           />
         </label>
       )}
@@ -266,18 +269,18 @@ export function DecisionPanel({
             maxLength={2000}
             rows={3}
             onChange={(event) => setNotes(event.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+            className={`mt-1 ${ui.input}`}
           />
         </label>
       )}
 
       {problem && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-redpen">
           {problem}
         </p>
       )}
       {mutation.isError && (
-        <div role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <div role="alert" className="rounded-xs border border-redpen bg-redpen-tint px-3 py-2 text-sm text-redpen">
           {conflict ? (
             <>
               <p className="font-medium">Another official acted on this submission first.</p>
@@ -294,14 +297,14 @@ export function DecisionPanel({
         <button
           type="submit"
           disabled={!spec || mutation.isPending}
-          className={`rounded px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
-            spec?.tone === "danger" ? "bg-red-700 hover:bg-red-800" : "bg-slate-900 hover:bg-slate-700"
-          }`}
+          className={
+            spec?.value === "approved" ? ui.buttonStamp : spec?.tone === "danger" ? ui.buttonRedPen : ui.buttonInk
+          }
         >
           {spec ? `${spec.label}…` : "Choose a decision"}
         </button>
         {action && (
-          <button type="button" onClick={clear} className="rounded border border-slate-300 px-4 py-2 text-sm">
+          <button type="button" onClick={clear} className={ui.buttonLine}>
             Clear
           </button>
         )}
@@ -311,7 +314,7 @@ export function DecisionPanel({
         <ConfirmDialog
           title={`${spec.label}?`}
           confirmLabel={spec.label}
-          tone={spec.tone}
+          tone={spec.value === "approved" ? "approve" : spec.tone}
           busy={mutation.isPending}
           onConfirm={() => mutation.mutate()}
           onCancel={() => setConfirming(false)}

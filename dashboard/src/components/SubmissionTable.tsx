@@ -24,9 +24,9 @@ export function SubmissionTable({
 }) {
   const review = variant === "review";
   return (
-    <div className="overflow-x-auto rounded border border-slate-200 bg-white">
+    <div className="overflow-x-auto rounded-xs border border-ink bg-paper">
       <table className="min-w-full text-sm">
-        <thead className="bg-slate-50 text-left text-slate-600">
+        <thead className="border-b-2 border-ink text-left text-xs [&_th]:label-caps [&_th]:font-semibold">
           <tr>
             <th className="px-3 py-2">Submission</th>
             <th className="px-3 py-2">Athlete</th>
@@ -50,33 +50,33 @@ export function SubmissionTable({
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.result_id} className="border-t border-slate-100 align-top hover:bg-slate-50">
+            <tr key={item.result_id} className="border-t border-rule align-top hover:bg-ground">
               <td className="px-3 py-2">
                 <Link
                   to={linkTo(item.result_id)}
-                  className="font-mono text-xs text-blue-700 hover:underline"
+                  className="numerals text-base tracking-wide text-ink underline decoration-line underline-offset-4 hover:decoration-ink"
                   aria-label={`Submission ${shortId(item.result_id)} by ${item.athlete_name}`}
                 >
                   #{shortId(item.result_id)}
                 </Link>
-                <div className="whitespace-nowrap text-xs text-slate-500">{formatDateTime(item.created_at)}</div>
+                <div className="whitespace-nowrap text-xs text-pencil">{formatDateTime(item.created_at)}</div>
               </td>
               <td className="px-3 py-2">
                 <div className="font-medium">{item.athlete_name}</div>
-                <div className="text-xs text-slate-500">{item.region}</div>
+                <div className="text-xs text-pencil">{item.region}</div>
               </td>
               <td className="px-3 py-2">
                 {nameOf(item.test_type)}
-                <span className="text-xs text-slate-500"> · attempt {item.attempt_number}</span>
+                <span className="text-xs text-pencil"> · attempt {item.attempt_number}</span>
               </td>
               {showSession && (
                 <td className="px-3 py-2">
                   {item.session_id ? (
-                    <Link to={paths.session(item.session_id)} className="text-blue-700 hover:underline">
+                    <Link to={paths.session(item.session_id)} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
                       {item.session_name}
                     </Link>
                   ) : (
-                    <span className="text-slate-400">No session</span>
+                    <span className="text-pencil">No session</span>
                   )}
                 </td>
               )}
@@ -88,7 +88,7 @@ export function SubmissionTable({
                   <td className="whitespace-nowrap px-3 py-2">
                     <SeverityBadge severity={item.max_severity} />
                     {item.open_flag_count > 0 && (
-                      <span className="ml-1 text-xs text-slate-500">({item.open_flag_count} open)</span>
+                      <span className="ml-1 text-xs text-pencil">({item.open_flag_count} open)</span>
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -102,12 +102,12 @@ export function SubmissionTable({
                   </td>
                   <td className="px-3 py-2">
                     <SeverityBadge severity={item.max_severity} />
-                    {item.flag_count > 0 && <span className="ml-1 text-xs text-slate-500">({item.flag_count})</span>}
+                    {item.flag_count > 0 && <span className="ml-1 text-xs text-pencil">({item.flag_count})</span>}
                   </td>
                 </>
               )}
-              <td className="px-3 py-2 text-right tabular-nums">{formatScore(item.provisional_score, item.unit)}</td>
-              <td className="px-3 py-2 text-right tabular-nums">{formatScore(item.server_score, item.unit)}</td>
+              <td className="numerals px-3 py-2 text-right text-base text-pencil">{formatScore(item.provisional_score, item.unit)}</td>
+              <td className="numerals px-3 py-2 text-right text-base">{formatScore(item.server_score, item.unit)}</td>
             </tr>
           ))}
         </tbody>

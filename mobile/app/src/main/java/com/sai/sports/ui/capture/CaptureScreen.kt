@@ -23,16 +23,29 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -52,19 +65,27 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -96,12 +117,24 @@ import com.sai.sports.gesture.GestureVerifier
 import com.sai.sports.sync.PracticeSyncWorker
 import com.sai.sports.sync.SyncScheduler
 import com.sai.sports.ui.common.Labels
+import com.sai.sports.ui.kit.DarkSystemBars
+import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.ModeTag
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.PlainButton
+import com.sai.sports.ui.kit.Sheet
+import com.sai.sports.ui.kit.SheetShape
+import com.sai.sports.ui.kit.TallyMarks
+import com.sai.sports.ui.kit.TitleBar
+import com.sai.sports.ui.kit.TrialsIcons
+import com.sai.sports.ui.theme.TrialsColors
 import com.sai.sports.utils.FrameExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.Executors
 
 @Composable
@@ -381,6 +414,9 @@ private fun CameraPreview(
         onDispose { view.keepScreenOn = false }
     }
 
+    // The camera is dark: the status bar icons switch to white while it shows.
+    DarkSystemBars()
+
     /** The camera is gone: abandon any attempt it was carrying, then say so. */
     fun failCamera() {
         val wasActive = flow.isActive && flow.phase.value != CapturePhase.Saving
@@ -656,7 +692,11 @@ private fun CameraPreview(
         if (attemptInProgress) abandonAttempt()
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
 
         /*
          * CameraX preview. COMPATIBLE (TextureView) rather than the default
@@ -691,120 +731,74 @@ private fun CameraPreview(
         )
 
         /*
-         * Top title + instructions
+         * The top of the screen, in reading order: which world this is and
+         * which test; how to stand (before starting); then, once scoring runs,
+         * the count — huge, because the athlete reads it from three metres away
+         * mid-rep — and the coaching cue under it, near their eye line.
          */
-        if (phase == CapturePhase.Ready || phase == CapturePhase.Recording) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CaptureStrip(
+                official = mode == AttemptMode.OFFICIAL,
+                testName = stringResource(Labels.testName(testType)),
+                sessionName = assessment?.name,
+                recording = phase == CapturePhase.Recording
+            )
 
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 32.dp, start = 20.dp, end = 20.dp)
-                    .background(color = Color.Black.copy(alpha = 0.55f))
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-
-                if (mode == AttemptMode.PRACTICE) {
-                    PracticeBadge()
-                }
-                assessment?.let { OfficialBadge(it.name) }
-
-                Text(
-                    text = stringResource(Labels.testName(testType)),
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.semantics { heading() }
-                )
-
-                Text(
-                    text = stringResource(
-                        when (testType) {
-                            TestType.SQUATS -> R.string.capture_hint_squats
-                            TestType.PUSH_UPS -> R.string.capture_hint_pushups
-                            TestType.BICEP_CURLS -> R.string.capture_hint_curls
-                            TestType.LUNGES -> R.string.capture_hint_lunges
-                            TestType.VERTICAL_JUMP -> R.string.capture_hint_jump
-                            TestType.SIT_UPS -> R.string.capture_hint_situps
-                        }
-                    ),
-                    color = Color.White,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-        }
-
-        /*
-         * Live score readout.
-         *
-         * Shown while scoring is active so the athlete gets the instant feedback
-         * the brief asks for, instead of waiting for the recording to end.
-         */
-        if (session.isActive) {
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 20.dp)
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    // Announced as it changes, so an athlete who cannot watch
-                    // the screen mid-rep still hears the count.
-                    .semantics(mergeDescendants = true) {
-                        liveRegion = LiveRegionMode.Polite
-                    },
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-
-                Text(
-                    text = if (testType.countsReps) session.liveScore.toInt().toString()
-                        else "%.1f".format(session.liveScore),
-                    color = Color.White,
-                    style = MaterialTheme.typography.displaySmall
-                )
-
-                Text(
-                    text = stringResource(Labels.unit(testType.unit)),
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodySmall
-                )
-
-                session.liveDetail?.let { hint ->
+            if (phase == CapturePhase.Ready) {
+                Sheet(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                ) {
                     Text(
-                        text = liveHintText(hint),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 6.dp)
+                        text = stringResource(
+                            when (testType) {
+                                TestType.SQUATS -> R.string.capture_hint_squats
+                                TestType.PUSH_UPS -> R.string.capture_hint_pushups
+                                TestType.BICEP_CURLS -> R.string.capture_hint_curls
+                                TestType.LUNGES -> R.string.capture_hint_lunges
+                                TestType.VERTICAL_JUMP -> R.string.capture_hint_jump
+                                TestType.SIT_UPS -> R.string.capture_hint_situps
+                            }
+                        ),
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
-        }
 
-        /*
-         * Live form coaching.
-         *
-         * Big, colour-coded and near the athlete's eye line, because they are
-         * mid-rep and glancing, not reading. Announced to screen readers only
-         * when the voice is not already saying it.
-         */
-        session.liveCue?.let { cue ->
+            /*
+             * Live score readout.
+             *
+             * Shown while scoring is active so the athlete gets the instant
+             * feedback the brief asks for, instead of waiting for the recording
+             * to end.
+             */
+            if (session.isActive) {
+                LiveCounter(
+                    score = if (testType.countsReps) session.liveScore.toInt().toString()
+                        else "%.1f".format(session.liveScore),
+                    unit = stringResource(Labels.unit(testType.unit)),
+                    detail = session.liveDetail?.let { liveHintText(it) }
+                )
+            }
 
-            val (background, foreground) = cueColors(cue.tone)
-            val speaking = voiceEnabled && voiceAvailable
-
-            Text(
-                text = cueText(cue, testType),
-                color = foreground,
-                style = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 210.dp, start = 20.dp, end = 20.dp)
-                    .background(background, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-                    .semantics {
-                        if (!speaking) liveRegion = LiveRegionMode.Polite
-                    }
-            )
+            /*
+             * Live form coaching: colour-coded, in words and an icon, because
+             * the athlete is mid-rep and glancing, not reading. Announced to
+             * screen readers only when the voice is not already saying it.
+             */
+            session.liveCue?.let { cue ->
+                CueBanner(
+                    text = cueText(cue, testType),
+                    tone = cue.tone,
+                    speaking = voiceEnabled && voiceAvailable
+                )
+            }
         }
 
         /*
@@ -886,123 +880,114 @@ private fun CameraPreview(
             )
         }
 
-        /*
-         * Countdown overlay
-         */
+        // Countdown: one big marigold number in an ink circle.
         (phase as? CapturePhase.Countdown)?.let { countdown ->
-
-            Text(
-                text = countdown.secondsLeft.toString(),
-                color = Color.White,
-                style = MaterialTheme.typography.displayLarge,
+            Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .padding(horizontal = 40.dp, vertical = 20.dp)
-                    .semantics { liveRegion = LiveRegionMode.Assertive }
-            )
+                    .size(184.dp)
+                    .background(TrialsColors.Ink.copy(alpha = 0.82f), CircleShape)
+                    .semantics { liveRegion = LiveRegionMode.Assertive },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = countdown.secondsLeft.toString(),
+                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 128.sp, lineHeight = 128.sp),
+                    color = TrialsColors.Marigold
+                )
+            }
         }
 
         /*
-         * Recording indicator
-         */
-        if (phase == CapturePhase.Recording) {
-
-            Text(
-                text = stringResource(R.string.capture_recording),
-                color = Color.Red,
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 180.dp)
-            )
-        }
-
-        /*
-         * Bottom controls
+         * The bottom of the screen: the tally of reps as a coach would mark
+         * it, then the controls: the way out, the shutter, the voice.
          */
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp),
+                .fillMaxWidth()
+                .background(TrialsColors.Ink.copy(alpha = 0.84f))
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            if (phase == CapturePhase.Saving) {
-                Text(
-                    text = stringResource(R.string.capture_scoring),
-                    color = Color.White
+            if (testType.countsReps && session.isActive) {
+                TallyMarks(
+                    counted = session.liveScore.toInt(),
+                    missed = session.liveMissed,
+                    markHeight = 36.dp
                 )
             }
 
-            if (testType.countsReps && (phase == CapturePhase.Ready || phase == CapturePhase.Recording)) {
-
-                val toggleDescription = stringResource(R.string.voice_toggle_description)
-
-                TextButton(
-                    onClick = {
-                        voiceEnabled = !voiceEnabled
-                        VoicePreference.setEnabled(context, voiceEnabled)
-                    },
-                    enabled = voiceAvailable,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
-                        .semantics { contentDescription = toggleDescription }
-                ) {
-                    Text(
-                        text = stringResource(
-                            if (voiceEnabled && voiceAvailable) R.string.voice_on else R.string.voice_off
-                        ),
-                        color = Color.White
-                    )
-                }
-
-                if (!voiceAvailable) {
-                    Text(
-                        text = stringResource(R.string.voice_unavailable),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .padding(horizontal = 24.dp)
-                            .background(Color.Black.copy(alpha = 0.55f))
-                            .padding(6.dp)
-                    )
-                }
+            if (phase == CapturePhase.Saving) {
+                Text(
+                    text = stringResource(R.string.capture_scoring),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TrialsColors.Paper
+                )
             }
 
-            if (phase == CapturePhase.Ready) {
-
-                // Starting needs a live picture, not just a bound camera: an
-                // attempt started on a black preview would record nothing.
-                Button(
-                    onClick = { flow.start() },
-                    enabled = videoCapture != null && cameraStreaming && poseLandmarkerHelper.isReady &&
-                        assessmentGate == SessionGate.OPEN &&
-                        (testType != TestType.VERTICAL_JUMP || athleteHeightCm != null)
-                ) {
-                    Text(stringResource(R.string.capture_record))
-                }
-            }
-
-            if (phase == CapturePhase.Recording) {
-
-                Button(onClick = { if (flow.stopRequested()) recording?.stop() }) {
-                    Text(stringResource(R.string.capture_stop))
-                }
-            }
-
-            if (phase != CapturePhase.Saving) {
-                Button(
-                    onClick = {
-                        if (attemptInProgress) abandonAttempt() else onBack()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    if (phase != CapturePhase.Saving) {
+                        PlainButton(
+                            text = stringResource(if (attemptInProgress) R.string.capture_cancel else R.string.action_back),
+                            onClick = { if (attemptInProgress) abandonAttempt() else onBack() },
+                            color = TrialsColors.Paper
+                        )
                     }
-                ) {
-                    Text(
-                        stringResource(if (attemptInProgress) R.string.capture_cancel else R.string.action_back)
-                    )
                 }
+
+                when (phase) {
+                    // Starting needs a live picture, not just a bound camera: an
+                    // attempt started on a black preview would record nothing.
+                    CapturePhase.Ready -> ShutterButton(
+                        label = stringResource(R.string.capture_record),
+                        official = mode == AttemptMode.OFFICIAL,
+                        recording = false,
+                        enabled = videoCapture != null && cameraStreaming && poseLandmarkerHelper.isReady &&
+                            assessmentGate == SessionGate.OPEN &&
+                            (testType != TestType.VERTICAL_JUMP || athleteHeightCm != null),
+                        onClick = { flow.start() }
+                    )
+                    CapturePhase.Recording -> ShutterButton(
+                        label = stringResource(R.string.capture_stop),
+                        official = mode == AttemptMode.OFFICIAL,
+                        recording = true,
+                        enabled = true,
+                        onClick = { if (flow.stopRequested()) recording?.stop() }
+                    )
+                    else -> Spacer(Modifier.size(ShutterSize))
+                }
+
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    if (testType.countsReps && (phase == CapturePhase.Ready || phase == CapturePhase.Recording)) {
+                        VoiceToggle(
+                            on = voiceEnabled && voiceAvailable,
+                            available = voiceAvailable,
+                            onToggle = {
+                                voiceEnabled = !voiceEnabled
+                                VoicePreference.setEnabled(context, voiceEnabled)
+                            }
+                        )
+                    }
+                }
+            }
+
+            if (testType.countsReps && !voiceAvailable &&
+                (phase == CapturePhase.Ready || phase == CapturePhase.Recording)
+            ) {
+                Text(
+                    text = stringResource(R.string.voice_unavailable),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TrialsColors.InkMuted,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -1151,14 +1136,6 @@ private fun spokenText(context: Context, cue: CoachCue, testType: TestType): Str
     if (cue is CoachCue.Counted) cue.count.toString()
     else context.getString(Labels.cue(cue, testType))
 
-/** Background and text colour per tone — green, grey, amber, red, all readable in sunlight. */
-private fun cueColors(tone: CueTone): Pair<Color, Color> = when (tone) {
-    CueTone.POSITIVE -> Color(0xFF2E7D32) to Color.White
-    CueTone.INFO -> Color(0xE6263238) to Color.White
-    CueTone.WARNING -> Color(0xFFFFC107) to Color.Black
-    CueTone.FAULT -> Color(0xFFC62828) to Color.White
-}
-
 @StringRes
 private fun gestureInstruction(gesture: Gesture): Int = when (gesture) {
     Gesture.RAISE_HAND -> R.string.gesture_raise_hand
@@ -1177,6 +1154,206 @@ private fun gestureHintText(hint: GestureVerifier.Hint): Int = when (hint) {
 }
 
 /**
+ * Across the top of the camera: OFFICIAL or PRACTICE, the test, and the
+ * recording light. Reaches up under the status bar so the bar sits on ink.
+ */
+@Composable
+private fun CaptureStrip(
+    official: Boolean,
+    testName: String,
+    sessionName: String?,
+    recording: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(TrialsColors.Ink.copy(alpha = 0.84f))
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ModeTag(official = official)
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = testName,
+                style = MaterialTheme.typography.titleLarge,
+                color = TrialsColors.Paper,
+                modifier = Modifier.semantics { heading() }
+            )
+            sessionName?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TrialsColors.InkMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (recording) {
+            Text(
+                text = stringResource(R.string.capture_recording),
+                style = MaterialTheme.typography.labelLarge,
+                color = TrialsColors.RedPenOnInk
+            )
+        }
+    }
+}
+
+/**
+ * The count, as big as the screen allows: read from across the room, mid-rep.
+ * Announced as it changes, so an athlete who cannot watch the screen still
+ * hears it.
+ */
+@Composable
+private fun LiveCounter(score: String, unit: String, detail: String?) {
+    val shadow = Shadow(color = TrialsColors.Ink.copy(alpha = 0.6f), offset = Offset(0f, 3f), blurRadius = 10f)
+    Column(
+        modifier = Modifier
+            .background(TrialsColors.Ink.copy(alpha = 0.5f), SheetShape)
+            .padding(horizontal = 28.dp, vertical = 6.dp)
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = score,
+            style = MaterialTheme.typography.displayLarge.copy(fontSize = 120.sp, lineHeight = 116.sp, shadow = shadow),
+            color = TrialsColors.Paper
+        )
+        Text(
+            text = unit.uppercase(Locale.getDefault()),
+            style = MaterialTheme.typography.labelMedium.copy(shadow = shadow),
+            color = TrialsColors.Paper
+        )
+        detail?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodyMedium.copy(shadow = shadow),
+                color = TrialsColors.Paper,
+                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+            )
+        }
+    }
+}
+
+/** A coaching cue in words, with an icon for a counted rep or a fault. */
+@Composable
+private fun CueBanner(text: String, tone: CueTone, speaking: Boolean) {
+    val (background, foreground, icon) = cueStyle(tone)
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .background(background, SheetShape)
+            .padding(horizontal = 18.dp, vertical = 12.dp)
+            .semantics(mergeDescendants = true) {
+                if (!speaking) liveRegion = LiveRegionMode.Polite
+            },
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        icon?.let { Icon(it, contentDescription = null, tint = foreground, modifier = Modifier.size(26.dp)) }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.headlineSmall,
+            color = foreground,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/**
+ * Background, text and icon per tone. Paper for a good rep, ink for advice,
+ * marigold for a warning, red pen for a fault — all readable in sunlight.
+ */
+private fun cueStyle(tone: CueTone): Triple<Color, Color, ImageVector?> = when (tone) {
+    CueTone.POSITIVE -> Triple(TrialsColors.Paper, TrialsColors.Ink, TrialsIcons.Check)
+    CueTone.INFO -> Triple(TrialsColors.Ink.copy(alpha = 0.9f), TrialsColors.Paper, null)
+    CueTone.WARNING -> Triple(TrialsColors.Marigold, TrialsColors.Ink, null)
+    CueTone.FAULT -> Triple(TrialsColors.RedPen, TrialsColors.Paper, TrialsIcons.Cross)
+}
+
+private val ShutterSize = 76.dp
+
+/**
+ * The record and stop control, shaped like a camera shutter so it needs no
+ * reading: a marigold disc to record an official test (white for practice),
+ * a red square to stop. The label underneath names it in words too.
+ */
+@Composable
+private fun ShutterButton(
+    label: String,
+    official: Boolean,
+    recording: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val ring = if (enabled) TrialsColors.Paper else TrialsColors.Paper.copy(alpha = 0.35f)
+    val disc = when {
+        !enabled -> TrialsColors.Paper.copy(alpha = 0.25f)
+        official -> TrialsColors.Marigold
+        else -> TrialsColors.Paper
+    }
+    Column(
+        modifier = Modifier
+            .clip(SheetShape)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(ShutterSize)
+                .border(4.dp, ring, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (recording) {
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .background(TrialsColors.RedPen, RoundedCornerShape(4.dp))
+                )
+            } else {
+                Box(
+                    Modifier
+                        .size(58.dp)
+                        .background(disc, CircleShape)
+                )
+            }
+        }
+        Text(text = label, style = MaterialTheme.typography.labelLarge, color = ring)
+    }
+}
+
+/** Spoken coaching on or off: a switch, so a screen reader says which. */
+@Composable
+private fun VoiceToggle(on: Boolean, available: Boolean, onToggle: () -> Unit) {
+    val description = stringResource(R.string.voice_toggle_description)
+    Column(
+        modifier = Modifier
+            .clip(SheetShape)
+            .toggleable(value = on, enabled = available, role = Role.Switch, onValueChange = { onToggle() })
+            .semantics { contentDescription = description }
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = if (on) TrialsIcons.SpeakerOn else TrialsIcons.SpeakerOff,
+            contentDescription = null,
+            tint = if (available) TrialsColors.Paper else TrialsColors.InkMuted,
+            modifier = Modifier.size(28.dp)
+        )
+        Text(
+            text = stringResource(if (on) R.string.voice_on else R.string.voice_off),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (available) TrialsColors.Paper else TrialsColors.InkMuted
+        )
+    }
+}
+
+/**
  * What to do, whether it is being seen, and how long is left — everything the
  * athlete needs from a few metres away, in large type.
  */
@@ -1191,76 +1368,49 @@ private fun GesturePanel(
     Column(
         modifier = modifier
             .padding(horizontal = 20.dp)
-            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+            .background(TrialsColors.Ink.copy(alpha = 0.9f), SheetShape)
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-
         Text(
-            text = stringResource(R.string.gesture_title),
-            color = Color.White,
-            style = MaterialTheme.typography.titleMedium,
+            text = stringResource(R.string.gesture_title).uppercase(Locale.getDefault()),
+            color = TrialsColors.Marigold,
+            style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.semantics { heading() }
         )
-
         Text(
             text = stringResource(gestureInstruction(gesture)),
-            color = Color.White,
+            color = TrialsColors.Paper,
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center
         )
-
         LinearProgressIndicator(
             progress = { progress },
-            modifier = Modifier.fillMaxWidth(),
-            color = Color(0xFF2E7D32)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp),
+            color = TrialsColors.Marigold,
+            trackColor = TrialsColors.InkRaised,
+            strokeCap = StrokeCap.Butt,
+            gapSize = 0.dp,
+            drawStopIndicator = {}
         )
-
         hint?.let {
             Text(
                 text = stringResource(gestureHintText(it)),
-                color = if (it == GestureVerifier.Hint.HOLD_IT) Color(0xFFA5D6A7) else Color(0xFFFFE082),
+                color = if (it == GestureVerifier.Hint.HOLD_IT) TrialsColors.Paper else TrialsColors.Marigold,
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
             )
         }
-
         Text(
             text = stringResource(R.string.gesture_seconds_left, secondsLeft),
-            color = Color.White,
+            color = TrialsColors.InkMuted,
             style = MaterialTheme.typography.bodySmall
         )
     }
-}
-
-/** Names the session an official attempt counts towards. */
-@Composable
-private fun OfficialBadge(sessionName: String) {
-    Text(
-        text = stringResource(R.string.official_badge) + " · " + sessionName,
-        color = Color.White,
-        style = MaterialTheme.typography.labelLarge,
-        modifier = Modifier
-            .padding(bottom = 6.dp)
-            .background(Color(0xFF1565C0), RoundedCornerShape(6.dp))
-            .padding(horizontal = 10.dp, vertical = 3.dp)
-    )
-}
-
-/** Marks every practice screen, so a practice attempt is never mistaken for an official one. */
-@Composable
-private fun PracticeBadge() {
-    Text(
-        text = stringResource(R.string.practice_badge),
-        color = Color.Black,
-        style = MaterialTheme.typography.labelLarge,
-        modifier = Modifier
-            .padding(bottom = 6.dp)
-            .background(Color(0xFFFFC107), RoundedCornerShape(6.dp))
-            .padding(horizontal = 10.dp, vertical = 3.dp)
-    )
 }
 
 /** A plain explanation of what went wrong, and the one thing to do about it. */
@@ -1271,24 +1421,17 @@ private fun MessagePanel(
     onAction: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .padding(horizontal = 20.dp)
-            .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
-            .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+    Sheet(
+        modifier = modifier.padding(horizontal = 20.dp),
+        padding = PaddingValues(20.dp),
+        spacing = 16.dp
     ) {
         Text(
             text = message,
-            color = Color.White,
             style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive }
         )
-        Button(onClick = onAction) {
-            Text(actionLabel)
-        }
+        InkButton(text = actionLabel, onClick = onAction, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -1299,44 +1442,27 @@ private fun PermissionScreen(
     onOpenSettings: () -> Unit,
     onBack: () -> Unit
 ) {
+    Page(header = { TitleBar(stringResource(R.string.camera_permission_title), onBack) }) {
+        Text(
+            text = stringResource(
+                if (permanentlyDenied) R.string.camera_permission_denied_body
+                else R.string.camera_permission_body
+            ),
+            style = MaterialTheme.typography.bodyLarge
+        )
 
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-
-            Text(
-                text = stringResource(R.string.camera_permission_title),
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading() }
+        if (permanentlyDenied) {
+            InkButton(
+                text = stringResource(R.string.camera_permission_open_settings),
+                onClick = onOpenSettings,
+                modifier = Modifier.fillMaxWidth()
             )
-
-            Text(
-                text = stringResource(
-                    if (permanentlyDenied) R.string.camera_permission_denied_body
-                    else R.string.camera_permission_body
-                ),
-                modifier = Modifier.padding(horizontal = 24.dp)
+        } else {
+            InkButton(
+                text = stringResource(R.string.camera_permission_allow),
+                onClick = onRequestPermission,
+                modifier = Modifier.fillMaxWidth()
             )
-
-            if (permanentlyDenied) {
-                Button(onClick = onOpenSettings) {
-                    Text(stringResource(R.string.camera_permission_open_settings))
-                }
-            } else {
-                Button(onClick = onRequestPermission) {
-                    Text(stringResource(R.string.camera_permission_allow))
-                }
-            }
-
-            Button(onClick = onBack) {
-                Text(stringResource(R.string.action_back))
-            }
         }
     }
 }

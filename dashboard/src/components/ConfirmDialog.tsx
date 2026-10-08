@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { ui } from "../lib/ui";
 
 /**
  * A modal question with two explicit answers. The confirm button carries the
@@ -19,7 +20,8 @@ export function ConfirmDialog({
   children: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
-  tone?: "neutral" | "danger";
+  /** "approve" confirms with the stamp's violet: the only place it acts. */
+  tone?: "neutral" | "danger" | "approve";
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -38,24 +40,24 @@ export function ConfirmDialog({
   }, [busy, onCancel]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-md space-y-4 rounded-lg bg-white p-5 shadow-lg"
+        className="w-full max-w-md space-y-4 rounded-xs border-2 border-ink bg-paper p-5"
       >
-        <h2 id={titleId} className="text-lg font-semibold">
+        <h2 id={titleId} className="text-2xl font-bold leading-tight [font-stretch:75%]">
           {title}
         </h2>
-        <div className="space-y-2 text-sm text-slate-700">{children}</div>
+        <div className="space-y-2 text-sm text-ink">{children}</div>
         <div className="flex justify-end gap-2">
           <button
             ref={cancelRef}
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="rounded border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100 disabled:opacity-50"
+            className={ui.buttonLine}
           >
             {cancelLabel}
           </button>
@@ -63,9 +65,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className={`rounded px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
-              tone === "danger" ? "bg-red-700 hover:bg-red-800" : "bg-slate-900 hover:bg-slate-700"
-            }`}
+            className={tone === "danger" ? ui.buttonRedPen : tone === "approve" ? ui.buttonStamp : ui.buttonInk}
           >
             {busy ? "Saving…" : confirmLabel}
           </button>

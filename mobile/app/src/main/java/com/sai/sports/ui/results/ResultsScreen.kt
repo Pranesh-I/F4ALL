@@ -4,19 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,41 +25,73 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sai.sports.R
 import com.sai.sports.analyzer.AnalyzerResult
 import com.sai.sports.analyzer.AttemptStatus
 import com.sai.sports.analyzer.PoseFrame
 import com.sai.sports.analyzer.TestType
+import com.sai.sports.auth.AppServices
 import com.sai.sports.coach.FormSummary
 import com.sai.sports.data.Attempt
 import com.sai.sports.data.AttemptMode
 import com.sai.sports.data.AttemptStore
 import com.sai.sports.data.PracticeComparison
 import com.sai.sports.data.PracticeStats
+import com.sai.sports.data.SyncRepository
+import com.sai.sports.data.local.TestAttemptEntity
+import com.sai.sports.sync.Delivery
 import com.sai.sports.ui.capture.PoseOverlayView
+import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
+import com.sai.sports.ui.kit.BibNumber
+import com.sai.sports.ui.kit.BigNumber
+import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.LineButton
+import com.sai.sports.ui.kit.ModeTag
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.PlainButton
+import com.sai.sports.ui.kit.RuleLine
+import com.sai.sports.ui.kit.ScoreInk
+import com.sai.sports.ui.kit.ScoreMark
+import com.sai.sports.ui.kit.SectionRule
+import com.sai.sports.ui.kit.Sheet
+import com.sai.sports.ui.kit.SheetShape
+import com.sai.sports.ui.kit.SheetStyle
+import com.sai.sports.ui.kit.Slip
+import com.sai.sports.ui.kit.SlipStep
+import com.sai.sports.ui.kit.StatusLine
+import com.sai.sports.ui.kit.StepState
+import com.sai.sports.ui.kit.TitleBar
+import com.sai.sports.ui.kit.TrialsIcons
+import com.sai.sports.ui.theme.TrialsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.text.DateFormat
+import java.util.Date
 import java.util.Locale
 
 /**
- * Shows the provisional score for a completed attempt, with a skeleton replay.
+ * The result of an attempt, straight after recording or from history.
  *
- * The replay is not decoration. When the count is not what the athlete expected,
- * the only useful answer is showing them what the app actually saw — and it is
- * the same view an SAI official gets in the Sprint 8 dashboard.
+ * An official attempt comes back as an acknowledgement slip: the phone's
+ * score in pencil, and where the attempt has got to on its way to an official
+ * result. Practice is rough work on a dashed sheet. The skeleton replay is not
+ * decoration: when the count is not what the athlete expected, the only useful
+ * answer is showing them what the app actually saw — the same view an SAI
+ * official gets on the dashboard.
  */
 @Composable
 fun ResultsScreen(
@@ -74,11 +102,15 @@ fun ResultsScreen(
      * True when opened from history to look back at an old attempt, rather
      * than straight after recording it: there is nothing to "try again".
      */
-    reviewing: Boolean = false
+    reviewing: Boolean = false,
+    /** Opens SAI's own record of a submitted attempt. */
+    onServerResult: ((String) -> Unit)? = null
 ) {
 
     val context = LocalContext.current
     val store = remember { AttemptStore(context) }
+    val queue = remember { SyncRepository(context) }
+    val athleteId = remember { AppServices.session(context).current()?.athleteId }
 
     val loaded by produceState<LoadedAttempt?>(initialValue = null, attemptId) {
         value = withContext(Dispatchers.IO) {
@@ -103,67 +135,77 @@ fun ResultsScreen(
         }
     }
 
+    // An official attempt's place in the upload queue, followed live, so the
+    // slip moves from "waiting for a connection" to "sent" in front of them.
+    val queued by remember(athleteId, attemptId) {
+        athleteId?.let { id ->
+            queue.observeAttempts(id).map { attempts -> attempts.firstOrNull { it.id == attemptId } }
+        } ?: flowOf(null)
+    }.collectAsStateWithLifecycle(initialValue = null)
+
     val current = loaded
 
     if (current == null) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(stringResource(R.string.loading))
+        Page {
+            Text(stringResource(R.string.loading), color = TrialsColors.Pencil)
         }
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    val attempt = current.attempt
+    val official = attempt.mode == AttemptMode.OFFICIAL
 
-        if (current.attempt.mode == AttemptMode.PRACTICE) {
-            PracticeLabel()
+    Page(header = { TitleBar(stringResource(Labels.testName(attempt.testType)), onBack = null) }) {
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ModeTag(official = official)
+            Text(
+                text = formatTime(attempt.recordedAtMs),
+                style = MaterialTheme.typography.bodySmall,
+                color = TrialsColors.Pencil
+            )
         }
 
-        ScoreCard(current.attempt.result)
-
-        current.comparison?.let { PracticeProgressCard(it, current.attempt) }
+        if (official) {
+            OfficialSlip(attempt, athleteId, queued, onServerResult)
+        } else {
+            PracticeSheet(attempt.result, current.comparison, attempt)
+        }
 
         if (current.frames.isNotEmpty()) {
             SkeletonReplay(
                 frames = current.frames,
-                imageWidth = current.attempt.imageWidth,
-                imageHeight = current.attempt.imageHeight
+                imageWidth = attempt.imageWidth,
+                imageHeight = attempt.imageHeight
             )
-        } else if (current.attempt.mode == AttemptMode.PRACTICE) {
+        } else if (!official) {
             // Practice from the athlete's other phone: the result came with
             // their account, the skeleton did not.
             Text(
                 text = stringResource(R.string.practice_no_replay),
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodySmall,
+                color = TrialsColors.Pencil
             )
         }
 
-        FormSummary.from(current.attempt.result.events)?.let { summary ->
-            FormCard(summary, current.attempt.testType)
+        FormSummary.from(attempt.result.events)?.let { summary ->
+            FormCard(summary, attempt.testType)
         }
 
-        QualityCard(current.attempt.result)
+        QualityCard(attempt.result)
 
-        if (current.attempt.result.events.isNotEmpty()) {
-            EventsCard(current.attempt.result)
+        if (attempt.result.events.isNotEmpty()) {
+            EventsCard(attempt.result)
         }
 
-        if (current.attempt.mode == AttemptMode.PRACTICE) {
-            Text(
-                text = stringResource(R.string.practice_notice),
-                style = MaterialTheme.typography.bodySmall
-            )
-        } else {
-            ProvisionalNotice()
-        }
+        Text(
+            text = stringResource(if (official) R.string.result_provisional_notice else R.string.practice_notice),
+            style = MaterialTheme.typography.bodySmall,
+            color = TrialsColors.Pencil
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -172,74 +214,210 @@ fun ResultsScreen(
             // A scored official session attempt used that test's one
             // submission: there is nothing to try again. An unscored one was
             // never queued, so the athlete may still go.
-            val usedSubmission = current.attempt.sessionId != null &&
-                current.attempt.mode == AttemptMode.OFFICIAL &&
-                current.attempt.result.status == AttemptStatus.COMPLETE
+            val usedSubmission = attempt.sessionId != null && official &&
+                attempt.result.status == AttemptStatus.COMPLETE
 
             if (reviewing || !usedSubmission) {
-                OutlinedButton(
+                LineButton(
+                    text = stringResource(if (reviewing) R.string.action_back else R.string.action_try_again),
                     onClick = onRetry,
                     modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(if (reviewing) R.string.action_back else R.string.action_try_again))
-                }
+                )
             }
 
-            Button(
+            InkButton(
+                text = stringResource(R.string.action_done),
                 onClick = onDone,
                 modifier = Modifier.weight(1f)
-            ) {
-                Text(stringResource(R.string.action_done))
-            }
+            )
         }
     }
 }
 
+/**
+ * The acknowledgement slip for an official attempt: the phone's count in
+ * pencil, then each step to an official result. Only SAI's re-measurement
+ * and an official's approval turn the pencil into ink — the slip says so
+ * before the athlete can wonder.
+ */
 @Composable
-private fun ScoreCard(result: AnalyzerResult) {
-
-    Card(modifier = Modifier.fillMaxWidth()) {
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-
+private fun OfficialSlip(
+    attempt: Attempt,
+    athleteId: String?,
+    queued: TestAttemptEntity?,
+    onServerResult: ((String) -> Unit)?
+) {
+    val result = attempt.result
+    Slip {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = stringResource(Labels.testName(result.testType)),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.semantics { heading() }
+                text = stringResource(Labels.testName(attempt.testType)).uppercase(Locale.getDefault()),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.weight(1f)
             )
-
-            if (result.status == AttemptStatus.COMPLETE) {
-
+            athleteId?.let {
                 Text(
-                    text = result.formattedScore(),
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = stringResource(Labels.unit(result.unit)),
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-            } else {
-
-                Text(
-                    text = stringResource(R.string.result_not_scored),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-
-                Text(
-                    text = stringResource(Labels.invalidReason(result.invalidReason)),
-                    style = MaterialTheme.typography.bodyMedium
+                    text = BibNumber.of(it),
+                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.sai.sports.ui.theme.TrialsFonts.Numerals)
                 )
             }
+        }
+
+        if (result.status != AttemptStatus.COMPLETE) {
+            NotScored(result)
+            return@Slip
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ScoreMark(
+                value = result.formattedScore(),
+                unit = stringResource(Labels.unit(result.unit)),
+                ink = ScoreInk.Pencil
+            )
+            Text(
+                text = stringResource(R.string.score_provisional),
+                style = MaterialTheme.typography.bodySmall,
+                color = TrialsColors.Pencil
+            )
+        }
+
+        RuleLine()
+
+        val delivery = queued?.let(Delivery::of)
+        Column {
+            SlipStep(
+                state = StepState.Done,
+                title = stringResource(R.string.step_counted),
+                detail = formatTime(attempt.recordedAtMs)
+            )
+            SlipStep(
+                state = when (delivery) {
+                    Delivery.SUBMITTED -> StepState.Done
+                    Delivery.NOT_ACCEPTED, Delivery.FAILED -> StepState.Refused
+                    null -> StepState.Waiting
+                    else -> StepState.Active
+                },
+                title = stringResource(R.string.home_sync),
+                detail = when (delivery) {
+                    Delivery.SENDING -> queued?.let { stringResource(Labels.syncStatus(it.syncStatus)) }
+                    Delivery.WAITING_TO_SUBMIT -> stringResource(R.string.sync_waiting_to_submit)
+                    Delivery.SUBMITTED -> stringResource(R.string.sync_submitted)
+                    Delivery.NOT_ACCEPTED -> stringResource(R.string.sync_not_accepted)
+                    Delivery.FAILED -> stringResource(R.string.sync_failed)
+                    null -> stringResource(R.string.step_waiting)
+                }
+            )
+            SlipStep(
+                state = if (delivery == Delivery.SUBMITTED) StepState.Active else StepState.Waiting,
+                title = stringResource(R.string.step_checked),
+                detail = stringResource(
+                    if (delivery == Delivery.SUBMITTED) R.string.step_in_progress else R.string.step_waiting
+                )
+            )
+            SlipStep(
+                state = StepState.Waiting,
+                title = stringResource(R.string.step_approved),
+                detail = stringResource(R.string.step_waiting),
+                last = true
+            )
+        }
+
+        val resultId = queued?.resultId
+        if (resultId != null && onServerResult != null) {
+            PlainButton(
+                text = stringResource(R.string.sync_see_result),
+                onClick = { onServerResult(resultId) },
+                icon = TrialsIcons.Forward
+            )
+        }
+    }
+}
+
+/** Why there is no number: said in red pen, with the analyzer's reason in the athlete's language. */
+@Composable
+private fun NotScored(result: AnalyzerResult) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = stringResource(R.string.result_not_scored),
+            style = MaterialTheme.typography.headlineSmall,
+            color = TrialsColors.RedPen
+        )
+        Text(
+            text = stringResource(Labels.invalidReason(result.invalidReason)),
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
+}
+
+/**
+ * A practice result: rough work in pencil, with progress in the athlete's own
+ * terms. A new personal best is highlighted in marigold — the garland colour.
+ */
+@Composable
+private fun PracticeSheet(result: AnalyzerResult, comparison: PracticeComparison?, attempt: Attempt) {
+    Sheet(style = SheetStyle.Rough, padding = PaddingValues(18.dp), spacing = 12.dp) {
+        if (result.status != AttemptStatus.COMPLETE) {
+            NotScored(result)
+        } else {
+            ScoreMark(
+                value = result.formattedScore(),
+                unit = stringResource(Labels.unit(result.unit)),
+                ink = ScoreInk.Pencil
+            )
+        }
+        Text(
+            text = stringResource(R.string.practice_never_counts),
+            style = MaterialTheme.typography.bodySmall,
+            color = TrialsColors.Pencil
+        )
+        comparison?.let { PracticeProgress(it, attempt) }
+    }
+}
+
+/** Progress, in the athlete's terms: a personal best, or how this compares with their best and their last. */
+@Composable
+private fun PracticeProgress(comparison: PracticeComparison, attempt: Attempt) {
+
+    val unit = stringResource(Labels.unit(attempt.result.unit))
+
+    fun format(value: Double) =
+        if (attempt.testType.countsReps) value.toInt().toString()
+        else String.format(Locale.getDefault(), "%.1f", value)
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        when {
+            comparison.isFirstScored -> Text(
+                text = stringResource(R.string.practice_first_best),
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            comparison.isPersonalBest -> Text(
+                text = stringResource(R.string.practice_new_best),
+                style = MaterialTheme.typography.titleLarge,
+                color = TrialsColors.Ink,
+                modifier = Modifier
+                    .background(TrialsColors.Marigold, SheetShape)
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite }
+            )
+
+            else -> comparison.previousBest?.let { best ->
+                Text(
+                    text = stringResource(R.string.practice_your_best, "${format(best)} $unit"),
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+        }
+
+        comparison.changeFromPrevious?.let { change ->
+            Text(
+                text = when {
+                    change > 0.0 -> stringResource(R.string.practice_vs_last_up, "${format(change)} $unit")
+                    change < 0.0 -> stringResource(R.string.practice_vs_last_down, "${format(-change)} $unit")
+                    else -> stringResource(R.string.practice_vs_last_same)
+                },
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 }
@@ -294,116 +472,96 @@ private fun SkeletonReplay(
         }
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Sheet(spacing = 12.dp) {
+        SectionRule(stringResource(R.string.result_replay_title))
 
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(safeWidth.toFloat() / safeHeight.toFloat())
+                .background(TrialsColors.Ink)
         ) {
+            val replayDescription = stringResource(R.string.result_replay_description)
+            AndroidView(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .semantics { contentDescription = replayDescription },
+                factory = { context ->
+                    PoseOverlayView(context).also {
+                        it.scaleMode = PoseOverlayView.ScaleMode.FIT_CENTER
+                        overlay = it
+                    }
+                }
+            )
+        }
+
+        Slider(
+            value = frameIndex.toFloat(),
+            onValueChange = {
+                isPlaying = false
+                frameIndex = it.toInt()
+            },
+            valueRange = 0f..frames.lastIndex.coerceAtLeast(1).toFloat()
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            LineButton(
+                text = stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
+                onClick = {
+                    if (frameIndex >= frames.lastIndex) {
+                        frameIndex = 0
+                    }
+                    isPlaying = !isPlaying
+                }
+            )
 
             Text(
-                text = stringResource(R.string.result_replay_title),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.semantics { heading() }
+                text = stringResource(R.string.result_frame_counter, frameIndex + 1, frames.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = TrialsColors.Pencil
             )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(safeWidth.toFloat() / safeHeight.toFloat())
-                    .background(Color.Black)
-            ) {
-                val replayDescription = stringResource(R.string.result_replay_description)
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .semantics { contentDescription = replayDescription },
-                    factory = { context ->
-                        PoseOverlayView(context).also {
-                            it.scaleMode = PoseOverlayView.ScaleMode.FIT_CENTER
-                            overlay = it
-                        }
-                    }
-                )
-            }
-
-            Slider(
-                value = frameIndex.toFloat(),
-                onValueChange = {
-                    isPlaying = false
-                    frameIndex = it.toInt()
-                },
-                valueRange = 0f..frames.lastIndex.coerceAtLeast(1).toFloat()
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-
-                OutlinedButton(
-                    onClick = {
-                        if (frameIndex >= frames.lastIndex) {
-                            frameIndex = 0
-                        }
-                        isPlaying = !isPlaying
-                    }
-                ) {
-                    Text(
-                        stringResource(if (isPlaying) R.string.action_pause else R.string.action_play)
-                    )
-                }
-
-                Text(
-                    text = stringResource(R.string.result_frame_counter, frameIndex + 1, frames.size),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
         }
     }
 }
 
+/** How much of the attempt the app could actually see. */
 @Composable
 private fun QualityCard(result: AnalyzerResult) {
+    Sheet(spacing = 10.dp) {
+        SectionRule(
+            title = stringResource(R.string.result_tracking_title),
+            trailing = "${(result.confidence * 100).toInt()}%"
+        )
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-
-        Column(
+        LinearProgressIndicator(
+            progress = { result.confidence.toFloat() },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+                .height(6.dp),
+            color = TrialsColors.Ink,
+            trackColor = TrialsColors.PaperShade,
+            strokeCap = StrokeCap.Butt,
+            gapSize = 0.dp,
+            drawStopIndicator = {}
+        )
 
-            Text(
-                text = stringResource(R.string.result_tracking_title),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.semantics { heading() }
-            )
+        Text(
+            text = stringResource(
+                R.string.result_tracking_detail,
+                (result.confidence * 100).toInt(),
+                result.framesAnalyzed,
+                result.framesRejected
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = TrialsColors.Pencil
+        )
 
-            LinearProgressIndicator(
-                progress = { result.confidence.toFloat() },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Text(
-                text = stringResource(
-                    R.string.result_tracking_detail,
-                    (result.confidence * 100).toInt(),
-                    result.framesAnalyzed,
-                    result.framesRejected
-                ),
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            if (result.framesRejected > result.framesAnalyzed) {
-                Text(
-                    text = stringResource(R.string.result_tracking_poor),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
+        if (result.framesRejected > result.framesAnalyzed) {
+            ErrorText(stringResource(R.string.result_tracking_poor))
         }
     }
 }
@@ -426,43 +584,34 @@ private fun EventsCard(result: AnalyzerResult) {
             stringResource(
                 if (sitUps) R.string.summary_reps_counted else R.string.summary_reps_counted_generic,
                 summary.repsCounted
-            )
+            ) to true
         )
         if (summary.partialReps > 0) add(
             stringResource(
                 if (sitUps) R.string.summary_partial_reps else R.string.summary_partial_reps_generic,
                 summary.partialReps
-            )
+            ) to false
         )
-        if (summary.tooFastReps > 0) add(stringResource(R.string.summary_too_fast_reps, summary.tooFastReps))
-        if (summary.formRejectedReps > 0) add(stringResource(R.string.summary_form_rejected, summary.formRejectedReps))
-        if (summary.formWarnings > 0) add(stringResource(R.string.summary_form_warnings, summary.formWarnings))
-        if (summary.wrongArmReps > 0) add(stringResource(R.string.summary_wrong_arm, summary.wrongArmReps))
-        if (summary.jumpsMeasured > 0) add(stringResource(R.string.summary_jumps_measured, summary.jumpsMeasured))
-        if (summary.jumpsRejected > 0) add(stringResource(R.string.summary_jumps_rejected, summary.jumpsRejected))
-        if (summary.trackingLost > 0) add(stringResource(R.string.summary_tracking_lost, summary.trackingLost))
+        if (summary.tooFastReps > 0) add(stringResource(R.string.summary_too_fast_reps, summary.tooFastReps) to false)
+        if (summary.formRejectedReps > 0) add(stringResource(R.string.summary_form_rejected, summary.formRejectedReps) to false)
+        if (summary.formWarnings > 0) add(stringResource(R.string.summary_form_warnings, summary.formWarnings) to false)
+        if (summary.wrongArmReps > 0) add(stringResource(R.string.summary_wrong_arm, summary.wrongArmReps) to false)
+        if (summary.jumpsMeasured > 0) add(stringResource(R.string.summary_jumps_measured, summary.jumpsMeasured) to true)
+        if (summary.jumpsRejected > 0) add(stringResource(R.string.summary_jumps_rejected, summary.jumpsRejected) to false)
+        if (summary.trackingLost > 0) add(stringResource(R.string.summary_tracking_lost, summary.trackingLost) to false)
     }
 
     if (lines.isEmpty()) return
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-
-            Text(
-                text = stringResource(R.string.result_summary_title),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.semantics { heading() }
+    Sheet(spacing = 8.dp) {
+        SectionRule(stringResource(R.string.result_summary_title))
+        // Counted in ink with a tick; what did not count in red pen.
+        lines.forEach { (line, counted) ->
+            StatusLine(
+                text = line,
+                icon = if (counted) TrialsIcons.Check else TrialsIcons.Cross,
+                color = if (counted) TrialsColors.Ink else TrialsColors.RedPen
             )
-
-            lines.forEach { line ->
-                Text(text = "• $line", style = MaterialTheme.typography.bodySmall)
-            }
         }
     }
 }
@@ -476,133 +625,41 @@ private fun EventsCard(result: AnalyzerResult) {
  */
 @Composable
 private fun FormCard(summary: FormSummary, testType: TestType) {
+    Sheet(spacing = 8.dp) {
+        SectionRule(stringResource(R.string.form_title))
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-
-            Text(
-                text = stringResource(R.string.form_title),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.semantics { heading() }
-            )
-
-            Text(
-                text = "${summary.scorePercent}%",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
+            BigNumber("${summary.scorePercent}%")
             Text(
                 text = stringResource(R.string.form_good_reps, summary.goodReps, summary.attemptedReps),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
             )
+        }
 
-            if (summary.toWorkOn.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.form_all_good),
-                    style = MaterialTheme.typography.bodyMedium
+        if (summary.toWorkOn.isEmpty()) {
+            StatusLine(
+                text = stringResource(R.string.form_all_good),
+                icon = TrialsIcons.Check,
+                color = TrialsColors.Ink
+            )
+        } else {
+            summary.toWorkOn.forEach { cue ->
+                StatusLine(
+                    text = stringResource(R.string.form_work_on, stringResource(Labels.cue(cue, testType))),
+                    icon = TrialsIcons.Forward,
+                    color = TrialsColors.Ink
                 )
-            } else {
-                summary.toWorkOn.forEach { cue ->
-                    Text(
-                        text = stringResource(R.string.form_work_on, stringResource(Labels.cue(cue, testType))),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
             }
         }
     }
 }
 
-/**
- * The system's first invariant, said out loud to the athlete.
- *
- * They should never be surprised when the official number differs from what
- * their phone showed.
- */
-@Composable
-private fun ProvisionalNotice() {
-
-    Text(
-        text = stringResource(R.string.result_provisional_notice),
-        style = MaterialTheme.typography.bodySmall
-    )
-}
-
-/** Says "practice" in words, not only colour, so it survives a screen reader and bright sun. */
-@Composable
-private fun PracticeLabel() {
-    Text(
-        text = stringResource(R.string.practice_badge),
-        style = MaterialTheme.typography.labelLarge,
-        color = Color.Black,
-        modifier = Modifier
-            .background(Color(0xFFFFC107), RoundedCornerShape(6.dp))
-            .padding(horizontal = 10.dp, vertical = 3.dp)
-    )
-}
-
-/**
- * Progress, in the athlete's terms: a personal best, or how this attempt
- * compares with their best and their last one.
- */
-@Composable
-private fun PracticeProgressCard(comparison: PracticeComparison, attempt: Attempt) {
-
-    val unit = stringResource(Labels.unit(attempt.result.unit))
-
-    fun format(value: Double) =
-        if (attempt.testType.countsReps) value.toInt().toString()
-        else String.format(Locale.getDefault(), "%.1f", value)
-
-    Card(modifier = Modifier.fillMaxWidth()) {
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-
-            when {
-                comparison.isFirstScored -> Text(
-                    text = stringResource(R.string.practice_first_best),
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                comparison.isPersonalBest -> Text(
-                    text = stringResource(R.string.practice_new_best),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color(0xFF2E7D32),
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-                )
-
-                else -> comparison.previousBest?.let { best ->
-                    Text(
-                        text = stringResource(R.string.practice_your_best, "${format(best)} $unit"),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-            }
-
-            comparison.changeFromPrevious?.let { change ->
-                Text(
-                    text = when {
-                        change > 0.0 -> stringResource(R.string.practice_vs_last_up, "${format(change)} $unit")
-                        change < 0.0 -> stringResource(R.string.practice_vs_last_down, "${format(-change)} $unit")
-                        else -> stringResource(R.string.practice_vs_last_same)
-                    },
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-    }
-}
+private fun formatTime(timestampMs: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(timestampMs))
 
 private data class LoadedAttempt(
     val attempt: Attempt,

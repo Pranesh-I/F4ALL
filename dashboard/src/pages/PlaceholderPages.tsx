@@ -22,7 +22,7 @@ export function AthletesPage() {
   return (
     <NotYetAvailable title="Athletes">
       The athlete directory is planned for a later sprint. Until then, find an athlete&apos;s tests in{" "}
-      <Link to={paths.submissions} className="text-blue-700 hover:underline">
+      <Link to={paths.submissions} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
         Submissions
       </Link>
       .
@@ -43,7 +43,7 @@ export function AnalyticsPage() {
   return (
     <NotYetAvailable title="Analytics">
       Analytics arrive with Sprint 16. Live counts by state are on the{" "}
-      <Link to={paths.dashboard} className="text-blue-700 hover:underline">
+      <Link to={paths.dashboard} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
         dashboard
       </Link>
       .
@@ -55,7 +55,7 @@ export function NotFoundPage() {
   return (
     <NotYetAvailable title="Page not found">
       There is no page at this address.{" "}
-      <Link to={paths.dashboard} className="text-blue-700 hover:underline">
+      <Link to={paths.dashboard} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
         Go to the dashboard
       </Link>
       .

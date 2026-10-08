@@ -36,22 +36,46 @@ class PoseOverlayView(
         FIT_CENTER
     }
 
+    /*
+     * Trials palette: chalk-white limbs over an ink edge, so the skeleton reads
+     * on a sunlit wall and in a dim room alike; marigold joints; pencil grey
+     * for a joint the model is unsure of.
+     */
+    private val density = resources.displayMetrics.density
+
     private val pointPaint = Paint().apply {
-        color = Color.GREEN
+        color = MARIGOLD
         style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val pointEdgePaint = Paint().apply {
+        color = INK
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * density
         isAntiAlias = true
     }
 
     private val lowConfidencePointPaint = Paint().apply {
-        color = Color.YELLOW
+        color = PENCIL
         style = Paint.Style.FILL
         isAntiAlias = true
     }
 
-    private val linePaint = Paint().apply {
-        color = Color.GREEN
+    private val lineEdgePaint = Paint().apply {
+        color = INK
+        alpha = 150
         style = Paint.Style.STROKE
-        strokeWidth = 6f
+        strokeWidth = 7f * density
+        strokeCap = Paint.Cap.ROUND
+        isAntiAlias = true
+    }
+
+    private val linePaint = Paint().apply {
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 3.5f * density
+        strokeCap = Paint.Cap.ROUND
         isAntiAlias = true
     }
 
@@ -103,31 +127,32 @@ class PoseOverlayView(
             if (start.visibility < AnalyzerThresholds.MIN_LANDMARK_VISIBILITY) continue
             if (end.visibility < AnalyzerThresholds.MIN_LANDMARK_VISIBILITY) continue
 
-            canvas.drawLine(
-                offsetX + start.x * scaledWidth,
-                offsetY + start.y * scaledHeight,
-                offsetX + end.x * scaledWidth,
-                offsetY + end.y * scaledHeight,
-                linePaint
-            )
+            val x1 = offsetX + start.x * scaledWidth
+            val y1 = offsetY + start.y * scaledHeight
+            val x2 = offsetX + end.x * scaledWidth
+            val y2 = offsetY + end.y * scaledHeight
+            canvas.drawLine(x1, y1, x2, y2, lineEdgePaint)
+            canvas.drawLine(x1, y1, x2, y2, linePaint)
         }
 
         for (point in points) {
 
-            val paint =
-                if (point.visibility >= AnalyzerThresholds.MIN_LANDMARK_VISIBILITY) pointPaint
-                else lowConfidencePointPaint
+            val confident = point.visibility >= AnalyzerThresholds.MIN_LANDMARK_VISIBILITY
+            val x = offsetX + point.x * scaledWidth
+            val y = offsetY + point.y * scaledHeight
+            val radius = 4f * density
 
-            canvas.drawCircle(
-                offsetX + point.x * scaledWidth,
-                offsetY + point.y * scaledHeight,
-                8f,
-                paint
-            )
+            canvas.drawCircle(x, y, radius, if (confident) pointPaint else lowConfidencePointPaint)
+            canvas.drawCircle(x, y, radius, pointEdgePaint)
         }
     }
 
     companion object {
+
+        // TrialsColors, as ARGB ints for the Android canvas.
+        private const val INK = 0xFF171512.toInt()
+        private const val MARIGOLD = 0xFFF2A900.toInt()
+        private const val PENCIL = 0xFF9A9A96.toInt()
 
         /*
          * MediaPipe Pose has 33 landmarks.

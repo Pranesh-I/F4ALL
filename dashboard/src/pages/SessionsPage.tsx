@@ -59,7 +59,7 @@ export function SessionsPage() {
           isAdmin && (
             <Link
               to={paths.newSession}
-              className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+              className="rounded-xs bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-raised"
             >
               New session
             </Link>
@@ -67,7 +67,7 @@ export function SessionsPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200" role="tablist" aria-label="Session status">
+      <div className="flex flex-wrap gap-2 border-b border-ink" role="tablist" aria-label="Session status">
         {FILTERS.map((filter) => (
           <button
             key={filter.key}
@@ -77,8 +77,8 @@ export function SessionsPage() {
             onClick={() => setParams(filter.key ? { status: filter.key } : {})}
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
               status === filter.key
-                ? "border-slate-900 text-slate-900"
-                : "border-transparent text-slate-500 hover:text-slate-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-pencil hover:text-ink"
             }`}
           >
             {filter.label}
@@ -100,7 +100,7 @@ export function SessionsPage() {
           action={
             isAdmin &&
             !status && (
-              <Link to={paths.newSession} className="text-blue-700 hover:underline">
+              <Link to={paths.newSession} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
                 Create the first session
               </Link>
             )
@@ -113,9 +113,9 @@ export function SessionsPage() {
       )}
 
       {sessions.data && sessions.data.length > 0 && (
-        <div className="overflow-x-auto rounded border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-xs border border-ink bg-paper">
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
+            <thead className="bg-ground text-left text-pencil">
               <tr>
                 <th className="px-3 py-2">Session</th>
                 <th className="px-3 py-2">Window</th>
@@ -128,14 +128,14 @@ export function SessionsPage() {
             </thead>
             <tbody>
               {sessions.data.map((session) => (
-                <tr key={session.id} className="border-t border-slate-100 align-top">
+                <tr key={session.id} className="border-t border-rule align-top">
                   <td className="px-3 py-2">
-                    <Link to={paths.session(session.id)} className="font-medium text-blue-700 hover:underline">
+                    <Link to={paths.session(session.id)} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
                       {session.name}
                     </Link>
-                    {session.description && <div className="text-slate-600">{session.description}</div>}
+                    {session.description && <div className="text-pencil">{session.description}</div>}
                   </td>
-                  <td className="px-3 py-2 text-slate-700">
+                  <td className="px-3 py-2 text-ink">
                     {formatDateTime(session.starts_at)}
                     <br />
                     to {formatDateTime(session.ends_at)}
@@ -152,7 +152,7 @@ export function SessionsPage() {
                         type="button"
                         onClick={() => toggle.mutate(session)}
                         disabled={toggle.isPending}
-                        className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100"
+                        className="rounded-xs border border-line px-2 py-1 hover:bg-paper-shade"
                       >
                         {session.enabled ? "Disable" : "Enable"}
                       </button>
@@ -164,7 +164,7 @@ export function SessionsPage() {
                             if (window.confirm(`Delete "${session.name}"?`)) remove.mutate(session);
                           }}
                           disabled={remove.isPending}
-                          className="rounded border border-red-300 px-2 py-1 text-red-700 hover:bg-red-50"
+                          className="rounded-xs border border-redpen px-2 py-1 text-redpen hover:bg-redpen-tint"
                         >
                           Delete
                         </button>

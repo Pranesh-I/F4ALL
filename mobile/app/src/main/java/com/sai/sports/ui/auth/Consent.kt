@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -15,9 +15,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.api.ConsentGrant
+import com.sai.sports.ui.kit.Sheet
+import com.sai.sports.ui.kit.StatusLine
+import com.sai.sports.ui.kit.TrialsIcons
+import com.sai.sports.ui.theme.TrialsColors
 
 /**
  * The rules for a consent the app asks for.
@@ -73,17 +78,18 @@ fun ConsentCard(
     guardianName: String,
     onGuardianNameChange: (String) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+    Sheet {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
             points.forEach { point ->
-                Text("• " + stringResource(point), style = MaterialTheme.typography.bodySmall)
+                StatusLine(text = stringResource(point), icon = TrialsIcons.Forward, color = TrialsColors.Ink)
             }
             if (minor) {
-                Text(stringResource(R.string.consent_guardian_note), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    stringResource(R.string.consent_guardian_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TrialsColors.Pencil
+                )
                 OutlinedTextField(
                     value = guardianName,
                     onValueChange = { onGuardianNameChange(it.take(150)) },
@@ -92,8 +98,16 @@ fun ConsentCard(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = agreed, onCheckedChange = onAgreedChange)
+            // The whole line ticks the box: one large target, one screen-reader stop.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = agreed, role = Role.Checkbox, onValueChange = onAgreedChange)
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Checkbox(checked = agreed, onCheckedChange = null)
                 Text(
                     stringResource(if (minor) R.string.consent_agree_guardian else R.string.consent_agree_self),
                     style = MaterialTheme.typography.bodyMedium

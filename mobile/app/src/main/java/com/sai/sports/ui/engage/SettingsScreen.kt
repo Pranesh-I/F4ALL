@@ -1,19 +1,11 @@
 package com.sai.sports.ui.engage
 
 import android.app.Activity
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.api.ApiResult
 import com.sai.sports.auth.AppServices
@@ -36,8 +27,11 @@ import com.sai.sports.i18n.LanguageStore
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
 import com.sai.sports.ui.common.SectionTitle
-import com.sai.sports.ui.common.TitleBar
+import com.sai.sports.ui.kit.LineButton
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.TitleBar
 import com.sai.sports.ui.onboarding.LanguagePicker
+import com.sai.sports.ui.theme.TrialsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -78,14 +72,7 @@ fun SettingsScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        TitleBar(stringResource(R.string.settings_title), onBack)
+    Page(header = { TitleBar(stringResource(R.string.settings_title), onBack) }) {
 
         SectionTitle(stringResource(R.string.settings_language))
         LanguagePicker(
@@ -99,8 +86,6 @@ fun SettingsScreen(
                 (context as? Activity)?.recreate()
             }
         )
-
-        HorizontalDivider()
 
         SectionTitle(stringResource(R.string.settings_privacy))
 
@@ -119,7 +104,11 @@ fun SettingsScreen(
                     ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(stringResource(R.string.settings_show_on_leaderboard), modifier = Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.settings_show_on_leaderboard),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f)
+                )
                 // The row handles the toggle, so the whole line is one large
                 // touch target and one screen-reader stop.
                 Switch(checked = current, onCheckedChange = null, enabled = !saving)
@@ -128,17 +117,20 @@ fun SettingsScreen(
                 stringResource(
                     if (current) R.string.settings_visible_explainer else R.string.settings_hidden_explainer
                 ),
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodySmall,
+                color = TrialsColors.Pencil
             )
         }
 
         error?.let { ErrorText(stringResource(it)) }
 
-        Text(stringResource(R.string.settings_data_note), style = MaterialTheme.typography.bodySmall)
+        Text(
+            stringResource(R.string.settings_data_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = TrialsColors.Pencil
+        )
 
-        HorizontalDivider()
-
-        OutlinedButton(
+        LineButton(
             onClick = {
                 scope.launch {
                     withContext(Dispatchers.IO) {
@@ -149,9 +141,9 @@ fun SettingsScreen(
                     onLoggedOut()
                 }
             },
+            text = stringResource(R.string.settings_sign_out),
+            color = TrialsColors.RedPen,
             modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.settings_sign_out))
-        }
+        )
     }
 }

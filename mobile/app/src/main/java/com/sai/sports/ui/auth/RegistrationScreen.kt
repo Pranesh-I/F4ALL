@@ -2,24 +2,16 @@ package com.sai.sports.ui.auth
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,7 +32,6 @@ import com.sai.sports.R
 import com.sai.sports.api.ApiFailure
 import com.sai.sports.api.ApiResult
 import com.sai.sports.api.Registration
-import com.sai.sports.ui.common.SectionTitle
 import com.sai.sports.auth.AppServices
 import com.sai.sports.data.AthleteProfileStore
 import com.sai.sports.data.Regions
@@ -48,7 +39,13 @@ import com.sai.sports.i18n.LanguageStore
 import com.sai.sports.sync.SyncScheduler
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
-import com.sai.sports.ui.common.ScreenTitle
+import com.sai.sports.ui.common.SectionTitle
+import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.LineButton
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.TitleBar
+import com.sai.sports.ui.kit.TrialsChip
+import com.sai.sports.ui.theme.TrialsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -192,14 +189,7 @@ fun RegistrationScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        ScreenTitle(stringResource(R.string.register_title))
+    Page(header = { TitleBar(stringResource(R.string.register_title), onBack = null) }) {
 
         OutlinedTextField(
             value = name,
@@ -209,28 +199,30 @@ fun RegistrationScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                dateOfBirth?.let { stringResource(R.string.register_dob_value, it.toString()) }
-                    ?: stringResource(R.string.register_dob_choose)
-            )
-        }
+        LineButton(
+            text = dateOfBirth?.let { stringResource(R.string.register_dob_value, it.toString()) }
+                    ?: stringResource(R.string.register_dob_choose),
+            onClick = { showDatePicker = true },
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Text(stringResource(R.string.register_gender), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             RegistrationRules.GENDERS.forEach { value ->
-                FilterChip(
+                TrialsChip(
                     selected = gender == value,
                     onClick = { gender = value },
-                    label = { Text(stringResource(Labels.gender(value))) }
+                    label = stringResource(Labels.gender(value))
                 )
             }
         }
 
         Box {
-            OutlinedButton(onClick = { regionMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(region ?: stringResource(R.string.register_region_choose))
-            }
+            LineButton(
+                text = region ?: stringResource(R.string.register_region_choose),
+                onClick = { regionMenuOpen = true },
+                modifier = Modifier.fillMaxWidth()
+            )
             DropdownMenu(expanded = regionMenuOpen, onDismissRequest = { regionMenuOpen = false }) {
                 Regions.ALL.forEach { option ->
                     DropdownMenuItem(
@@ -287,7 +279,11 @@ fun RegistrationScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Text(stringResource(R.string.register_cohort_note), style = MaterialTheme.typography.bodySmall)
+        Text(
+            stringResource(R.string.register_cohort_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = TrialsColors.Pencil
+        )
 
         SectionTitle(stringResource(R.string.consent_title))
         ConsentCard(
@@ -307,9 +303,11 @@ fun RegistrationScreen(
         if (busy) {
             CircularProgressIndicator()
         } else {
-            Button(onClick = ::submit, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.register_submit))
-            }
+            InkButton(
+                text = stringResource(R.string.register_submit),
+                onClick = ::submit,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

@@ -91,6 +91,8 @@ fun AppNavigation() {
                     navController.navigate(instructionsRoute(type, AttemptMode.OFFICIAL, sessionId))
                 },
                 onPractice = { navController.navigate(ROUTE_PRACTICE) },
+                onPracticeTest = { type -> navController.navigate(instructionsRoute(type, AttemptMode.PRACTICE)) },
+                onPracticeHistory = { navController.navigate(ROUTE_PRACTICE_HISTORY) },
                 onSyncStatus = { navController.navigate(ROUTE_SYNC) },
                 onProfile = { navController.navigate(ROUTE_PROFILE) },
                 onLeaderboard = { navController.navigate(ROUTE_LEADERBOARD) },
@@ -201,7 +203,8 @@ fun AppNavigation() {
                     if (!navController.popBackStack(route = ROUTE_PRACTICE, inclusive = false)) {
                         navController.popBackStack(route = ROUTE_HOME, inclusive = false)
                     }
-                }
+                },
+                onServerResult = { resultId -> navController.navigate("server-result/$resultId") }
             )
         }
 

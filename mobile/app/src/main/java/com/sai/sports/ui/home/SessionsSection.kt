@@ -1,14 +1,14 @@
 package com.sai.sports.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sai.sports.R
@@ -35,19 +37,30 @@ import com.sai.sports.data.SessionTestView
 import com.sai.sports.data.SessionView
 import com.sai.sports.data.SyncRepository
 import com.sai.sports.ui.common.Labels
-import com.sai.sports.ui.common.SectionTitle
+import com.sai.sports.ui.kit.LaneNumber
+import com.sai.sports.ui.kit.LineButton
+import com.sai.sports.ui.kit.MarigoldButton
+import com.sai.sports.ui.kit.Sheet
+import com.sai.sports.ui.kit.SheetShape
+import com.sai.sports.ui.kit.SheetStyle
+import com.sai.sports.ui.kit.StatusLine
+import com.sai.sports.ui.kit.TrialsIcons
+import com.sai.sports.ui.theme.TrialsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 
 /**
  * The official side of the home screen: the assessment sessions SAI has
  * opened for this athlete, and within each, the tests they may still take.
  *
- * Shown from the cache straight away, then refreshed — so an athlete with no
- * signal at the ground still sees the session they came for.
+ * Each open session is a floodlit band (ink, with the marigold Start) so it
+ * can never be confused with practice. Shown from the cache straight away,
+ * then refreshed, so an athlete with no signal at the ground still sees the
+ * session they came for.
  */
 @Composable
 internal fun SessionsSection(
@@ -78,100 +91,125 @@ internal fun SessionsSection(
         athleteId?.let(queue::observeSessionAttempts) ?: flowOf(emptyList())
     }.collectAsStateWithLifecycle(initialValue = emptyList())
 
-    SectionTitle(stringResource(R.string.home_sessions_title))
-
     val current = cached
     val views = current?.let {
         SessionAvailability.views(it, local, repository.wallNow(), repository.elapsedNow())
     }.orEmpty()
 
     when {
-        current == null && loading -> Text(stringResource(R.string.sessions_checking))
+        current == null && loading -> Sheet {
+            OfficialLabel(color = TrialsColors.Pencil)
+            Text(
+                stringResource(R.string.sessions_checking),
+                style = MaterialTheme.typography.bodyMedium,
+                color = TrialsColors.Pencil
+            )
+        }
 
-        views.isEmpty() -> Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    stringResource(R.string.sessions_none),
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    stringResource(if (fetchFailed && current == null) R.string.sessions_offline else R.string.sessions_none_note),
-                    style = MaterialTheme.typography.bodySmall
-                )
-                if (fetchFailed) {
-                    OutlinedButton(onClick = { refreshes++ }) {
-                        Text(stringResource(R.string.action_try_again))
-                    }
-                }
+        views.isEmpty() -> Sheet {
+            OfficialLabel(color = TrialsColors.Pencil)
+            Text(stringResource(R.string.sessions_none), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(
+                    if (fetchFailed && current == null) R.string.sessions_offline else R.string.sessions_none_note
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = TrialsColors.Pencil
+            )
+            if (fetchFailed) {
+                LineButton(text = stringResource(R.string.action_try_again), onClick = { refreshes++ })
             }
         }
 
-        else -> views.forEach { view -> SessionCard(view, onSessionTest) }
+        else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            views.forEach { view -> SessionBand(view, onSessionTest) }
+        }
     }
 }
 
 @Composable
-private fun SessionCard(view: SessionView, onSessionTest: (String, TestType) -> Unit) {
+private fun OfficialLabel(color: Color) {
+    Text(
+        text = stringResource(R.string.home_sessions_title).uppercase(Locale.getDefault()),
+        style = MaterialTheme.typography.labelMedium,
+        color = color,
+        modifier = Modifier.semantics { heading() }
+    )
+}
+
+@Composable
+private fun SessionBand(view: SessionView, onSessionTest: (String, TestType) -> Unit) {
 
     val closes = remember(view.session.endsAtMs) {
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(view.session.endsAtMs))
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(view.session.name, style = MaterialTheme.typography.titleMedium)
+    Sheet(style = SheetStyle.Field, padding = PaddingValues(18.dp), spacing = 14.dp) {
+        OfficialLabel(color = TrialsColors.Marigold)
+
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(view.session.name, style = MaterialTheme.typography.headlineSmall)
             Text(
                 stringResource(R.string.session_open_until, closes),
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodyMedium,
+                color = TrialsColors.InkMuted
             )
             view.session.description?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium)
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = TrialsColors.InkMuted)
             }
-            view.tests.forEach { test ->
-                SessionTestRow(test) { onSessionTest(view.session.id, test.testType) }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            view.tests.forEachIndexed { index, test ->
+                SessionTestRow(index + 1, test) { onSessionTest(view.session.id, test.testType) }
             }
         }
     }
 }
 
 @Composable
-private fun SessionTestRow(test: SessionTestView, onStart: () -> Unit) {
+private fun SessionTestRow(number: Int, test: SessionTestView, onStart: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .background(TrialsColors.InkRaised, SheetShape)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(stringResource(Labels.testName(test.testType)), style = MaterialTheme.typography.bodyLarge)
+        LaneNumber(number, color = TrialsColors.InkMuted)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                stringResource(Labels.testName(test.testType)),
+                style = MaterialTheme.typography.titleMedium,
+                color = TrialsColors.Paper
+            )
             when (test.state) {
-                SessionTestState.RESUBMIT -> Text(
-                    stringResource(R.string.session_state_resubmit),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                SessionTestState.RESUBMIT -> StatusLine(
+                    text = stringResource(R.string.session_state_resubmit),
+                    icon = TrialsIcons.Cross,
+                    color = TrialsColors.RedPenOnInk
                 )
-                SessionTestState.WAITING_TO_SEND -> Text(
-                    stringResource(R.string.session_state_waiting),
-                    style = MaterialTheme.typography.bodySmall
+                SessionTestState.WAITING_TO_SEND -> StatusLine(
+                    text = stringResource(R.string.session_state_waiting),
+                    icon = TrialsIcons.Clock,
+                    color = TrialsColors.InkMuted
                 )
-                SessionTestState.SUBMITTED -> Text(
-                    stringResource(R.string.session_state_submitted),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF2E7D32)
+                SessionTestState.SUBMITTED -> StatusLine(
+                    text = stringResource(R.string.session_state_submitted),
+                    icon = TrialsIcons.Check,
+                    color = TrialsColors.Paper
                 )
                 SessionTestState.AVAILABLE -> Unit
             }
         }
         // One submission per test: once it is taken, there is no button to press.
         if (test.state.canRecord) {
-            Button(onClick = onStart) { Text(stringResource(R.string.session_start)) }
+            MarigoldButton(text = stringResource(R.string.session_start), onClick = onStart)
         }
     }
 }

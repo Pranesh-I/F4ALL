@@ -67,10 +67,10 @@ export function SessionForm({
     });
   }
 
-  const input = "mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm";
+  const input = "mt-1 w-full rounded-xs border border-line px-3 py-2 text-sm";
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded border border-slate-200 bg-white p-4" aria-label={label}>
+    <form onSubmit={submit} className="space-y-4 rounded-xs border border-ink bg-paper p-4" aria-label={label}>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block text-sm">
           Name
@@ -126,7 +126,7 @@ export function SessionForm({
                   }
                 />
                 {catalog.nameOf(test.code)}
-                <span className="text-xs text-slate-500">({test.unit})</span>
+                <span className="text-xs text-pencil">({test.unit})</span>
               </label>
             ))}
           </div>
@@ -141,7 +141,7 @@ export function SessionForm({
       )}
 
       {message && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-redpen">
           {message}
         </p>
       )}
@@ -150,11 +150,11 @@ export function SessionForm({
         <button
           type="submit"
           disabled={pending || !catalog.tests}
-          className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-xs bg-ink px-4 py-2 text-sm font-medium text-paper disabled:opacity-50"
         >
           {pending ? "Saving…" : submitLabel}
         </button>
-        <button type="button" onClick={onCancel} className="rounded border border-slate-300 px-4 py-2 text-sm">
+        <button type="button" onClick={onCancel} className="rounded-xs border border-line px-4 py-2 text-sm">
           Cancel
         </button>
       </div>

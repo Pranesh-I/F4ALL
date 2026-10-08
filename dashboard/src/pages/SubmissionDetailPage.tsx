@@ -38,7 +38,7 @@ export function SubmissionDetailPage() {
   });
 
   const back = (
-    <Link to={paths.submissions} className="text-blue-700 hover:underline">
+    <Link to={paths.submissions} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
       ← Submissions
     </Link>
   );
@@ -66,10 +66,10 @@ export function SubmissionDetailPage() {
         actions={
           <Link
             to={paths.review(result.result_id)}
-            className={`rounded px-4 py-2 text-sm font-medium ${
+            className={`rounded-xs px-4 py-2 text-sm font-medium ${
               decidable
-                ? "bg-slate-900 text-white hover:bg-slate-700"
-                : "border border-slate-300 bg-white hover:bg-slate-100"
+                ? "bg-ink text-paper hover:bg-ink-raised"
+                : "border border-line bg-paper hover:bg-paper-shade"
             }`}
           >
             {decidable ? "Review and decide" : "Open review view"}
@@ -81,7 +81,7 @@ export function SubmissionDetailPage() {
         <StatusBadge status={result.status} />
         <ReviewStatusBadge status={result.review_status} />
         {result.status === "flagged" && (
-          <span className="text-slate-600">Needs an official&apos;s decision before it counts.</span>
+          <span className="text-pencil">Needs an official&apos;s decision before it counts.</span>
         )}
       </div>
 
@@ -108,12 +108,12 @@ export function SubmissionDetailPage() {
         <Panel title="Integrity">
           <IntegrityFlagList flags={result.flags} />
           <p className="mt-3 text-sm">
-            <span className="text-slate-500">Photo check before the test: </span>
+            <span className="text-pencil">Photo check before the test: </span>
             {identityCheckLabel(result.identity_check)}
           </p>
           {verification.data?.face_check && (
             <p className="text-sm">
-              <span className="text-slate-500">Face check on the recording: </span>
+              <span className="text-pencil">Face check on the recording: </span>
               {verification.data.face_check.replace(/_/g, " ")}
             </p>
           )}

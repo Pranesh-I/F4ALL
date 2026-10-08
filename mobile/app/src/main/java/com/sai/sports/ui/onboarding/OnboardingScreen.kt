@@ -4,21 +4,19 @@ import android.app.Activity
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,11 +31,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.i18n.AppLanguage
 import com.sai.sports.i18n.LanguageStore
 import com.sai.sports.ui.common.ScreenTitle
+import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.LaneLines
+import com.sai.sports.ui.kit.LineButton
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.RuleLine
+import com.sai.sports.ui.kit.Sheet
+import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.TrialsFonts
+import java.util.Locale
 
 /**
  * First run: language, then three short pages, then sign-in.
@@ -58,15 +67,20 @@ fun OnboardingScreen(onFinished: () -> Unit) {
     var page by rememberSaveable { mutableIntStateOf(if (LanguageStore.current(context) == null) 0 else 1) }
 
     if (page == 0) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Deliberately multilingual: the athlete has not chosen yet.
-            ScreenTitle("Choose your language · अपनी भाषा चुनें · உங்கள் மொழியைத் தேர்ந்தெடுக்கவும் · আপনার ভাষা বেছে নিন")
+        Page(header = { LaneLines(Modifier.padding(top = 20.dp)) }, spacing = 20.dp) {
+            // Deliberately multilingual: the athlete has not chosen yet. Each
+            // line is set in its own script's face, so none of them looks foreign.
+            Column(
+                modifier = Modifier.semantics(mergeDescendants = true) { heading() },
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                LANGUAGE_PROMPTS.forEach { (language, prompt) ->
+                    Text(
+                        text = prompt,
+                        style = MaterialTheme.typography.headlineSmall.copy(fontFamily = TrialsFonts.text(language))
+                    )
+                }
+            }
             LanguagePicker(
                 selected = LanguageStore.current(context),
                 onSelected = { language ->
@@ -87,35 +101,46 @@ fun OnboardingScreen(onFinished: () -> Unit) {
     val index = (page - 1).coerceIn(0, pages.lastIndex)
     val current = pages[index]
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    Page(header = { LaneLines(Modifier.padding(top = 20.dp)) }, spacing = 20.dp) {
+        // Three lanes, one per page: how far through the athlete is.
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            pages.indices.forEach { lane ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(4.dp)
+                        .background(if (lane <= index) TrialsColors.Ink else TrialsColors.Rule)
+                )
+            }
+        }
         Text(
-            stringResource(R.string.onboarding_step, index + 1, pages.size),
-            style = MaterialTheme.typography.labelLarge
+            stringResource(R.string.onboarding_step, index + 1, pages.size).uppercase(Locale.getDefault()),
+            style = MaterialTheme.typography.labelMedium,
+            color = TrialsColors.Pencil
         )
-        Image(
-            painter = painterResource(current.image),
-            // Decorative: the heading and body carry the meaning.
-            contentDescription = null,
-            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
-            modifier = Modifier.height(160.dp)
-        )
+        Sheet(padding = PaddingValues(24.dp)) {
+            Image(
+                painter = painterResource(current.image),
+                // Decorative: the heading and body carry the meaning.
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(TrialsColors.Ink),
+                modifier = Modifier
+                    .height(150.dp)
+                    .align(Alignment.CenterHorizontally)
+            )
+        }
         ScreenTitle(stringResource(current.title))
         Text(stringResource(current.body), style = MaterialTheme.typography.bodyLarge)
 
         Spacer(Modifier.height(8.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = { page -= 1 }, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.action_back))
-            }
-            Button(
+            LineButton(
+                text = stringResource(R.string.action_back),
+                onClick = { page -= 1 },
+                modifier = Modifier.weight(1f)
+            )
+            InkButton(
                 onClick = {
                     if (index == pages.lastIndex) {
                         OnboardingStore.markComplete(context)
@@ -124,17 +149,22 @@ fun OnboardingScreen(onFinished: () -> Unit) {
                         page += 1
                     }
                 },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    stringResource(
-                        if (index == pages.lastIndex) R.string.onboarding_start else R.string.action_next
-                    )
+                modifier = Modifier.weight(1f),
+                text = stringResource(
+                    if (index == pages.lastIndex) R.string.onboarding_start else R.string.action_next
                 )
-            }
+            )
         }
     }
 }
+
+/** "Choose your language", in each language, for the very first screen. */
+private val LANGUAGE_PROMPTS = listOf(
+    AppLanguage.ENGLISH to "Choose your language",
+    AppLanguage.HINDI to "अपनी भाषा चुनें",
+    AppLanguage.TAMIL to "உங்கள் மொழியைத் தேர்ந்தெடுக்கவும்",
+    AppLanguage.BENGALI to "আপনার ভাষা বেছে নিন"
+)
 
 private data class IntroPage(
     @DrawableRes val image: Int,
@@ -142,10 +172,14 @@ private data class IntroPage(
     @StringRes val body: Int
 )
 
-/** One radio row per language, each labelled in its own script. */
+/**
+ * One radio row per language, each labelled in its own script and set in that
+ * script's face, so a Tamil reader sees Tamil that looks like Tamil, whatever
+ * language the screen is in.
+ */
 @Composable
 fun LanguagePicker(selected: AppLanguage?, onSelected: (AppLanguage) -> Unit) {
-    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.selectableGroup()) {
         AppLanguage.entries.forEach { language ->
             Row(
                 modifier = Modifier
@@ -155,13 +189,17 @@ fun LanguagePicker(selected: AppLanguage?, onSelected: (AppLanguage) -> Unit) {
                         role = Role.RadioButton,
                         onClick = { onSelected(language) }
                     )
-                    .padding(vertical = 12.dp),
+                    .padding(vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 RadioButton(selected = language == selected, onClick = null)
-                Text(language.nativeName, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    language.nativeName,
+                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = TrialsFonts.text(language))
+                )
             }
+            RuleLine()
         }
     }
 }

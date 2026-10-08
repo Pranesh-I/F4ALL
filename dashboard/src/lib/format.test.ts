@@ -1,4 +1,5 @@
 import {
+  bibNumber,
   flagReason,
   flagTimestampMs,
   formatScore,
@@ -57,5 +58,14 @@ describe("format", () => {
     expect(identityCheckLabel(null)).toBe("not taken");
     expect(identityCheckLabel(undefined)).toBe("not taken");
     expect(identityCheckLabel("no_match")).toContain("did not clearly match");
+  });
+});
+
+describe("bibNumber", () => {
+  it("is the short ID, upper-cased and split in two, exactly as the athlete app prints it", () => {
+    // Pinned to the same example as the app's TrialsDesignRulesTest.
+    expect(bibNumber("3f9c21ab-0d4e-4c6a-9a51-7b2f0c1d2e3f")).toBe("3F9C·21AB");
+    expect(bibNumber("abcd")).toBe("ABCD");
+    expect(bibNumber("")).toBe("");
   });
 });

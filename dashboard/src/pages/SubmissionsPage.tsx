@@ -53,14 +53,14 @@ export function SubmissionsPage() {
       {list.data && list.data.items.length > 0 && (
         <>
           <SubmissionTable items={list.data.items} nameOf={catalog.nameOf} />
-          <div className="flex items-center justify-between text-sm text-slate-600">
+          <div className="flex items-center justify-between text-sm text-pencil">
             <span>{total} submission(s)</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 disabled={page === 0}
                 onClick={() => filters.update({ page: String(page - 1) })}
-                className="rounded border border-slate-300 px-3 py-1 disabled:opacity-40"
+                className="rounded-xs border border-line px-3 py-1 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -71,7 +71,7 @@ export function SubmissionsPage() {
                 type="button"
                 disabled={page + 1 >= pages}
                 onClick={() => filters.update({ page: String(page + 1) })}
-                className="rounded border border-slate-300 px-3 py-1 disabled:opacity-40"
+                className="rounded-xs border border-line px-3 py-1 disabled:opacity-40"
               >
                 Next
               </button>

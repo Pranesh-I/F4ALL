@@ -4,16 +4,11 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,7 +26,16 @@ import com.sai.sports.auth.AppServices
 import com.sai.sports.data.SessionRepository
 import com.sai.sports.ui.common.Labels
 import com.sai.sports.ui.common.SectionTitle
-import com.sai.sports.ui.common.TitleBar
+import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.LaneNumber
+import com.sai.sports.ui.kit.MarigoldButton
+import com.sai.sports.ui.kit.ModeTag
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.Sheet
+import com.sai.sports.ui.kit.SheetStyle
+import com.sai.sports.ui.kit.TitleBar
+import com.sai.sports.ui.theme.TrialsColors
+import java.util.Locale
 
 /**
  * How to do the test, before the camera opens.
@@ -60,63 +64,56 @@ fun InstructionsScreen(
         else SessionRepository(context, AppServices.api(context)).session(athleteId, sessionId)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        TitleBar(stringResource(Labels.testName(testType)), onBack)
+    Page(header = { TitleBar(stringResource(Labels.testName(testType)), onBack) }) {
 
-        // An official attempt: say so, and show SAI's rules for this session
-        // before anything else.
+        // An official attempt: say so, on the floodlit field, and show SAI's
+        // rules for this session before anything else.
         session?.let {
-            Card {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+            Sheet(style = SheetStyle.Field) {
+                Text(
+                    text = (stringResource(R.string.official_badge) + " · " + it.name).uppercase(Locale.getDefault()),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TrialsColors.Marigold
+                )
+                Text(
+                    text = stringResource(R.string.session_once_note),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                it.rules?.let { rules ->
                     Text(
-                        text = stringResource(R.string.official_badge) + " · " + it.name,
-                        style = MaterialTheme.typography.titleSmall
+                        text = stringResource(R.string.session_rules_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TrialsColors.Marigold
                     )
-                    Text(
-                        text = stringResource(R.string.session_once_note),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    it.rules?.let { rules ->
-                        Text(
-                            text = stringResource(R.string.session_rules_title),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        Text(text = rules, style = MaterialTheme.typography.bodyMedium)
-                    }
+                    Text(text = rules, style = MaterialTheme.typography.bodyMedium, color = TrialsColors.InkMuted)
                 }
             }
-        }
+        } ?: ModeTag(official = false)
 
         SectionTitle(stringResource(R.string.instructions_setup))
-        Diagram(R.drawable.ic_setup_camera, R.string.diagram_setup)
+        Sheet(padding = PaddingValues(12.dp)) {
+            Diagram(R.drawable.ic_setup_camera, R.string.diagram_setup, Modifier.align(Alignment.CenterHorizontally))
+        }
         guide.setupSteps.forEachIndexed { index, step -> Step(index + 1, step) }
 
         SectionTitle(stringResource(R.string.instructions_movement))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             guide.diagrams.forEach { (image, description) ->
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Diagram(image, description)
-                    Text(stringResource(description), style = MaterialTheme.typography.bodySmall)
+                Sheet(modifier = Modifier.weight(1f), padding = PaddingValues(10.dp), spacing = 6.dp) {
+                    Diagram(image, description, Modifier.align(Alignment.CenterHorizontally))
+                    Text(
+                        stringResource(description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TrialsColors.Pencil,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
                 }
             }
         }
         guide.movementSteps.forEachIndexed { index, step -> Step(index + 1, step) }
 
-        Card {
-            Text(
-                stringResource(guide.counts),
-                modifier = Modifier.padding(14.dp),
-                style = MaterialTheme.typography.bodyMedium
-            )
+        Sheet(style = SheetStyle.Rough) {
+            Text(stringResource(guide.counts), style = MaterialTheme.typography.bodyMedium)
         }
 
         // The ready signal is new to every athlete; say what it is before the
@@ -125,27 +122,43 @@ fun InstructionsScreen(
         Step(1, R.string.start_step_gesture)
         Step(2, R.string.start_step_countdown)
 
-        Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.instructions_start))
+        // Marigold is the official action; practice starts in plain ink.
+        if (session != null) {
+            MarigoldButton(
+                text = stringResource(R.string.instructions_start),
+                onClick = onStart,
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            InkButton(
+                text = stringResource(R.string.instructions_start),
+                onClick = onStart,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
 
 @Composable
-private fun Diagram(@DrawableRes image: Int, @StringRes description: Int) {
+private fun Diagram(@DrawableRes image: Int, @StringRes description: Int, modifier: Modifier = Modifier) {
     Image(
         painter = painterResource(image),
         contentDescription = stringResource(description),
-        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
-        modifier = Modifier.size(120.dp)
+        colorFilter = ColorFilter.tint(TrialsColors.Ink),
+        modifier = modifier.size(120.dp)
     )
 }
 
+/** A numbered step, its number in the chest-number face. */
 @Composable
 private fun Step(number: Int, @StringRes text: Int) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("$number.", style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(text), style = MaterialTheme.typography.bodyLarge)
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        LaneNumber(number, color = TrialsColors.Ink)
+        Text(
+            stringResource(text),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(top = 2.dp)
+        )
     }
 }
 

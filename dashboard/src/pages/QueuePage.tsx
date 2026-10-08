@@ -63,7 +63,7 @@ export function QueuePage() {
         }
       />
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200" role="tablist" aria-label="Review state">
+      <div className="flex flex-wrap gap-2 border-b border-ink" role="tablist" aria-label="Review state">
         {TABS.map((item) => (
           <button
             key={item.key}
@@ -73,7 +73,7 @@ export function QueuePage() {
             aria-selected={tab === item.key}
             onClick={() => filters.update({ review_status: item.key })}
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
-              tab === item.key ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"
+              tab === item.key ? "border-ink text-ink" : "border-transparent text-pencil hover:text-ink"
             }`}
           >
             {item.label}
@@ -96,14 +96,14 @@ export function QueuePage() {
       {queue.data && queue.data.items.length > 0 && (
         <>
           <SubmissionTable items={queue.data.items} nameOf={nameOf} variant="review" linkTo={paths.review} />
-          <div className="flex items-center justify-between text-sm text-slate-600">
+          <div className="flex items-center justify-between text-sm text-pencil">
             <span>{total} submission(s)</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 disabled={page === 0}
                 onClick={() => filters.update({ page: String(page - 1) })}
-                className="rounded border border-slate-300 px-3 py-1 disabled:opacity-40"
+                className="rounded-xs border border-line px-3 py-1 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -114,7 +114,7 @@ export function QueuePage() {
                 type="button"
                 disabled={page + 1 >= pages}
                 onClick={() => filters.update({ page: String(page + 1) })}
-                className="rounded border border-slate-300 px-3 py-1 disabled:opacity-40"
+                className="rounded-xs border border-line px-3 py-1 disabled:opacity-40"
               >
                 Next
               </button>
@@ -129,8 +129,8 @@ export function QueuePage() {
 function Stat({ label, value, tone }: { label: string; value: number; tone?: "red" }) {
   return (
     <div
-      className={`rounded border px-3 py-1.5 ${
-        tone === "red" && value > 0 ? "border-red-200 bg-red-50 text-red-800" : "border-slate-200 bg-white"
+      className={`rounded-xs border px-3 py-1.5 ${
+        tone === "red" && value > 0 ? "border-redpen bg-redpen-tint text-redpen" : "border-ink bg-paper"
       }`}
     >
       <span className="font-semibold tabular-nums">{value}</span> {label}

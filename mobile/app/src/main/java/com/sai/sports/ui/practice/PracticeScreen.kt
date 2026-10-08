@@ -1,16 +1,9 @@
 package com.sai.sports.ui.practice
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.analyzer.TestType
@@ -30,7 +22,14 @@ import com.sai.sports.data.AttemptStore
 import com.sai.sports.data.PracticeRecord
 import com.sai.sports.data.PracticeStats
 import com.sai.sports.ui.common.Labels
-import com.sai.sports.ui.common.TitleBar
+import com.sai.sports.ui.kit.LineButton
+import com.sai.sports.ui.kit.ModeTag
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.RegisterRow
+import com.sai.sports.ui.kit.Sheet
+import com.sai.sports.ui.kit.SheetStyle
+import com.sai.sports.ui.kit.TitleBar
+import com.sai.sports.ui.theme.TrialsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -63,73 +62,69 @@ fun PracticeScreen(
 
     SyncPracticeOnOpen(athleteId, store) { refreshes++ }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        TitleBar(stringResource(R.string.practice_title), onBack)
+    Page(header = { TitleBar(stringResource(R.string.practice_title), onBack) }) {
+
+        ModeTag(official = false)
 
         Text(
             text = stringResource(R.string.practice_intro),
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
+            color = TrialsColors.Pencil
         )
 
-        val loaded = records
-        if (loaded == null) {
-            Text(stringResource(R.string.loading))
-        } else {
-            loaded.forEach { record ->
-                PracticeTestCard(record, onClick = { onTestSelected(record.testType) })
+        Sheet(
+            style = SheetStyle.Rough,
+            padding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            spacing = 0.dp
+        ) {
+            val loaded = records
+            if (loaded == null) {
+                Text(
+                    stringResource(R.string.loading),
+                    color = TrialsColors.Pencil,
+                    modifier = Modifier.padding(vertical = 14.dp)
+                )
+            } else {
+                loaded.forEachIndexed { index, record ->
+                    PracticeRow(
+                        number = index + 1,
+                        record = record,
+                        last = index == loaded.lastIndex,
+                        onClick = { onTestSelected(record.testType) }
+                    )
+                }
             }
         }
 
-        OutlinedButton(onClick = onHistory, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.practice_history))
-        }
+        LineButton(
+            text = stringResource(R.string.practice_history),
+            onClick = onHistory,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
+/** One test on the rough sheet: its best, in pencil, and how often it has been tried. */
 @Composable
-private fun PracticeTestCard(record: PracticeRecord, onClick: () -> Unit) {
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = stringResource(Labels.testName(record.testType)),
-                style = MaterialTheme.typography.titleMedium
+private fun PracticeRow(number: Int, record: PracticeRecord, last: Boolean, onClick: () -> Unit) {
+    val best = record.best
+    RegisterRow(
+        label = stringResource(Labels.testName(record.testType)),
+        index = number,
+        value = best?.let {
+            stringResource(
+                R.string.practice_best,
+                "${it.result.formattedScore()} ${stringResource(Labels.unit(it.result.unit))}"
             )
-
-            val best = record.best
-            Text(
-                text = when {
-                    best != null -> stringResource(
-                        R.string.practice_best,
-                        "${best.result.formattedScore()} ${stringResource(Labels.unit(best.result.unit))}"
-                    )
-                    record.attempts == 0 -> stringResource(R.string.practice_not_tried)
-                    else -> stringResource(R.string.history_not_scored)
-                },
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            if (record.attempts > 0) {
-                Text(
-                    text = stringResource(R.string.practice_attempts, record.attempts),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-    }
+        },
+        valueColor = TrialsColors.Pencil,
+        valueStyle = MaterialTheme.typography.titleSmall,
+        detail = when {
+            record.attempts == 0 -> stringResource(R.string.practice_not_tried)
+            best == null -> stringResource(R.string.history_not_scored)
+            else -> stringResource(R.string.practice_attempts, record.attempts)
+        },
+        onClick = onClick,
+        divider = !last
+    )
 }

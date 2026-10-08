@@ -5,15 +5,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,11 +26,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.api.ApiResult
@@ -39,7 +39,14 @@ import com.sai.sports.api.BadgeSummary
 import com.sai.sports.auth.AppServices
 import com.sai.sports.ui.common.Labels
 import com.sai.sports.ui.common.LoadFailed
-import com.sai.sports.ui.common.TitleBar
+import com.sai.sports.ui.kit.BigNumber
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.RuleLine
+import com.sai.sports.ui.kit.Sheet
+import com.sai.sports.ui.kit.TitleBar
+import com.sai.sports.ui.kit.TrialsIcons
+import com.sai.sports.ui.kit.dashedBorder
+import com.sai.sports.ui.theme.TrialsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -66,13 +73,7 @@ fun BadgesScreen(onBack: () -> Unit) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        TitleBar(stringResource(R.string.badges_title), onBack)
+    Page(scrollable = false, header = { TitleBar(stringResource(R.string.badges_title), onBack) }) {
 
         val current = summary
         val failure = error
@@ -80,30 +81,46 @@ fun BadgesScreen(onBack: () -> Unit) {
         when {
             current == null && failure == null -> CircularProgressIndicator()
             current == null -> LoadFailed(stringResource(failure!!)) { reload += 1 }
-            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            else -> LazyColumn {
                 item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(
-                                stringResource(R.string.badges_streak_current, current.currentStreakWeeks),
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                stringResource(R.string.badges_streak_longest, current.longestStreakWeeks),
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                    Sheet(modifier = Modifier.padding(bottom = 8.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            BigNumber(current.currentStreakWeeks.toString())
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.badges_streak_current, current.currentStreakWeeks),
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    stringResource(R.string.badges_streak_longest, current.longestStreakWeeks),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TrialsColors.Pencil
+                                )
+                            }
                         }
                     }
                 }
                 items(current.badges, key = { it.code }) { badge -> BadgeRow(badge) }
                 item {
-                    Text(stringResource(R.string.badges_note), style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        stringResource(R.string.badges_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TrialsColors.Pencil,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
                 }
             }
         }
     }
 }
 
+/**
+ * One badge. Earned ones wear the marigold garland; the rest are an empty
+ * pencil ring with how far there is to go.
+ */
 @Composable
 private fun BadgeRow(badge: Badge) {
     val title = stringResource(Labels.badgeTitle(badge.code))
@@ -118,46 +135,54 @@ private fun BadgeRow(badge: Badge) {
         stringResource(R.string.badges_progress, badge.progress, badge.target)
     }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            // One announcement per badge — title, what it is for, and whether
-            // it is earned — instead of three separate stops.
-            .clearAndSetSemantics { contentDescription = "$title. $description. $state" }
+    Column(
+        // One announcement per badge — title, what it is for, and whether
+        // it is earned — instead of three separate stops.
+        Modifier.clearAndSetSemantics { contentDescription = "$title. $description. $state" }
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(vertical = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .background(
-                        if (badge.earned) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                        CircleShape
+                    .size(46.dp)
+                    .then(
+                        if (badge.earned) {
+                            Modifier.background(TrialsColors.Marigold, CircleShape)
+                        } else {
+                            Modifier.dashedBorder(1.5.dp, TrialsColors.Pencil, radius = 23.dp)
+                        }
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = if (badge.earned) "★" else "☆",
-                    color = if (badge.earned) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.titleLarge
+                Icon(
+                    TrialsIcons.Star,
+                    contentDescription = null,
+                    tint = if (badge.earned) TrialsColors.Ink else TrialsColors.Pencil,
+                    modifier = Modifier.size(24.dp)
                 )
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, fontWeight = FontWeight.SemiBold)
-                Text(description, style = MaterialTheme.typography.bodySmall)
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = TrialsColors.Pencil)
                 if (!badge.earned && badge.target > 1) {
                     LinearProgressIndicator(
                         progress = { badge.progress.toFloat() / badge.target },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp),
+                        color = TrialsColors.Ink,
+                        trackColor = TrialsColors.PaperShade,
+                        strokeCap = StrokeCap.Butt,
+                        gapSize = 0.dp,
+                        drawStopIndicator = {}
                     )
                 }
                 Text(state, style = MaterialTheme.typography.labelMedium)
             }
         }
+        RuleLine()
     }
 }
