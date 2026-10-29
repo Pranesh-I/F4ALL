@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.ui.kit.LineButton
 import com.sai.sports.ui.kit.SectionRule
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.AppColors
 
 /**
  * A screen title that screen readers announce as a heading, so a TalkBack user
@@ -52,7 +52,7 @@ fun TitleBar(title: String, onBack: () -> Unit) {
 fun ErrorText(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        color = TrialsColors.RedPen,
+        color = AppColors.Danger,
         style = MaterialTheme.typography.bodyMedium,
         modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite }
     )

@@ -22,79 +22,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.AppColors
 
 /**
- * The tear-off acknowledgement slip an office hands back when a form is
- * submitted. Holds a submitted result and where it has got to.
+ * The receipt for a submitted result: a card that holds the result and the
+ * steps it is going through on its way to becoming official.
  */
 @Composable
 fun Slip(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    CompositionLocalProvider(LocalContentColor provides TrialsColors.Ink) {
+    CompositionLocalProvider(LocalContentColor provides AppColors.TextPrimary) {
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .background(TrialsColors.Paper, PerforatedShape)
-                .border(1.dp, TrialsColors.Ink, PerforatedShape)
-                .drawBehind {
-                    // "Tear here."
-                    val y = size.height - 18.dp.toPx()
-                    drawLine(
-                        color = TrialsColors.Line,
-                        start = Offset(12.dp.toPx(), y),
-                        end = Offset(size.width - 12.dp.toPx(), y),
-                        strokeWidth = 1.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
-                    )
-                }
-                .padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 34.dp),
+                .background(AppColors.Surface, SheetShape)
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             content = content
         )
-    }
-}
-
-/** A rectangle whose bottom edge is a row of perforation notches. */
-private object PerforatedShape : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val radius = with(density) { 5.dp.toPx() }
-        val period = with(density) { 18.dp.toPx() }
-        val notches = ((size.width - period) / period).toInt().coerceAtLeast(1)
-        val margin = (size.width - (notches - 1) * period) / 2
-
-        val path = Path().apply {
-            moveTo(0f, 0f)
-            lineTo(size.width, 0f)
-            lineTo(size.width, size.height)
-            for (i in notches - 1 downTo 0) {
-                val cx = margin + i * period
-                lineTo(cx + radius, size.height)
-                arcTo(
-                    rect = Rect(cx - radius, size.height - radius, cx + radius, size.height + radius),
-                    startAngleDegrees = 0f,
-                    sweepAngleDegrees = -180f,
-                    forceMoveTo = false
-                )
-            }
-            lineTo(0f, size.height)
-            close()
-        }
-        return Outline.Generic(path)
     }
 }
 
@@ -129,7 +78,7 @@ fun SlipStep(
                     Modifier
                         .width(2.dp)
                         .weight(1f)
-                        .background(if (state == StepState.Done) TrialsColors.Ink else TrialsColors.Rule)
+                        .background(if (state == StepState.Done) AppColors.Accent else AppColors.SurfaceHighest)
                 )
             }
         }
@@ -142,13 +91,13 @@ fun SlipStep(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
-                color = if (state == StepState.Waiting) TrialsColors.Pencil else TrialsColors.Ink
+                color = if (state == StepState.Waiting) AppColors.TextSecondary else AppColors.TextPrimary
             )
             detail?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (state == StepState.Refused) TrialsColors.RedPen else TrialsColors.Pencil
+                    color = if (state == StepState.Refused) AppColors.Danger else AppColors.TextSecondary
                 )
             }
         }
@@ -159,19 +108,19 @@ fun SlipStep(
 private fun StepMarker(state: StepState) {
     val size = Modifier.size(26.dp)
     when (state) {
-        StepState.Done -> Box(size.background(TrialsColors.Ink, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(TrialsIcons.Check, contentDescription = null, tint = TrialsColors.Paper, modifier = Modifier.size(15.dp))
+        StepState.Done -> Box(size.background(AppColors.Accent, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(AppIcons.Check, contentDescription = null, tint = AppColors.OnAccent, modifier = Modifier.size(15.dp))
         }
-        StepState.Active -> Box(size.border(2.dp, TrialsColors.Ink, CircleShape), contentAlignment = Alignment.Center) {
+        StepState.Active -> Box(size.border(2.dp, AppColors.Accent, CircleShape), contentAlignment = Alignment.Center) {
             Box(
                 Modifier
                     .size(10.dp)
-                    .background(TrialsColors.Ink, CircleShape)
+                    .background(AppColors.Accent, CircleShape)
             )
         }
-        StepState.Waiting -> Box(size.dashedBorder(1.5.dp, TrialsColors.Pencil, radius = 13.dp, dash = 3.dp, gap = 3.dp))
-        StepState.Refused -> Box(size.background(TrialsColors.RedPen, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(TrialsIcons.Cross, contentDescription = null, tint = TrialsColors.Paper, modifier = Modifier.size(15.dp))
+        StepState.Waiting -> Box(size.dashedBorder(1.5.dp, AppColors.TextSecondary, radius = 13.dp, dash = 3.dp, gap = 3.dp))
+        StepState.Refused -> Box(size.background(AppColors.Danger, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(AppIcons.Cross, contentDescription = null, tint = AppColors.OnInverse, modifier = Modifier.size(15.dp))
         }
     }
 }

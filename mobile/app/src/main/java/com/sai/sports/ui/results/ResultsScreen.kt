@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -25,13 +29,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -53,11 +60,14 @@ import com.sai.sports.sync.Delivery
 import com.sai.sports.ui.capture.PoseOverlayView
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
+import com.sai.sports.ui.kit.AppIcons
 import com.sai.sports.ui.kit.BibNumber
 import com.sai.sports.ui.kit.BigNumber
+import com.sai.sports.ui.kit.FlowProgress
 import com.sai.sports.ui.kit.InkButton
 import com.sai.sports.ui.kit.LineButton
 import com.sai.sports.ui.kit.ModeTag
+import com.sai.sports.ui.kit.OfficialStep
 import com.sai.sports.ui.kit.Page
 import com.sai.sports.ui.kit.PlainButton
 import com.sai.sports.ui.kit.RuleLine
@@ -71,17 +81,17 @@ import com.sai.sports.ui.kit.Slip
 import com.sai.sports.ui.kit.SlipStep
 import com.sai.sports.ui.kit.StatusLine
 import com.sai.sports.ui.kit.StepState
+import com.sai.sports.ui.kit.SuccessBurst
 import com.sai.sports.ui.kit.TitleBar
-import com.sai.sports.ui.kit.TrialsIcons
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.AppColors
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.text.DateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * The result of an attempt, straight after recording or from history.
@@ -147,7 +157,7 @@ fun ResultsScreen(
 
     if (current == null) {
         Page {
-            Text(stringResource(R.string.loading), color = TrialsColors.Pencil)
+            Text(stringResource(R.string.loading), color = AppColors.TextSecondary)
         }
         return
     }
@@ -157,6 +167,15 @@ fun ResultsScreen(
 
     Page(header = { TitleBar(stringResource(Labels.testName(attempt.testType)), onBack = null) }) {
 
+        // Straight after recording, the moment gets its due: a finished test
+        // is celebrated, an unscored one is told plainly, without the confetti.
+        if (!reviewing) {
+            CompletionHeader(
+                scored = attempt.result.status == AttemptStatus.COMPLETE,
+                official = official
+            )
+        }
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -165,11 +184,13 @@ fun ResultsScreen(
             Text(
                 text = formatTime(attempt.recordedAtMs),
                 style = MaterialTheme.typography.bodySmall,
-                color = TrialsColors.Pencil
+                color = AppColors.TextSecondary
             )
         }
 
         if (official) {
+            // The last step of an official test: getting it to SAI.
+            if (!reviewing) FlowProgress(current = OfficialStep.UPLOAD)
             OfficialSlip(attempt, athleteId, queued, onServerResult)
         } else {
             PracticeSheet(attempt.result, current.comparison, attempt)
@@ -187,7 +208,7 @@ fun ResultsScreen(
             Text(
                 text = stringResource(R.string.practice_no_replay),
                 style = MaterialTheme.typography.bodySmall,
-                color = TrialsColors.Pencil
+                color = AppColors.TextSecondary
             )
         }
 
@@ -204,7 +225,7 @@ fun ResultsScreen(
         Text(
             text = stringResource(if (official) R.string.result_provisional_notice else R.string.practice_notice),
             style = MaterialTheme.typography.bodySmall,
-            color = TrialsColors.Pencil
+            color = AppColors.TextSecondary
         )
 
         Row(
@@ -241,6 +262,48 @@ fun ResultsScreen(
  * before the athlete can wonder.
  */
 @Composable
+private fun CompletionHeader(scored: Boolean, official: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (scored) {
+            SuccessBurst(size = 180.dp)
+        } else {
+            Box(
+                Modifier
+                    .padding(vertical = 12.dp)
+                    .size(72.dp)
+                    .background(AppColors.SurfaceHigh, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(AppIcons.Info, contentDescription = null, tint = AppColors.Warning, modifier = Modifier.size(34.dp))
+            }
+        }
+        Text(
+            stringResource(if (scored) R.string.result_complete_title else R.string.result_not_scored_title),
+            style = MaterialTheme.typography.headlineLarge,
+            color = AppColors.TextPrimary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { heading() }
+        )
+        Text(
+            stringResource(
+                when {
+                    !scored -> R.string.result_not_scored_body
+                    official -> R.string.result_complete_official
+                    else -> R.string.result_complete_practice
+                }
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+            color = AppColors.TextSecondary,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
 private fun OfficialSlip(
     attempt: Attempt,
     athleteId: String?,
@@ -258,7 +321,7 @@ private fun OfficialSlip(
             athleteId?.let {
                 Text(
                     text = BibNumber.of(it),
-                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.sai.sports.ui.theme.TrialsFonts.Numerals)
+                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.sai.sports.ui.theme.AppFonts.Numerals)
                 )
             }
         }
@@ -277,7 +340,7 @@ private fun OfficialSlip(
             Text(
                 text = stringResource(R.string.score_provisional),
                 style = MaterialTheme.typography.bodySmall,
-                color = TrialsColors.Pencil
+                color = AppColors.TextSecondary
             )
         }
 
@@ -327,7 +390,7 @@ private fun OfficialSlip(
             PlainButton(
                 text = stringResource(R.string.sync_see_result),
                 onClick = { onServerResult(resultId) },
-                icon = TrialsIcons.Forward
+                icon = AppIcons.Forward
             )
         }
     }
@@ -340,7 +403,7 @@ private fun NotScored(result: AnalyzerResult) {
         Text(
             text = stringResource(R.string.result_not_scored),
             style = MaterialTheme.typography.headlineSmall,
-            color = TrialsColors.RedPen
+            color = AppColors.Danger
         )
         Text(
             text = stringResource(Labels.invalidReason(result.invalidReason)),
@@ -368,7 +431,7 @@ private fun PracticeSheet(result: AnalyzerResult, comparison: PracticeComparison
         Text(
             text = stringResource(R.string.practice_never_counts),
             style = MaterialTheme.typography.bodySmall,
-            color = TrialsColors.Pencil
+            color = AppColors.TextSecondary
         )
         comparison?.let { PracticeProgress(it, attempt) }
     }
@@ -394,9 +457,9 @@ private fun PracticeProgress(comparison: PracticeComparison, attempt: Attempt) {
             comparison.isPersonalBest -> Text(
                 text = stringResource(R.string.practice_new_best),
                 style = MaterialTheme.typography.titleLarge,
-                color = TrialsColors.Ink,
+                color = AppColors.TextPrimary,
                 modifier = Modifier
-                    .background(TrialsColors.Marigold, SheetShape)
+                    .background(AppColors.Accent, SheetShape)
                     .padding(horizontal = 10.dp, vertical = 4.dp)
                     .semantics { liveRegion = LiveRegionMode.Polite }
             )
@@ -479,7 +542,7 @@ private fun SkeletonReplay(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(safeWidth.toFloat() / safeHeight.toFloat())
-                .background(TrialsColors.Ink)
+                .background(Color.Black, RoundedCornerShape(14.dp))
         ) {
             val replayDescription = stringResource(R.string.result_replay_description)
             AndroidView(
@@ -522,7 +585,7 @@ private fun SkeletonReplay(
             Text(
                 text = stringResource(R.string.result_frame_counter, frameIndex + 1, frames.size),
                 style = MaterialTheme.typography.bodySmall,
-                color = TrialsColors.Pencil
+                color = AppColors.TextSecondary
             )
         }
     }
@@ -542,8 +605,8 @@ private fun QualityCard(result: AnalyzerResult) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(6.dp),
-            color = TrialsColors.Ink,
-            trackColor = TrialsColors.PaperShade,
+            color = AppColors.TextPrimary,
+            trackColor = AppColors.SurfaceHigh,
             strokeCap = StrokeCap.Butt,
             gapSize = 0.dp,
             drawStopIndicator = {}
@@ -557,7 +620,7 @@ private fun QualityCard(result: AnalyzerResult) {
                 result.framesRejected
             ),
             style = MaterialTheme.typography.bodySmall,
-            color = TrialsColors.Pencil
+            color = AppColors.TextSecondary
         )
 
         if (result.framesRejected > result.framesAnalyzed) {
@@ -609,8 +672,8 @@ private fun EventsCard(result: AnalyzerResult) {
         lines.forEach { (line, counted) ->
             StatusLine(
                 text = line,
-                icon = if (counted) TrialsIcons.Check else TrialsIcons.Cross,
-                color = if (counted) TrialsColors.Ink else TrialsColors.RedPen
+                icon = if (counted) AppIcons.Check else AppIcons.Cross,
+                color = if (counted) AppColors.TextPrimary else AppColors.Danger
             )
         }
     }
@@ -643,15 +706,15 @@ private fun FormCard(summary: FormSummary, testType: TestType) {
         if (summary.toWorkOn.isEmpty()) {
             StatusLine(
                 text = stringResource(R.string.form_all_good),
-                icon = TrialsIcons.Check,
-                color = TrialsColors.Ink
+                icon = AppIcons.Check,
+                color = AppColors.TextPrimary
             )
         } else {
             summary.toWorkOn.forEach { cue ->
                 StatusLine(
                     text = stringResource(R.string.form_work_on, stringResource(Labels.cue(cue, testType))),
-                    icon = TrialsIcons.Forward,
-                    color = TrialsColors.Ink
+                    icon = AppIcons.Forward,
+                    color = AppColors.TextPrimary
                 )
             }
         }

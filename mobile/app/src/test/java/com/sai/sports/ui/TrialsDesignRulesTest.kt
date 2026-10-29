@@ -12,7 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The rules behind the Trials Day design: chest numbers and how a score is written. */
+/** The design rules: chest numbers and how a score is written. */
 class TrialsDesignRulesTest {
 
     @Test

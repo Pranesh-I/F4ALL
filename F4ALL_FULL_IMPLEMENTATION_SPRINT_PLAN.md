@@ -216,55 +216,60 @@ If the current prototype is already using MongoDB/Cloudinary, migration should b
 
 # 4. Final Feature Matrix
 
+Status as of 2026-10-13 (checked against the code and a full test run; see `TASK.md`).
+
 | Module | Feature | Priority | Status |
 |---|---|---:|---|
-| Authentication | Registration | P0 | To verify |
-| Authentication | Login | P0 | To verify |
-| Authentication | OTP verification | P0 | To implement/verify |
-| Authentication | Face verification | P0 | To implement/verify |
-| Profile | Athlete profile | P0 | To implement/verify |
-| Profile | Achievements | P1 | To implement |
-| Practice | Practice Mode | P0 | To implement/verify |
-| Session | Session Mode | P0 | To implement |
-| Session | Admin-created sessions | P0 | To implement |
-| Session | One submission per session | P0 | To implement |
-| Exercise | Squat | P0 | Existing/verify |
-| Exercise | Push-up | P0 | To implement |
-| Exercise | Bicep curl | P0 | To implement |
-| Exercise | Lunge | P0 | To implement |
-| Exercise | Vertical jump | P0 | Existing/verify |
-| Exercise | Sit-up | P1 | Later |
-| Exercise | Shuttle run | P1 | Later |
-| Exercise | Endurance run | P1 | Later |
-| AI | MediaPipe pose | P0 | Existing |
-| AI | Rep counting | P0 | Existing/continue |
-| AI | Form correction | P0 | To complete |
-| AI | Voice feedback | P0 | To implement/verify |
-| AI | Gesture verification | P0 | Existing/verify |
-| AI | Anti-cheat | P0 | To implement |
-| Camera | Camera lifecycle | P0 | Must harden |
-| Camera | Countdown | P0 | To implement/verify |
-| Storage | Local Room queue | P0 | To implement |
-| Sync | Background upload | P0 | To implement |
-| Backend | Upload API | P0 | To implement |
-| Backend | Server re-verification | P0 | To implement |
-| Backend | Result finalization | P0 | To implement |
-| Dashboard | Admin login | P0 | To implement |
-| Dashboard | Session creation | P0 | To implement |
-| Dashboard | Session management | P0 | To implement |
-| Dashboard | Athlete submissions | P0 | To implement |
-| Dashboard | Video review | P0 | To implement |
-| Dashboard | Approve/reject | P0 | To implement |
-| Dashboard | Flag reasons | P0 | To implement |
-| Dashboard | Leaderboards | P1 | To implement |
-| Dashboard | Analytics | P1 | To implement |
-| UX | Multi-language | P1 | Later |
-| UX | Accessibility | P1 | Later |
-| Security | Encryption | P0 | To implement |
-| Security | Audit logs | P0 | To implement |
-| Testing | Device matrix | P0 | To implement |
-| Testing | Accuracy validation | P0 | Ongoing |
-| Testing | Field pilot | P0 | Final phase |
+| Authentication | Registration | P0 | Done (Sprint 8) |
+| Authentication | Login | P0 | Done (Sprint 8) |
+| Authentication | OTP verification | P0 | Done; real SMS needs SAI's DLT-registered gateway |
+| Authentication | Face verification | P0 | Done (pre-test check + server check, advisory only) |
+| Profile | Athlete profile | P0 | Done (Sprint 8) |
+| Profile | Achievements | P1 | Done (profile field + badges) |
+| Practice | Practice Mode | P0 | Done (Sprint 6) |
+| Session | Session Mode | P0 | Done (Sprint 7) |
+| Session | Admin-created sessions | P0 | Done (Sprints 7, 13) |
+| Session | One submission per session | P0 | Done (Sprint 7) |
+| Exercise | Squat | P0 | Done; accuracy pending (Sprint 22) |
+| Exercise | Push-up | P0 | Done; accuracy pending (Sprint 22) |
+| Exercise | Bicep curl | P0 | Done; accuracy pending (Sprint 22) |
+| Exercise | Lunge | P0 | Done; accuracy pending (Sprint 22) |
+| Exercise | Vertical jump | P0 | Done; accuracy pending (Sprint 22) |
+| Exercise | Sit-up | P1 | Done |
+| Exercise | Shuttle run | P1 | Done (Sprint 18); real-run calibration in Sprint 22 |
+| Exercise | Endurance run | P1 | Done (Sprint 18); real-run calibration in Sprint 22 |
+| AI | MediaPipe pose | P0 | Done |
+| AI | Rep counting | P0 | Done (Kotlin/Python parity enforced) |
+| AI | Form correction | P0 | Done (Sprint 4) |
+| AI | Voice feedback | P0 | Done (Sprint 4) |
+| AI | Gesture verification | P0 | Done (Sprint 5) |
+| AI | Anti-cheat | P0 | Done v1 (Sprint 12) |
+| Camera | Camera lifecycle | P0 | Done (Sprint 5); device matrix pending (Sprint 21) |
+| Camera | Countdown | P0 | Done |
+| Storage | Local Room queue | P0 | Done (Sprint 9) |
+| Sync | Background upload | P0 | Done (Sprint 9) |
+| Backend | Upload API | P0 | Done (Sprint 10) |
+| Backend | Server re-verification | P0 | Done (Sprint 11) |
+| Backend | Result finalization | P0 | Done (Sprint 11) |
+| Dashboard | Admin login | P0 | Done |
+| Dashboard | Session creation | P0 | Done (Sprint 13) |
+| Dashboard | Session management | P0 | Done (Sprint 13) |
+| Dashboard | Athlete submissions | P0 | Done (Sprints 13-14) |
+| Dashboard | Video review | P0 | Done (Sprint 14) |
+| Dashboard | Approve/reject | P0 | Done (Sprint 14) |
+| Dashboard | Flag reasons | P0 | Done (Sprints 12, 14) |
+| Dashboard | Leaderboards | P1 | Done (Sprint 16: test, age, region, session filters) |
+| Dashboard | Analytics | P1 | Done (Sprint 16) |
+| UX | Multi-language | P1 | Done (en, hi, ta, bn); native review pending |
+| UX | Accessibility | P1 | Done (Sprint 19: contrast, targets, labels checked in tests); device walk pending |
+| Security | Encryption | P0 | Done (Sprint 20): HTTPS-only app, DB TLS enforced, SSE bucket, encrypted photo; SAI's bucket check pending |
+| Security | Audit logs | P0 | Done (Sprints 14, 20): review trail + access log of every officials' request and sign-in |
+| Security | Rate limiting | P0 | Done (Sprint 20) |
+| Security | Data retention | P0 | Done (Sprint 20): daily job; periods for SAI to confirm |
+| Testing | Device matrix | P0 | Partial (Sprint 21): tooling + 1 phone (OPPO Reno13); entry-level phones pending |
+| Testing | Accuracy validation | P0 | Tooling done (Sprint 22); blocked on human-labelled recordings |
+| Testing | Load & reliability | P0 | Done (Sprint 23): pilot-scale target met, 7 failure scenarios pass |
+| Testing | Field pilot | P0 | Rehearsed end to end (Sprint 24); protocol ready; needs real athletes |
 
 ---
 
@@ -1321,17 +1326,21 @@ Audit
 
 ## Security
 
-- [ ] HTTPS
-- [ ] Secure authentication
-- [ ] Role-based access
-- [ ] Private video storage
-- [ ] Signed URLs
-- [ ] Encryption
-- [ ] Rate limiting
-- [ ] Input validation
-- [ ] Audit logs
-- [ ] Consent
-- [ ] Data retention policy
+Checked in Sprint 20 (docs/SECURITY-REVIEW.md). What needs SAI's own
+infrastructure (certificate, bucket, independent review) is on TASK.md's
+deferred list.
+
+- [x] HTTPS
+- [x] Secure authentication
+- [x] Role-based access
+- [x] Private video storage
+- [x] Signed URLs
+- [x] Encryption
+- [x] Rate limiting
+- [x] Input validation
+- [x] Audit logs
+- [x] Consent
+- [x] Data retention policy
 
 ## Testing
 
@@ -1341,10 +1350,10 @@ Audit
 - [ ] UI tests
 - [ ] AI accuracy tests
 - [ ] Device tests
-- [ ] Offline tests
-- [ ] Network failure tests
-- [ ] Load tests
-- [ ] Security tests
+- [x] Offline tests
+- [x] Network failure tests
+- [x] Load tests
+- [x] Security tests
 - [ ] Pilot test
 
 ---

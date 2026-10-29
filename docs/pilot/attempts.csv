@@ -1,0 +1,3 @@
+# One row per official attempt. Pilot ids only (P01...): no names here.
+# human_result: the settled evaluator result (two evaluators, disagreements settled from the video).
+pilot_id,date,site,phone_model,test,human_result_1,human_result_2,human_result,human_form,mobile_result,server_result,status_after_verification,flags,minutes_to_verdict,review_action,recorded_offline,notes

@@ -66,6 +66,8 @@ services:
 
   api:
     profiles: ["app"]
+    # Sprint 23: brought back after a crash or a host restart.
+    restart: unless-stopped
     build: ./backend
     environment: *backend_env
     ports:
@@ -82,6 +84,7 @@ services:
   # uploaded videos; in production both use S3 instead.
   worker:
     profiles: ["app"]
+    restart: unless-stopped
     build: ./backend
     command: ["celery", "-A", "app.worker:celery_app", "worker", "--loglevel=info", "--concurrency=2"]
     environment: *backend_env
@@ -92,6 +95,46 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+
+  # Sprint 17: finds events in the database and delivers athlete notifications.
+  # Separate from the API and the worker, so if it stops, nothing else does.
+  notifier:
+    profiles: ["app"]
+    restart: unless-stopped
+    build: ./backend
+    command: ["python", "-m", "app.notifications.dispatch"]
+    environment: *backend_env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Sprint 23: re-queues verification jobs a crashed worker took down with it.
+  # 20 minutes is past the task's 15-minute hard limit, so a slow job that is
+  # still running is never queued a second time; if one were, only the latest
+  # claim may write a verdict (tasks.py).
+  requeue:
+    profiles: ["app"]
+    restart: unless-stopped
+    build: ./backend
+    command: ["sh", "-c", "while true; do python -m app.cli reverify-pending --older-than-minutes 20; sleep 300; done"]
+    environment: *backend_env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Sprint 20: deletes personal data past its retention period, once a day
+  # (services/retention.py; periods in docs/PRIVACY.md).
+  retention:
+    profiles: ["app"]
+    restart: unless-stopped
+    build: ./backend
+    command: ["sh", "-c", "while true; do python -m app.cli retention; sleep 86400; done"]
+    environment: *backend_env
+    volumes:
+      - f4all_storage:/app/var
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   f4all_postgres_data:

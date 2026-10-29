@@ -1,0 +1,29 @@
+{
+  "items": [
+    {
+      "created_at": "2026-10-01T11:00:00",
+      "final_score": null,
+      "provisional_score": 25.0,
+      "result_id": "00000000-0000-0000-0000-00000000000c",
+      "server_score": 24.0,
+      "session_id": "00000000-0000-0000-0000-000000000002",
+      "session_name": "District trials",
+      "status": "verified",
+      "test_type": "SIT_UPS",
+      "unit": "reps"
+    },
+    {
+      "created_at": "2026-10-01T10:00:00",
+      "final_score": null,
+      "provisional_score": 18.0,
+      "result_id": "00000000-0000-0000-0000-00000000000b",
+      "server_score": 18.0,
+      "session_id": null,
+      "session_name": null,
+      "status": "rejected",
+      "test_type": "SIT_UPS",
+      "unit": "reps"
+    }
+  ],
+  "next_before": "2026-10-01T10:00:00"
+}

@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
+import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
@@ -39,19 +40,40 @@ class PoseLandmarkerHelper(
 
     private var lastTimestampMs = 0L
 
+    private val perf = PosePerfMeter()
+
     /** False when the model failed to load; the screen shows an error instead of a dead preview. */
     @Volatile
     var isReady = false
         private set
+
+    /** Which processor runs the model on this phone: "GPU", or "CPU" when the GPU could not. */
+    var delegate: String = "none"
+        private set
+
+    // Set by MediaPipe's error callback; acted on by the next frame, on the
+    // camera thread, because the landmarker cannot be closed from inside its
+    // own callback.
+    @Volatile
+    private var gpuFailed = false
 
     init {
         setupPoseLandmarker()
     }
 
     private fun setupPoseLandmarker() {
+        // The GPU first (Sprint 21: on the first phone measured it was the
+        // difference between dropping a third of the frames and keeping up),
+        // the CPU when this phone's GPU driver cannot run the model.
+        for (choice in listOf(Delegate.GPU, Delegate.CPU)) {
+            if (tryCreate(choice)) return
+        }
+    }
 
+    private fun tryCreate(choice: Delegate): Boolean {
         val baseOptions = BaseOptions.builder()
             .setModelAssetPath(MODEL_ASSET)
+            .setDelegate(choice)
             .build()
 
         val options = PoseLandmarker.PoseLandmarkerOptions.builder()
@@ -62,20 +84,36 @@ class PoseLandmarkerHelper(
             .setMinPosePresenceConfidence(0.5f)
             .setMinTrackingConfidence(0.5f)
             .setResultListener { result, input ->
+                perf.onResult(result.timestampMs(), SystemClock.uptimeMillis())
+                    ?.let { Log.i(PERF_TAG, it.logLine()) }
                 listener.onResults(result, input.width, input.height)
             }
             .setErrorListener { error ->
-                listener.onError(error.message ?: "Unknown MediaPipe error")
+                if (choice == Delegate.GPU) {
+                    // Some GPU drivers load the model and then fail on the
+                    // first frames. Fall back rather than show an error.
+                    Log.w(TAG, "Pose model failed on the GPU; switching to the CPU", error)
+                    gpuFailed = true
+                } else {
+                    listener.onError(error.message ?: "Unknown MediaPipe error")
+                }
             }
             .build()
 
-        try {
+        return try {
             poseLandmarker = PoseLandmarker.createFromOptions(context, options)
             isReady = true
-            Log.d(TAG, "Pose Landmarker initialized successfully")
+            delegate = choice.name
+            Log.i(PERF_TAG, "delegate=${choice.name}")
+            true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize Pose Landmarker", e)
-            listener.onError(e.message ?: "Failed to initialize Pose Landmarker")
+            if (choice == Delegate.CPU) {
+                Log.e(TAG, "Failed to initialize Pose Landmarker", e)
+                listener.onError(e.message ?: "Failed to initialize Pose Landmarker")
+            } else {
+                Log.w(TAG, "Pose model cannot run on the ${choice.name}; trying the next", e)
+            }
+            false
         }
     }
 
@@ -85,10 +123,19 @@ class PoseLandmarkerHelper(
         try {
             synchronized(lock) {
 
+                if (gpuFailed && delegate == Delegate.GPU.name) {
+                    gpuFailed = false
+                    poseLandmarker?.close()
+                    poseLandmarker = null
+                    isReady = false
+                    tryCreate(Delegate.CPU)
+                }
+
                 val landmarker = poseLandmarker ?: return
 
                 val frameTime = maxOf(SystemClock.uptimeMillis(), lastTimestampMs + 1)
                 lastTimestampMs = frameTime
+                perf.onSent(frameTime)
 
                 val bitmap = imageProxy.toBitmap()
                 val rotation = imageProxy.imageInfo.rotationDegrees
@@ -132,6 +179,8 @@ class PoseLandmarkerHelper(
 
     companion object {
         private const val TAG = "PoseLandmarkerHelper"
+        // Read by the device-matrix measurements: adb logcat -s PosePerf
+        private const val PERF_TAG = "PosePerf"
         private const val MODEL_ASSET = "pose_landmarker_lite.task"
     }
 }

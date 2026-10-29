@@ -22,17 +22,21 @@ import com.sai.sports.i18n.AppLanguage
  * screen and an English one read as the same product.
  *
  * The bundled files are subset (see assets/licenses/Anek-OFL.txt for the
- * licence): Latin keeps weight 400–800 and width 75–100, because condensed,
- * heavy numerals are the chest-number look; the Indian scripts keep weight
- * 400–700 at normal width, because condensed Devanagari, Bengali and Tamil are
- * harder to read and every score is written in Latin digits anyway.
+ * licence): Latin keeps weight 400–800 and width 75–100. Scores use it
+ * condensed and heavy, the scoreboard look; headings use it slightly narrowed
+ * and bold. The Indian scripts keep weight 400–700 at normal width, because
+ * condensed Devanagari, Bengali and Tamil are harder to read and every score is
+ * written in Latin digits anyway.
  */
-object TrialsFonts {
+object AppFonts {
 
     /** Scores, counters and chest numbers. Latin glyphs only — never for translated text. */
     val Numerals: FontFamily = family(R.font.anek_latin, width = 75f, maxWeight = 800)
 
     private val LatinText = family(R.font.anek_latin, width = 100f, maxWeight = 800)
+
+    /** Latin headings: a touch narrower than body text, so short titles feel athletic. */
+    private val LatinHeading = family(R.font.anek_latin, width = 92f, maxWeight = 800)
     private val Devanagari = family(R.font.anek_devanagari, width = null, maxWeight = 700)
     private val Bangla = family(R.font.anek_bangla, width = null, maxWeight = 700)
     private val Tamil = family(R.font.anek_tamil, width = null, maxWeight = 700)
@@ -45,9 +49,9 @@ object TrialsFonts {
         AppLanguage.TAMIL -> Tamil
     }
 
-    /** Headings and tags: condensed for Latin, the plain script face otherwise. */
+    /** Headings: narrowed for Latin, the plain script face otherwise. */
     fun display(language: AppLanguage): FontFamily =
-        if (language == AppLanguage.ENGLISH) Numerals else text(language)
+        if (language == AppLanguage.ENGLISH) LatinHeading else text(language)
 
     // Variation settings on a resource font are still marked experimental,
     // though Compose has shipped them since 1.2.
@@ -78,16 +82,16 @@ object TrialsFonts {
  * word. And Indian scripts stack vowel signs above and below the line, so
  * their line heights are looser, or the marks of one line touch the next.
  */
-fun trialsTypography(language: AppLanguage): Typography {
-    val text = TrialsFonts.text(language)
-    val display = TrialsFonts.display(language)
+fun appTypography(language: AppLanguage): Typography {
+    val text = AppFonts.text(language)
+    val display = AppFonts.display(language)
     val latin = language == AppLanguage.ENGLISH
 
     fun tracking(amount: Float): TextUnit = if (latin) amount.em else 0.em
     fun lines(size: Int): TextUnit = if (latin) size.sp else (size * 1.15f).sp
 
     fun numerals(size: Int, height: Int) = TextStyle(
-        fontFamily = TrialsFonts.Numerals,
+        fontFamily = AppFonts.Numerals,
         fontWeight = FontWeight.ExtraBold,
         fontSize = size.sp,
         lineHeight = height.sp,
@@ -100,29 +104,29 @@ fun trialsTypography(language: AppLanguage): Typography {
         displaySmall = numerals(52, 54),
 
         headlineLarge = TextStyle(
-            fontFamily = display, fontWeight = FontWeight.Bold,
-            fontSize = 34.sp, lineHeight = lines(38)
+            fontFamily = display, fontWeight = FontWeight.ExtraBold,
+            fontSize = 32.sp, lineHeight = lines(36), letterSpacing = tracking(-0.01f)
         ),
         headlineMedium = TextStyle(
             fontFamily = display, fontWeight = FontWeight.Bold,
-            fontSize = 29.sp, lineHeight = lines(34)
+            fontSize = 27.sp, lineHeight = lines(32), letterSpacing = tracking(-0.01f)
         ),
         headlineSmall = TextStyle(
             fontFamily = display, fontWeight = FontWeight.Bold,
-            fontSize = 25.sp, lineHeight = lines(30)
+            fontSize = 23.sp, lineHeight = lines(28)
         ),
 
         titleLarge = TextStyle(
             fontFamily = text, fontWeight = FontWeight.SemiBold,
-            fontSize = 21.sp, lineHeight = lines(28)
+            fontSize = 20.sp, lineHeight = lines(26)
         ),
         titleMedium = TextStyle(
             fontFamily = text, fontWeight = FontWeight.SemiBold,
-            fontSize = 18.sp, lineHeight = lines(25)
+            fontSize = 17.sp, lineHeight = lines(23)
         ),
         titleSmall = TextStyle(
             fontFamily = text, fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp, lineHeight = lines(22)
+            fontSize = 15.sp, lineHeight = lines(21)
         ),
 
         bodyLarge = TextStyle(
@@ -138,17 +142,19 @@ fun trialsTypography(language: AppLanguage): Typography {
             fontSize = 13.sp, lineHeight = lines(19)
         ),
 
+        // Buttons.
         labelLarge = TextStyle(
-            fontFamily = display, fontWeight = FontWeight.SemiBold,
-            fontSize = 17.sp, lineHeight = lines(22), letterSpacing = tracking(0.02f)
+            fontFamily = text, fontWeight = FontWeight.Bold,
+            fontSize = 16.sp, lineHeight = lines(22), letterSpacing = tracking(0.01f)
         ),
+        // Eyebrows and tags: "WEDNESDAY, 9 APRIL", "VIEW ALL", "OFFICIAL".
         labelMedium = TextStyle(
-            fontFamily = display, fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp, lineHeight = lines(18), letterSpacing = tracking(0.08f)
+            fontFamily = text, fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp, lineHeight = lines(18), letterSpacing = tracking(0.1f)
         ),
         labelSmall = TextStyle(
-            fontFamily = display, fontWeight = FontWeight.SemiBold,
-            fontSize = 12.sp, lineHeight = lines(16), letterSpacing = tracking(0.08f)
+            fontFamily = text, fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp, lineHeight = lines(16), letterSpacing = tracking(0.06f)
         )
     )
 }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sprint 20. A release build speaks HTTPS only: athletes' videos, face photos
+  and sign-in tokens never cross a network in the clear. The system's trusted
+  certificate authorities only; user-installed ones are not trusted, so a
+  certificate added to the phone cannot be used to read the traffic.
+  Debug builds override this (src/debug/res/xml) to reach a developer's server.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

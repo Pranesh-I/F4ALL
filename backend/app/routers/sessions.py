@@ -40,7 +40,7 @@ from ..schemas import (
 )
 from ..security import current_official, require_athlete
 from ..services import sessions as rules
-from ..verification.analyzers import TestType
+from ..test_catalog import ASSESSABLE
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 admin_router = APIRouter(prefix="/api/dashboard/sessions", tags=["Dashboard"])
@@ -371,7 +371,7 @@ def _load(db: Session, session_id: uuid.UUID) -> AssessmentSession:
 
 
 def _validated_tests(codes: list[str]) -> list[str]:
-    known = {test.value for test in TestType}
+    known = set(ASSESSABLE)
     cleaned: list[str] = []
     for code in codes:
         normalised = code.strip().upper()
@@ -475,10 +475,7 @@ def _response(session: AssessmentSession, submissions: int) -> AssessmentSession
 
 
 def _unit(code: str) -> str:
-    try:
-        return TestType(code).unit
-    except ValueError:
-        return "reps"
+    return ASSESSABLE.get(code, "reps")
 
 
 def _clean(value: str | None) -> str | None:

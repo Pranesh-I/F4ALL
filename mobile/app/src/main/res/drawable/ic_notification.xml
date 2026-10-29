@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for notifications: a stopwatch, one flat colour as Android requires. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10,1h4v2h-4zM12,4a9,9 0,1 0,0.001 0zM12,6a7,7 0,1 1,-0.001 0zM11,8h2v5.5l3.2,1.9 -1,1.7L11,14.6z" />
+</vector>

@@ -65,6 +65,21 @@ TEST_BATTERY = [
         "unit": "cm",
         "description": "Standing vertical jump height above a standing reference.",
     },
+    # Sprint 18 field tests: timed, so the lowest time is the best.
+    {
+        "code": "SHUTTLE_RUN",
+        "name": "Shuttle Run",
+        "unit": "seconds",
+        "description": "4 x 10 m shuttle run, timed by the phone's motion sensors.",
+        "higher_is_better": False,
+    },
+    {
+        "code": "ENDURANCE_RUN",
+        "name": "Endurance Run",
+        "unit": "seconds",
+        "description": "600 m run (walking allowed), timed by GPS distance.",
+        "higher_is_better": False,
+    },
 ]
 
 
@@ -83,6 +98,7 @@ def seed() -> int:
                 existing.name = entry["name"]
                 existing.unit = entry["unit"]
                 existing.description = entry["description"]
+                existing.higher_is_better = entry.get("higher_is_better", True)
                 db.add(existing)
                 continue
 
@@ -314,6 +330,116 @@ def encrypt_photos() -> int:
     return 1 if failed else 0
 
 
+def retention_command(dry_run: bool) -> int:
+    """Delete personal data past its retention period (services/retention.py)."""
+    from .services import retention
+    from .storage import get_storage
+
+    settings = get_settings()
+    with session_scope() as db:
+        report = retention.run(db, settings, get_storage(settings), dry_run=dry_run)
+    verb = "Would delete" if dry_run else "Deleted"
+    for name, count in sorted(report.counts.items()):
+        print(f"{verb} {count:>6} {name.replace('_', ' ')}")
+    if report.storage_errors:
+        print(f"{report.storage_errors} stored file(s) could not be deleted; see the log")
+    return 1 if report.storage_errors else 0
+
+
+def storage_problems(client, bucket: str) -> list[str]:
+    """What is wrong with the bucket's own settings, as plain sentences.
+
+    The code already encrypts each object and only hands out signed links; this
+    checks the bucket would refuse a public link or an unencrypted object even
+    if some other tool wrote one.
+    """
+    from botocore.exceptions import ClientError
+
+    problems: list[str] = []
+    try:
+        block = client.get_public_access_block(Bucket=bucket)[
+            "PublicAccessBlockConfiguration"
+        ]
+        missing = [name for name, on in block.items() if not on]
+        if missing:
+            problems.append("Public access block is off for: " + ", ".join(missing))
+    except ClientError:
+        problems.append("The bucket has no public access block")
+    try:
+        rules = client.get_bucket_encryption(Bucket=bucket)[
+            "ServerSideEncryptionConfiguration"
+        ]["Rules"]
+        if not rules:
+            problems.append("The bucket has no default encryption")
+    except ClientError:
+        problems.append("The bucket has no default encryption")
+    try:
+        if client.get_bucket_versioning(Bucket=bucket).get("Status") == "Enabled":
+            # A deleted object would survive as an old version, and the
+            # retention job would delete nothing.
+            problems.append(
+                "Versioning is on: add a lifecycle rule that expires noncurrent"
+                " versions, or retention deletes do not remove the data"
+            )
+    except ClientError:
+        problems.append("Could not read the bucket's versioning setting")
+    return problems
+
+
+def check_storage() -> int:
+    from .storage import S3Storage, get_storage
+
+    settings = get_settings()
+    storage = get_storage(settings)
+    if not isinstance(storage, S3Storage):
+        print("Local storage: nothing to check (only allowed outside production)")
+        return 0
+    problems = storage_problems(storage.client, storage.bucket)
+    for problem in problems:
+        print(f"PROBLEM: {problem}")
+    if not problems:
+        print(f"s3://{storage.bucket}: private, encrypted by default, deletes are final")
+    return 1 if problems else 0
+
+
+def consistency_command() -> int:
+    """Look for results in a state they must never be in (Sprint 23)."""
+    from .services import consistency
+    from .storage import get_storage
+
+    settings = get_settings()
+    with session_scope() as db:
+        report = consistency.check(
+            db, get_storage(settings), sla_seconds=settings.verification_sla_seconds
+        )
+    print(f"Checked {report.checked} result(s)")
+    for rule, ids in sorted(report.problems.items()):
+        print(f"PROBLEM {rule}: {len(ids)} — {', '.join(ids[:10])}")
+    if report.ok:
+        print("No result is in a state it must never be in")
+    return 0 if report.ok else 1
+
+
+def accuracy_command(manifest: str | None, report: str | None, skip_run: bool) -> int:
+    """Run the dataset through the server pipeline; write the report (Sprint 22)."""
+    from .services import accuracy
+    from .tasks import MODELS_DIR
+
+    manifest_path = Path(manifest) if manifest else accuracy.DEFAULT_MANIFEST
+    report_path = Path(report) if report else accuracy.DEFAULT_REPORT
+    rows = accuracy.load_manifest(manifest_path)
+    runner = None if skip_run else accuracy.server_pipeline(MODELS_DIR)
+    cases = accuracy.evaluate(rows, manifest_path.parent, runner)
+    report_path.write_text(
+        accuracy.render(cases, manifest_path), encoding="utf-8", newline="\n"
+    )
+    results = accuracy.write_results(cases, manifest_path)
+    labelled = sum(1 for case in cases if case.labelled)
+    print(f"{len(cases)} recording(s), {labelled} with a human result")
+    print(f"Wrote {report_path} and {results}")
+    return 1 if any(case.error for case in cases) else 0
+
+
 OPENAPI_PATH = Path(__file__).resolve().parent.parent.parent / "docs" / "openapi.yaml"
 
 OPENAPI_HEADER = (
@@ -383,6 +509,24 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser(
         "encrypt-photos", help="Encrypt registration photos stored in the clear"
     )
+    retention_parser = subparsers.add_parser(
+        "retention", help="Delete personal data past its retention period"
+    )
+    retention_parser.add_argument("--dry-run", action="store_true")
+    subparsers.add_parser(
+        "check-storage", help="Check the bucket is private, encrypted and final"
+    )
+    subparsers.add_parser(
+        "consistency", help="Find results in a state they must never be in"
+    )
+    accuracy_parser = subparsers.add_parser(
+        "accuracy", help="Measure the pipeline against human ground truth"
+    )
+    accuracy_parser.add_argument("--manifest", default=None)
+    accuracy_parser.add_argument("--report", default=None)
+    accuracy_parser.add_argument(
+        "--skip-run", action="store_true", help="use ai_result from the manifest"
+    )
 
     args = parser.parse_args(argv)
 
@@ -402,6 +546,14 @@ def main(argv: list[str] | None = None) -> int:
         return identity_key()
     if args.command == "encrypt-photos":
         return encrypt_photos()
+    if args.command == "retention":
+        return retention_command(args.dry_run)
+    if args.command == "check-storage":
+        return check_storage()
+    if args.command == "consistency":
+        return consistency_command()
+    if args.command == "accuracy":
+        return accuracy_command(args.manifest, args.report, args.skip_run)
     if args.command == "create-official":
         return create_official_command(
             args.email, args.name, args.role, args.region, password=None

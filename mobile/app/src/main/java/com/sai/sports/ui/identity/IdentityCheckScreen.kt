@@ -47,12 +47,14 @@ import com.sai.sports.data.IdentityPassStore
 import com.sai.sports.data.IdentityPhotos
 import com.sai.sports.data.ProfileStatusStore
 import com.sai.sports.ui.common.ErrorText
+import com.sai.sports.ui.kit.FlowProgress
 import com.sai.sports.ui.kit.InkButton
 import com.sai.sports.ui.kit.LineButton
+import com.sai.sports.ui.kit.OfficialStep
 import com.sai.sports.ui.kit.Page
 import com.sai.sports.ui.kit.SheetShape
 import com.sai.sports.ui.kit.TitleBar
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.AppColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,6 +75,8 @@ import java.io.ByteArrayOutputStream
  */
 @Composable
 fun IdentityCheckScreen(
+    /** A shuttle or endurance run: no hand signal follows the photo check. */
+    fieldTest: Boolean = false,
     sessionId: String,
     onBack: () -> Unit,
     onVerified: () -> Unit,
@@ -145,6 +149,8 @@ fun IdentityCheckScreen(
     if (!ready) return
 
     Page(header = { TitleBar(stringResource(R.string.identity_title), onBack = onBack) }) {
+        // The photo check is always the first step of an official test.
+        FlowProgress(current = OfficialStep.IDENTITY, fieldTest = fieldTest)
 
         val current = step
         val showCamera = hasCamera && (current is IdentityStep.Ready ||
@@ -287,7 +293,7 @@ private fun FrontCamera(onReady: (ImageCapture) -> Unit) {
             .fillMaxWidth()
             .aspectRatio(3f / 4f)
             .clip(SheetShape)
-            .border(2.dp, TrialsColors.Ink, SheetShape)
+            .border(2.dp, AppColors.TextPrimary, SheetShape)
     ) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
     }

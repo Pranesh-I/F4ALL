@@ -81,6 +81,8 @@ def client(settings, db_session_factory, monkeypatch):
             session.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    # The audit middleware writes outside the dependency system.
+    app.state.session_factory = db_session_factory
     app.dependency_overrides[get_settings] = lambda: settings
 
     # The verification task needs Celery and a real video; the API tests are

@@ -2,9 +2,10 @@ import { Navigate, Route, Routes, useLocation, useParams } from "react-router-do
 import { AdminLayout } from "./components/AdminLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardPage } from "./pages/DashboardPage";
+import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { LoginPage } from "./pages/LoginPage";
-import { AnalyticsPage, AthleteDetailPage, AthletesPage, NotFoundPage } from "./pages/PlaceholderPages";
+import { AthleteDetailPage, AthletesPage, NotFoundPage } from "./pages/PlaceholderPages";
 import { QueuePage } from "./pages/QueuePage";
 import { ReviewPage } from "./pages/ReviewPage";
 import { SessionCreatePage } from "./pages/SessionCreatePage";

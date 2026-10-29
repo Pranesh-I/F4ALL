@@ -27,6 +27,8 @@ from tests.test_dashboard import (
 from tests.test_sessions import athlete_auth, create_session, submit
 
 ALL_SIX = ["SQUATS", "PUSH_UPS", "BICEP_CURLS", "LUNGES", "VERTICAL_JUMP", "SIT_UPS"]
+# Sprint 18: the timed field tests follow the six pose tests.
+FIELD = ["SHUTTLE_RUN", "ENDURANCE_RUN"]
 
 
 def admin_login(client, official) -> dict:
@@ -63,7 +65,7 @@ def test_the_sprint_13_journey(client, db, settings, athlete, seeded_tests):
 
     # The tests offered come from the backend, all six of them.
     catalog = client.get("/api/dashboard/tests", headers=headers).json()
-    assert [test["code"] for test in catalog] == ALL_SIX
+    assert [test["code"] for test in catalog] == ALL_SIX + FIELD
 
     # Create a session with every test, open now.
     created = client.post(
@@ -473,7 +475,7 @@ def test_the_tests_catalog_is_the_six_the_server_can_score(
         "/api/dashboard/tests", headers=token_for(reviewer, settings)
     ).json()
 
-    assert [test["code"] for test in catalog] == ALL_SIX
+    assert [test["code"] for test in catalog] == ALL_SIX + FIELD
     by_code = {test["code"]: test for test in catalog}
     # Named from the seeded tests table where it has a row...
     assert by_code["SIT_UPS"]["name"] == "Sit-ups"
@@ -481,6 +483,9 @@ def test_the_tests_catalog_is_the_six_the_server_can_score(
     # ...and still offered, readably, where it does not.
     assert by_code["BICEP_CURLS"]["name"] == "Bicep Curls"
     assert by_code["VERTICAL_JUMP"]["unit"] == "cm"
+    # Timed field tests: seconds, and the lowest time is the best.
+    assert {by_code[code]["unit"] for code in FIELD} == {"seconds"}
+    assert not any(by_code[code]["higher_is_better"] for code in FIELD)
     assert {by_code[code]["unit"] for code in ALL_SIX if code != "VERTICAL_JUMP"} == {
         "reps"
     }

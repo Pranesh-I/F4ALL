@@ -25,7 +25,7 @@ from ..database import get_db
 from ..models import Athlete, PracticeAttempt
 from ..schemas import PracticeAttemptIn, PracticeAttemptOut, PracticeHistoryResponse
 from ..security import require_athlete
-from ..verification.analyzers import TestType
+from ..test_catalog import ASSESSABLE
 
 router = APIRouter(prefix="/api/athletes/me/practice", tags=["Practice"])
 
@@ -52,18 +52,17 @@ def save_practice_attempt(
     PUT on the phone's own id makes this idempotent: an upload repeated after a
     lost response overwrites the same row instead of adding a second attempt.
     """
-    try:
-        test_type = TestType(payload.test_type)
-    except ValueError:
+    unit = ASSESSABLE.get(payload.test_type)
+    if unit is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Unknown test type: {payload.test_type}",
-        ) from None
+        )
 
-    if payload.unit != test_type.unit:
+    if payload.unit != unit:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"{test_type.value} is scored in {test_type.unit}",
+            detail=f"{payload.test_type} is scored in {unit}",
         )
 
     recorded_at = datetime.fromtimestamp(payload.recorded_at_ms / 1000, tz=UTC)
@@ -83,7 +82,7 @@ def save_practice_attempt(
     if row is None:
         row = PracticeAttempt(athlete_id=athlete.id, client_attempt_id=client_attempt_id)
 
-    row.test_code = test_type.value
+    row.test_code = payload.test_type
     row.score = payload.score
     row.unit = payload.unit
     row.status = payload.status

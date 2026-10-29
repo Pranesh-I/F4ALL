@@ -19,15 +19,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sai.sports.R
+import com.sai.sports.analyzer.TestType
 import com.sai.sports.api.ApiResult
 import com.sai.sports.api.Benchmark
 import com.sai.sports.api.ReviewNote
+import com.sai.sports.api.ServerForm
 import com.sai.sports.api.ServerResult
 import com.sai.sports.auth.AppServices
 import com.sai.sports.ui.common.Labels
 import com.sai.sports.ui.common.LoadFailed
 import com.sai.sports.ui.kit.BibNumber
+import com.sai.sports.ui.kit.BigNumber
 import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.RegisterRow
 import com.sai.sports.ui.kit.RuleLine
 import com.sai.sports.ui.kit.ScoreCorrection
 import com.sai.sports.ui.kit.ScoreInk
@@ -38,12 +42,16 @@ import com.sai.sports.ui.kit.SheetStyle
 import com.sai.sports.ui.kit.Slip
 import com.sai.sports.ui.kit.SlipStep
 import com.sai.sports.ui.kit.Stamp
+import com.sai.sports.ui.kit.StatusLine
 import com.sai.sports.ui.kit.StepState
 import com.sai.sports.ui.kit.TitleBar
-import com.sai.sports.ui.theme.TrialsColors
-import com.sai.sports.ui.theme.TrialsFonts
+import com.sai.sports.ui.kit.AppIcons
+import com.sai.sports.ui.theme.AppColors
+import com.sai.sports.ui.theme.AppFonts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.text.DateFormat
+import java.util.Date
 import java.util.Locale
 
 /**
@@ -57,7 +65,9 @@ import java.util.Locale
 @Composable
 fun ServerResultScreen(
     resultId: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    /** Opens another official result, such as the attempt before this one. */
+    onOpenResult: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val api = remember { AppServices.api(context) }
@@ -92,19 +102,19 @@ fun ServerResultScreen(
 
                 current.review?.let { ReviewCard(it) }
 
+                RecordCard(current, unit, onOpenResult)
+
+                if (TestType.entries.firstOrNull { it.name == current.testType }?.countsReps == true) {
+                    ServerFormCard(current.serverForm, current.testType)
+                }
+
                 current.benchmark?.let { BenchmarkCard(it, unit) }
 
                 if (current.benchmark == null && current.benchmarkUnavailable != null) {
                     Text(
-                        stringResource(
-                            if (current.serverScore == null && current.finalScore == null) {
-                                R.string.benchmark_not_verified
-                            } else {
-                                R.string.benchmark_no_cohort
-                            }
-                        ),
+                        stringResource(ResultPresentation.benchmarkUnavailable(current.status)),
                         style = MaterialTheme.typography.bodySmall,
-                        color = TrialsColors.Pencil
+                        color = AppColors.TextSecondary
                     )
                 }
             }
@@ -131,7 +141,7 @@ private fun ResultSlip(result: ServerResult, unit: String, athleteId: String?) {
             athleteId?.let {
                 Text(
                     text = BibNumber.of(it),
-                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = TrialsFonts.Numerals)
+                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = AppFonts.Numerals)
                 )
             }
         }
@@ -160,20 +170,20 @@ private fun ResultSlip(result: ServerResult, unit: String, athleteId: String?) {
                 }
 
                 ResultPresentation.Writing.STRUCK ->
-                    ScoreMark(format(headline), unit, ScoreInk.Pen, struck = true, strikeColor = TrialsColors.RedPen)
+                    ScoreMark(format(headline), unit, ScoreInk.Pen, struck = true, strikeColor = AppColors.Danger)
             }
 
-            Text(stringResource(label), style = MaterialTheme.typography.bodySmall, color = TrialsColors.Pencil)
+            Text(stringResource(label), style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
             Text(
                 stringResource(Labels.resultStatus(result.status)),
                 style = MaterialTheme.typography.titleMedium,
-                color = if (writing == ResultPresentation.Writing.STRUCK) TrialsColors.RedPen else TrialsColors.Ink
+                color = if (writing == ResultPresentation.Writing.STRUCK) AppColors.Danger else AppColors.TextPrimary
             )
             if (writing == ResultPresentation.Writing.CORRECTED) {
                 Text(
                     stringResource(R.string.result_phone_counted, "${format(result.provisionalScore)} $unit"),
                     style = MaterialTheme.typography.bodySmall,
-                    color = TrialsColors.Pencil
+                    color = AppColors.TextSecondary
                 )
             }
         }
@@ -216,6 +226,128 @@ private fun ResultSlip(result: ServerResult, unit: String, athleteId: String?) {
     }
 }
 
+/**
+ * Where this result stands in the athlete's record: when and where it was
+ * taken, whether it counts, their best at this test and the attempt before.
+ */
+@Composable
+private fun RecordCard(result: ServerResult, unit: String, onOpenResult: (String) -> Unit) {
+    val format = ResultPresentation::formatNumber
+    Sheet(spacing = 0.dp) {
+        SectionRule(stringResource(R.string.result_record_title))
+
+        result.createdAtMs?.let {
+            RegisterRow(label = stringResource(R.string.result_date), value = formatDate(it))
+        }
+
+        RegisterRow(
+            label = stringResource(R.string.result_session),
+            value = result.sessionName ?: stringResource(R.string.history_official_test)
+        )
+
+        val validity = ResultPresentation.validity(result.status)
+        RegisterRow(
+            label = stringResource(R.string.result_validity),
+            value = stringResource(ResultPresentation.validityLabel(validity)),
+            valueColor = when (validity) {
+                ResultPresentation.Validity.COUNTS -> AppColors.Accent
+                ResultPresentation.Validity.DOES_NOT_COUNT -> AppColors.Danger
+                else -> AppColors.TextSecondary
+            },
+            detail = result.serverInvalidReason?.let {
+                stringResource(R.string.result_not_scored_by_sai, stringResource(Labels.invalidReason(it)))
+            },
+            detailColor = AppColors.Danger
+        )
+
+        val best = result.personalBest
+        RegisterRow(
+            label = stringResource(R.string.result_personal_best),
+            value = best?.let { "${format(it.score)} " + stringResource(Labels.unit(it.unit)) } ?: "—",
+            valueColor = if (best?.official == true) AppColors.TextPrimary else AppColors.TextSecondary,
+            detail = when {
+                best == null -> stringResource(R.string.result_best_none)
+                ResultPresentation.isPersonalBest(best, result.resultId) ->
+                    stringResource(R.string.result_best_this)
+                else -> stringResource(ResultPresentation.officialLabel(best.official))
+            },
+            detailColor = if (best?.official == true) AppColors.Accent else AppColors.TextSecondary
+        )
+
+        val previous = result.previousAttempt
+        if (previous == null) {
+            RegisterRow(
+                label = stringResource(R.string.result_previous),
+                value = "—",
+                detail = stringResource(R.string.result_previous_none),
+                divider = false
+            )
+        } else {
+            val (score, _) = ResultPresentation.headline(
+                previous.provisionalScore, previous.serverScore, previous.finalScore
+            )
+            RegisterRow(
+                label = stringResource(R.string.result_previous),
+                value = "${format(score)} " + stringResource(Labels.unit(previous.unit)),
+                valueColor = if (previous.status == "rejected") AppColors.Danger else AppColors.TextPrimary,
+                detail = formatDate(previous.createdAtMs) + " · " +
+                    stringResource(Labels.resultStatus(previous.status)),
+                onClick = { onOpenResult(previous.resultId) },
+                onClickLabel = stringResource(R.string.profile_open_result),
+                divider = false
+            )
+        }
+    }
+}
+
+/**
+ * SAI's own verdict on the athlete's form: the share of good reps, and what
+ * went wrong most often. Said plainly when SAI has not measured it yet.
+ */
+@Composable
+private fun ServerFormCard(form: ServerForm?, testType: String) {
+    Sheet(spacing = 8.dp) {
+        SectionRule(stringResource(R.string.form_title))
+        if (form == null) {
+            Text(
+                stringResource(R.string.result_form_unavailable),
+                style = MaterialTheme.typography.bodyMedium,
+                color = AppColors.TextSecondary
+            )
+            return@Sheet
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            BigNumber("${form.score}%")
+            Text(
+                stringResource(R.string.result_form_from_sai),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        val faults = ResultPresentation.formFaults(form)
+        when {
+            form.faults == null -> Unit
+            faults.isEmpty() -> StatusLine(
+                text = stringResource(R.string.form_all_good),
+                icon = AppIcons.Check,
+                color = AppColors.TextPrimary
+            )
+            else -> faults.forEach { (issue, reps) ->
+                StatusLine(
+                    text = stringResource(R.string.result_form_fault, stringResource(Labels.formIssue(issue)), reps),
+                    icon = AppIcons.Forward,
+                    color = AppColors.TextPrimary
+                )
+            }
+        }
+    }
+}
+
+private fun formatDate(epochMs: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(epochMs))
+
 /** What the official decided, and their own words — a red-pen note when the athlete must act. */
 @Composable
 private fun ReviewCard(review: ReviewNote) {
@@ -224,7 +356,7 @@ private fun ReviewCard(review: ReviewNote) {
         Text(
             stringResource(Labels.reviewAction(review.action)),
             style = MaterialTheme.typography.titleMedium,
-            color = if (approved) TrialsColors.Stamp else TrialsColors.RedPen
+            color = if (approved) AppColors.Accent else AppColors.Danger
         )
         // The official's own words, in whatever language they wrote.
         review.notes?.takeIf { it.isNotBlank() }?.let {
@@ -254,7 +386,15 @@ private fun BenchmarkCard(benchmark: Benchmark, unit: String) {
         Text(
             stringResource(R.string.benchmark_group, stringResource(Labels.gender(gender)), ages),
             style = MaterialTheme.typography.bodySmall,
-            color = TrialsColors.Pencil
+            color = AppColors.TextSecondary
+        )
+        Text(
+            stringResource(
+                R.string.benchmark_norms_from,
+                benchmark.region ?: stringResource(R.string.benchmark_all_india)
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = AppColors.TextSecondary
         )
 
         if (benchmark.provisional) {

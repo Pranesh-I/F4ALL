@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends
@@ -59,7 +60,9 @@ def readiness(
     try:
         import redis
 
-        client = redis.Redis.from_url(settings.redis_url, socket_connect_timeout=2)
+        client = redis.Redis.from_url(
+            settings.redis_url, socket_connect_timeout=2, socket_timeout=2
+        )
         client.ping()
     except Exception as exc:
         broker_ok = False
@@ -158,10 +161,16 @@ def _recent_timings(db: Session, settings: Settings) -> dict:
 
 
 def _percentile(ordered: list[float], fraction: float) -> float | None:
-    """Nearest-rank percentile; None when there is nothing to measure."""
+    """Nearest-rank percentile; None when there is nothing to measure.
+
+    The ceil(fraction * n)-th value, as Postgres's `percentile_disc` computes
+    it. It used to round, which picks the value one rank too low whenever
+    fraction * n has a fractional part under a half — found in Sprint 16 by
+    checking the analytics API against raw SQL.
+    """
     if not ordered:
         return None
-    index = min(len(ordered) - 1, max(0, round(fraction * len(ordered)) - 1))
+    index = min(len(ordered) - 1, max(0, math.ceil(fraction * len(ordered)) - 1))
     return round(ordered[index], 2)
 
 

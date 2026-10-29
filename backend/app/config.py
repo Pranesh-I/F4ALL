@@ -162,6 +162,48 @@ class Settings(BaseSettings):
     # against the matcher by trial and error.
     identity_checks_per_hour: int = 12
 
+    # --- Notifications (Sprint 17) ---
+    # "console" logs pushes (development), "fcm" sends them through Firebase
+    # Cloud Messaging, "inbox" sends none: athletes' phones read their inbox.
+    notification_provider: str = "console"
+    fcm_project_id: str = ""
+    # A Firebase service-account key file. Never commit one.
+    fcm_service_account_file: str = ""
+    fcm_api_base: str = "https://fcm.googleapis.com"
+    # How often the notifier looks for new events and retries deliveries.
+    notifier_interval_seconds: int = 30
+    notification_max_attempts: int = 5
+    # "Session ending soon" goes out this long before the close, or at half the
+    # session's length for a session shorter than twice this.
+    session_ending_soon_hours: int = 24
+    # On its very first run the notifier looks back this far, and no further:
+    # results from before it existed are history, not news.
+    notifier_first_run_lookback_hours: int = 1
+
+    # --- Rate limits (Sprint 20), requests per minute ---
+    rate_limit_enabled: bool = True
+    # "memory" counts per process (development, tests); "redis" shares the
+    # count across workers and is required in production.
+    rate_limit_backend: str = "memory"
+    # Per client address and per account, for the API as a whole.
+    rate_limit_per_minute: int = 300
+    rate_limit_sign_in_per_minute: int = 10
+    rate_limit_otp_per_minute: int = 30
+    # Video chunks and signed media: one upload or playback is many requests.
+    rate_limit_upload_per_minute: int = 1200
+    # Behind a load balancer the client is the first X-Forwarded-For address.
+    # Only true when that header is set by your own proxy, never the client.
+    rate_limit_trust_forwarded: bool = False
+
+    # --- Retention (Sprint 20), in days; see services/retention.py ---
+    retention_video_days: int = 365
+    retention_identity_check_days: int = 90
+    retention_notification_days: int = 365
+    retention_access_log_days: int = 730
+    retention_otp_days: int = 30
+    retention_refresh_token_days: int = 30
+    retention_upload_days: int = 7
+
     @property
     def is_production(self) -> bool:
         return self.environment.lower() in {"production", "prod", "staging"}
@@ -196,6 +238,25 @@ class Settings(BaseSettings):
             problems.append("STORAGE_BACKEND must be 's3' with S3_BUCKET set")
         if self.sms_backend != "http" or not self.sms_api_url:
             problems.append("SMS_BACKEND must be 'http' with SMS_API_URL set")
+        secure_modes = ("require", "verify-ca", "verify-full")
+        if self.database_url.startswith("postgresql") and not any(
+            f"sslmode={mode}" in self.database_url for mode in secure_modes
+        ):
+            problems.append(
+                "DATABASE_URL must use TLS: add ?sslmode=require (or verify-full)"
+            )
+        if self.rate_limit_backend != "redis":
+            problems.append(
+                "RATE_LIMIT_BACKEND must be 'redis' so limits hold across workers"
+            )
+        if self.notification_provider == "fcm":
+            if not (self.fcm_project_id and self.fcm_service_account_file):
+                problems.append(
+                    "NOTIFICATION_PROVIDER 'fcm' needs FCM_PROJECT_ID and "
+                    "FCM_SERVICE_ACCOUNT_FILE"
+                )
+        elif self.notification_provider != "inbox":
+            problems.append("NOTIFICATION_PROVIDER must be 'fcm' or 'inbox'")
         if self.debug:
             problems.append("DEBUG must be false")
         if not self.public_base_url.startswith("https://"):
@@ -212,3 +273,14 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def settings_for_request(request, default: Settings) -> Settings:
+    """The settings a middleware should use for this request.
+
+    Endpoints get settings through ``Depends(get_settings)``, which a test or
+    an embedding app may override; middleware runs outside dependency
+    injection, so it looks the override up itself and both agree.
+    """
+    override = request.app.dependency_overrides.get(get_settings)
+    return override() if override is not None else default

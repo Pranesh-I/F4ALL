@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only: plain HTTP is allowed so the app can reach a development
+  server on a laptop (adb reverse, the emulator's 10.0.2.2, or the LAN).
+  The release configuration in src/main/res/xml is HTTPS only, and
+  TransportSecurityTest checks it. Lint reads this file as if it shipped, hence
+  the suppression: it never reaches a release build.
+-->
+<network-security-config
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="AcceptsUserCertificates,InsecureBaseConfiguration">
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

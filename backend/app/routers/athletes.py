@@ -33,16 +33,17 @@ from sqlalchemy.orm import Session
 from ..config import Settings, get_settings
 from ..database import get_db
 from ..models import (
+    AssessmentSession,
     Athlete,
     ConsentPurpose,
     Gender,
     Test,
     TestResult,
-    TestResultStatus,
 )
 from ..regions import canonical_region
 from ..schemas import (
     AthleteLeaderboardEntry,
+    AthleteLeaderboardOptions,
     AthleteLeaderboardResponse,
     AthleteProfileResponse,
     AthleteProfileUpdate,
@@ -51,19 +52,27 @@ from ..schemas import (
     BadgeResponse,
     BadgesResponse,
     ConsentRequest,
+    LeaderboardSessionOption,
     MessageResponse,
     PersonalBest,
     RegistrationResponse,
-    TestHistoryItem,
     TestHistoryPage,
     TokenResponse,
     YourStanding,
 )
 from ..security import phone_subject, registration_claim, require_athlete
+from ..services import athlete_results, identity_crypto
 from ..services import consents as consent_service
-from ..services import identity_crypto
 from ..services import tokens as token_service
-from ..services.athlete_leaderboard import build_board, display_name
+from ..services.athlete_leaderboard import (
+    AGE_BANDS,
+    TOP_N,
+    VIEWER_BAND,
+    age_band,
+    build_board,
+    display_name,
+    parse_band,
+)
 from ..services.badges import ResultFact, compute_badges
 from ..services.benchmarks import age_on
 from ..storage import get_storage
@@ -82,6 +91,9 @@ MAX_AGE_YEARS = 40
 SUPPORTED_LANGUAGES = ("en", "hi", "ta", "bn")
 
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
+
+# Sessions offered as leaderboard filters: the most recent the athlete took part in.
+MAX_SESSION_OPTIONS = 20
 ALLOWED_PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
@@ -362,17 +374,16 @@ def my_summary(
 ):
     """Profile, test history and personal bests."""
     rows = db.execute(
-        select(TestResult, Test)
-        .join(Test, Test.id == TestResult.test_id)
-        .where(TestResult.athlete_id == athlete.id)
-        .order_by(TestResult.created_at.desc())
+        _results_query(athlete).order_by(TestResult.created_at.desc())
     ).all()
 
-    history = [_history_item(result, test) for result, test in rows]
+    history = [athlete_results.history_item(*row) for row in rows]
 
     return AthleteSummaryResponse(
         profile=_profile(db, athlete, age_on(athlete.dob)),
-        personal_bests=_personal_bests(rows),
+        personal_bests=athlete_results.personal_bests(
+            [(result, test) for result, test, _ in rows]
+        ),
         history=history,
         total_tests=len(history),
     )
@@ -393,11 +404,7 @@ def my_history(
     `/me/summary` returns everything at once, which is fine for a new athlete
     and not for one with two years of sessions on a prepaid data pack.
     """
-    query = (
-        select(TestResult, Test)
-        .join(Test, Test.id == TestResult.test_id)
-        .where(TestResult.athlete_id == athlete.id)
-    )
+    query = _results_query(athlete)
     if test_type:
         query = query.where(Test.code == test_type.strip().upper())
     if before is not None:
@@ -409,7 +416,7 @@ def my_history(
 
     page = rows[:limit]
     return TestHistoryPage(
-        items=[_history_item(result, test) for result, test in page],
+        items=[athlete_results.history_item(*row) for row in page],
         next_before=page[-1][0].created_at if len(rows) > limit else None,
     )
 
@@ -419,67 +426,23 @@ def my_personal_bests(
     db: Session = Depends(get_db),
     athlete: Athlete = Depends(require_athlete),
 ):
-    """Best trusted score per test — see `_personal_bests` for what counts."""
+    """Best trusted score per test — see `services/athlete_results.py` for what counts."""
     rows = db.execute(
         select(TestResult, Test)
         .join(Test, Test.id == TestResult.test_id)
         .where(TestResult.athlete_id == athlete.id)
     ).all()
-    return _personal_bests(rows)
+    return athlete_results.personal_bests(rows)
 
 
-def _history_item(result: TestResult, test: Test) -> TestHistoryItem:
-    return TestHistoryItem(
-        result_id=result.id,
-        test_type=test.code,
-        unit=test.unit,
-        status=_value(result.status),
-        provisional_score=_as_float(result.provisional_score),
-        server_score=_as_float(result.server_score),
-        final_score=_as_float(result.final_score),
-        created_at=result.created_at,
-        session_id=result.session_id,
+def _results_query(athlete: Athlete):
+    """The athlete's official results, each with its test and session name."""
+    return (
+        select(TestResult, Test, AssessmentSession.name)
+        .join(Test, Test.id == TestResult.test_id)
+        .outerjoin(AssessmentSession, AssessmentSession.id == TestResult.session_id)
+        .where(TestResult.athlete_id == athlete.id)
     )
-
-
-def _personal_bests(rows) -> list[PersonalBest]:
-    """Best score per test type.
-
-    Only counts results the server has actually stood behind — a provisional
-    score the phone reported is not an achievement, and a rejected or flagged
-    attempt is certainly not one. `official` distinguishes an approved result
-    from a merely verified one, because the athlete must never be shown a
-    machine number in the place where an official one belongs.
-    """
-    best: dict[str, PersonalBest] = {}
-
-    for result, test in rows:
-        approved = result.status is TestResultStatus.approved
-        verified = result.status is TestResultStatus.verified
-
-        if approved and result.final_score is not None:
-            score, official = float(result.final_score), True
-        elif verified and result.server_score is not None:
-            score, official = float(result.server_score), False
-        else:
-            continue
-
-        current = best.get(test.code)
-        # Timed tests are won by the lowest number.
-        better = (
-            current is None
-            or (score > current.score if test.higher_is_better else score < current.score)
-        )
-        if better:
-            best[test.code] = PersonalBest(
-                test_type=test.code,
-                unit=test.unit,
-                score=score,
-                achieved_at=result.verified_at or result.created_at,
-                official=official,
-            )
-
-    return sorted(best.values(), key=lambda item: item.test_type)
 
 
 def _validated_age(dob: date) -> int:
@@ -611,14 +574,52 @@ def my_badges(
     )
 
 
+@router.get("/leaderboard-options", response_model=AthleteLeaderboardOptions)
+def athlete_leaderboard_options(
+    db: Session = Depends(get_db),
+    athlete: Athlete = Depends(require_athlete),
+):
+    """The choices the leaderboard's filters offer this athlete."""
+    band = age_band(age_on(athlete.dob))
+    sessions = db.execute(
+        select(AssessmentSession.id, AssessmentSession.name, AssessmentSession.starts_at)
+        .join(TestResult, TestResult.session_id == AssessmentSession.id)
+        .where(TestResult.athlete_id == athlete.id)
+        .distinct()
+        .order_by(AssessmentSession.starts_at.desc())
+        .limit(MAX_SESSION_OPTIONS)
+    ).all()
+    return AthleteLeaderboardOptions(
+        age_bands=[f"{low}-{high}" for low, high in AGE_BANDS],
+        your_age_band=f"{band[0]}-{band[1]}" if band else None,
+        your_region=athlete.region,
+        sessions=[
+            LeaderboardSessionOption(session_id=session_id, name=name)
+            for session_id, name, _ in sessions
+        ],
+    )
+
+
 @router.get("/leaderboard/{test_type}", response_model=AthleteLeaderboardResponse)
 def athlete_leaderboard(
     test_type: str,
     scope: str = "region",
+    region: str | None = Query(
+        default=None, max_length=100, description="Any state; overrides `scope`"
+    ),
+    age_band_filter: str = Query(
+        default="mine",
+        alias="age_band",
+        max_length=10,
+        description='"mine", "all", or a band such as "12-13"',
+    ),
+    session_id: uuid.UUID | None = Query(default=None),
+    limit: int = Query(default=TOP_N, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=10_000),
     db: Session = Depends(get_db),
     athlete: Athlete = Depends(require_athlete),
 ):
-    """Top athletes in the caller's age band and gender, by region or nationally."""
+    """Top athletes in one gender and age band, by state, nationally or in a session."""
     if scope not in ("region", "national"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -631,24 +632,57 @@ def athlete_leaderboard(
     if test is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown test")
 
-    region = athlete.region if scope == "region" else None
-    board = build_board(db, viewer=athlete, test=test, region=region)
+    if region is not None:
+        board_region = _validated_region(region)
+    else:
+        board_region = athlete.region if scope == "region" else None
+
+    if age_band_filter == "mine":
+        band = VIEWER_BAND
+    elif age_band_filter == "all":
+        band = None
+    else:
+        band = parse_band(age_band_filter)
+        if band is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="age_band must be 'mine', 'all' or one of: "
+                + ", ".join(f"{low}-{high}" for low, high in AGE_BANDS),
+            )
+
+    session = None
+    if session_id is not None:
+        session = db.get(AssessmentSession, session_id)
+        if session is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown session")
+
+    board = build_board(
+        db,
+        viewer=athlete,
+        test=test,
+        region=board_region,
+        band=band,
+        session_id=session_id,
+        limit=limit,
+        offset=offset,
+    )
+    shown_band = board.cohort.split(", ", 1)[1]
 
     return AthleteLeaderboardResponse(
         test_type=test.code,
         unit=test.unit,
-        scope=scope,
-        region=region,
+        scope="region" if board_region else "national",
+        region=board_region,
         cohort=board.cohort,
         entries=[
             AthleteLeaderboardEntry(
-                rank=index + 1,
+                rank=item.rank,
                 display_name=display_name(item.name),
                 region=item.region,
                 score=item.score,
                 is_you=item.athlete_id == athlete.id,
             )
-            for index, item in enumerate(board.entries)
+            for item in board.entries
         ],
         you=(
             YourStanding(
@@ -660,12 +694,13 @@ def athlete_leaderboard(
             else None
         ),
         total_ranked=board.total_ranked,
+        age_band=None if shown_band == "all ages" else shown_band,
+        session_id=session.id if session else None,
+        session_name=session.name if session else None,
+        offset=offset,
     )
 
 
 def _trusted_score(result: TestResult) -> float | None:
-    if _value(result.status) == TestResultStatus.approved.value:
-        return _as_float(result.final_score)
-    if _value(result.status) == TestResultStatus.verified.value:
-        return _as_float(result.server_score)
-    return None
+    trusted = athlete_results.trusted_score(result)
+    return trusted[0] if trusted is not None else None

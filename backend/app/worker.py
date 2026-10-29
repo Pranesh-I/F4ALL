@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from celery import Celery
+from celery.signals import celeryd_init
 
 from .config import get_settings
 
@@ -48,3 +49,19 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=False,
     broker_connection_max_retries=0,
 )
+
+
+@celeryd_init.connect
+def keep_reconnecting(conf=None, **_kwargs) -> None:
+    """A worker waits out a broker outage; only the API's publishing fails fast.
+
+    The bounds above are for the API, which publishes inside a request. Applied
+    to a worker they made it exit at the first Redis blip (found by the Sprint
+    23 Redis-outage run), and verification then stopped until someone restarted
+    it. A worker has no caller waiting: it should keep trying until the broker
+    is back.
+    """
+    conf = conf if conf is not None else celery_app.conf
+    conf.broker_connection_retry = True
+    conf.broker_connection_retry_on_startup = True
+    conf.broker_connection_max_retries = None  # forever

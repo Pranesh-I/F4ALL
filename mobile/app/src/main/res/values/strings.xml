@@ -64,11 +64,9 @@
     <!-- Home -->
     <string name="home_sync">Sent to SAI</string>
     <string name="home_sync_waiting">Waiting to send: %1$d</string>
-    <string name="home_profile">My profile and results</string>
     <string name="home_provisional_note">Scores on your phone are provisional. SAI confirms the official result.</string>
 
     <!-- Login -->
-    <string name="login_title">Sign in</string>
     <string name="login_body">We will send a code to your phone to confirm it is you.</string>
     <string name="login_phone_label">Mobile number</string>
     <string name="login_code_label">%1$d-digit code</string>
@@ -84,7 +82,6 @@
     <string name="login_error_code_wrong">That code is wrong or has expired</string>
 
     <!-- Registration -->
-    <string name="register_title">Create your athlete profile</string>
     <string name="register_name">Full name</string>
     <string name="register_dob_choose">Choose your date of birth</string>
     <string name="register_dob_value">Date of birth: %1$s</string>
@@ -207,14 +204,10 @@
     <string name="sync_failed">Could not send</string>
 
     <!-- Profile -->
-    <string name="profile_title">My profile</string>
-    <string name="profile_summary_line">%1$d years · %2$s · %3$s</string>
-    <string name="profile_height">Height: %1$s cm</string>
     <string name="profile_no_photo">No photo on file — SAI cannot confirm it is you in your test videos.</string>
     <string name="profile_add_photo">Add photo</string>
     <string name="profile_bests">Personal bests</string>
     <string name="profile_bests_empty">Your best scores appear here once SAI has checked a test.</string>
-    <string name="profile_results">All results</string>
     <string name="profile_results_empty">Tests you record appear here after they reach SAI.</string>
     <string name="profile_open_result">Open result</string>
     <string name="best_official">Official</string>
@@ -404,11 +397,9 @@
     <!-- Sprint 6: practice mode -->
     <string name="home_practice">Practice</string>
     <string name="home_practice_note">Train as often as you like. Practice is saved privately to your account and never counts as an official test.</string>
-    <string name="practice_title">Practice</string>
     <string name="practice_intro">Practise any test as many times as you like. Your practice is saved to your account, so it is there on any phone you sign in on. Only you can see it, and it never counts as an official test.</string>
     <string name="practice_best">Best: %1$s</string>
     <string name="practice_not_tried">Not tried yet</string>
-    <string name="practice_attempts">Attempts: %1$d</string>
     <string name="practice_history">Practice history</string>
     <string name="practice_badge">PRACTICE</string>
     <string name="practice_notice">Practice attempt — saved privately to your account. Only you can see it. It is not sent for official review and does not count as an official test.</string>
@@ -519,4 +510,200 @@
     <string name="step_in_progress">In progress</string>
     <string name="step_waiting">Waiting</string>
     <string name="practice_never_counts">Private · never counts as an official test</string>
+
+    <!-- Sprint 15: results, history and benchmarking -->
+    <string name="history_filter_official">Official</string>
+    <string name="history_filter_practice">Practice</string>
+    <string name="history_load_more">Show older results</string>
+    <string name="history_none">No results yet. Your official tests and your practice appear here.</string>
+    <string name="history_official_test">Official test</string>
+    <string name="profile_recent_results">Recent results</string>
+    <string name="result_record_title">Your record</string>
+    <string name="result_date">Date</string>
+    <string name="result_session">Session</string>
+    <string name="result_validity">Counts?</string>
+    <string name="validity_pending">Waiting for SAI\'s check</string>
+    <string name="validity_counts">Counts towards your record</string>
+    <string name="validity_under_review">On hold until an SAI official decides</string>
+    <string name="validity_does_not_count">Does not count</string>
+    <string name="result_not_scored_by_sai">SAI could not score the video: %1$s</string>
+    <string name="result_personal_best">Personal best</string>
+    <string name="result_best_this">This result is your personal best</string>
+    <string name="result_best_none">No personal best yet. A result counts once SAI has checked it.</string>
+    <string name="result_previous">Previous attempt</string>
+    <string name="result_previous_none">This is your first attempt at this test.</string>
+    <string name="result_form_unavailable">Not available yet. SAI\'s form check appears after it checks your video.</string>
+    <string name="result_form_from_sai">Form score from SAI\'s check of your video</string>
+    <string name="result_form_fault">%1$s · reps affected: %2$d</string>
+    <string name="benchmark_under_review">Your comparison appears if an SAI official accepts this result.</string>
+    <string name="benchmark_not_counted">This result does not count, so it is not compared.</string>
+    <string name="benchmark_norms_from">Norms used: %1$s</string>
+    <string name="benchmark_all_india">All India</string>
+
+    <!-- Sprint 16: leaderboard filters -->
+    <string name="leaderboard_filter_place">Where</string>
+    <string name="leaderboard_filter_age">Age group</string>
+    <string name="leaderboard_filter_session">Session</string>
+    <string name="leaderboard_other_state">Other state</string>
+    <string name="leaderboard_my_age">My age (%1$s)</string>
+    <string name="leaderboard_my_age_plain">My age group</string>
+    <string name="leaderboard_all_ages">All ages</string>
+    <string name="leaderboard_all_results">All results</string>
+    <string name="leaderboard_in_session">%1$s · Session: %2$s</string>
+    <string name="leaderboard_cohort_all_ages">%1$s, all ages · %2$s</string>
+    <string name="leaderboard_show_more">Show more</string>
+
+    <!-- Sprint 17: notifications -->
+    <string name="notif_session_opened_title">Session open: %1$s</string>
+    <string name="notif_session_opened_body">Your official tests are open now. Record them before the session closes.</string>
+    <string name="notif_session_ending_title">Closing soon: %1$s</string>
+    <string name="notif_session_ending_body">You still have tests to record in this session. It closes soon.</string>
+    <string name="notif_received_title">%1$s: received</string>
+    <string name="notif_received_body">SAI has your test and is checking the video.</string>
+    <string name="notif_verified_title">%1$s: checked by SAI</string>
+    <string name="notif_verified_body">Your score has been checked. An official will approve it next.</string>
+    <string name="notif_flagged_title">%1$s: being reviewed</string>
+    <string name="notif_flagged_body">An SAI official will look at your test. We will tell you when it is decided.</string>
+    <string name="notif_approved_title">%1$s: approved</string>
+    <string name="notif_approved_body">Your result is now official. Open the app to see it.</string>
+    <string name="notif_rejected_title">%1$s: not accepted</string>
+    <string name="notif_rejected_body">This result was not accepted. Open the app to see why.</string>
+    <string name="notif_resubmission_title">%1$s: please record again</string>
+    <string name="notif_resubmission_body">An SAI official asked you to record this test again.</string>
+    <string name="notif_channel_name">Results and sessions</string>
+    <string name="notif_channel_description">When SAI checks or decides a test, and when a session opens or is closing.</string>
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_empty">Nothing yet. SAI will tell you here when your tests are checked and when sessions open.</string>
+    <string name="notifications_mark_all">Mark all as read</string>
+    <string name="notifications_older">Show older</string>
+    <string name="notifications_open">Open</string>
+    <string name="notifications_unread">Unread</string>
+    <string name="home_notifications_unread">New notifications: %1$d</string>
+
+    <!-- Sprint 18: field tests -->
+    <string name="test_shuttle_run">Shuttle run (4 × 10 m)</string>
+    <string name="test_endurance_run">Endurance run (600 m)</string>
+    <string name="field_invalid_not_enough_data">Too little was recorded. Try again.</string>
+    <string name="field_invalid_low_sample_rate">This phone\'s motion sensor is too slow for this test.</string>
+    <string name="field_invalid_sensor_gap">The motion sensor stopped during the run. Try again.</string>
+    <string name="field_invalid_moved_before_start">You moved before GO. Stand still until the beep.</string>
+    <string name="field_invalid_wrong_turn_count">The phone did not count three turns. Turn fully at each line.</string>
+    <string name="field_invalid_leg_too_fast">A length was impossibly quick. Run the full 10 m each time.</string>
+    <string name="field_invalid_too_fast">That time is faster than is possible. Try again.</string>
+    <string name="field_invalid_no_finish">The phone did not find the finish. Stop and stand still after the last line.</string>
+    <string name="field_invalid_no_start_fix">No GPS position at the start. Wait for GPS ready before starting.</string>
+    <string name="field_invalid_gps_weak">GPS signal too weak. Run outdoors, away from tall buildings and trees.</string>
+    <string name="field_invalid_gps_unreliable">GPS positions jumped too often to measure the distance.</string>
+    <string name="field_invalid_gps_gap">GPS was lost for too long during the run.</string>
+    <string name="field_invalid_distance_not_reached">The run stopped before 600 m.</string>
+    <string name="field_invalid_not_on_foot">No running steps were felt. Carry the phone while you run.</string>
+    <string name="field_setup_title">Before you start</string>
+    <string name="field_shuttle_step_1">Mark two lines 10 m apart on flat ground.</string>
+    <string name="field_shuttle_step_2">Put the phone in a pocket or waistband, or hold it firmly in one hand.</string>
+    <string name="field_shuttle_step_3">Stand still behind a line. Run when the phone beeps GO.</string>
+    <string name="field_shuttle_step_4">Run to the far line and back twice — 4 lengths, 3 turns — then run through the line and stand still.</string>
+    <string name="field_endurance_step_1">Go outdoors to a track or a flat open route of at least 600 m.</string>
+    <string name="field_endurance_step_2">Wait here until the GPS is ready.</string>
+    <string name="field_endurance_step_3">Carry the phone while you run. Walking is allowed.</string>
+    <string name="field_endurance_step_4">The time stops by itself at 600 m. Keep the app open.</string>
+    <string name="field_no_gyroscope">This phone has no gyroscope, so it cannot count the turns of a shuttle run.</string>
+    <string name="field_location_why">The endurance run measures distance with GPS, so the app needs your location during the run.</string>
+    <string name="field_location_allow">Allow location</string>
+    <string name="field_gps_waiting">Finding GPS…</string>
+    <string name="field_gps_ready">GPS ready · accuracy (m): %1$d</string>
+    <string name="field_start">Start</string>
+    <string name="field_stand_still">Stand still…</string>
+    <string name="field_turns_so_far">Turns: %1$d</string>
+    <string name="field_distance_so_far">Distance so far (m): %1$d</string>
+    <string name="field_running_shuttle">Run! The time stops when you stand still after the last line.</string>
+    <string name="field_running_endurance">Run! The time stops by itself at 600 m.</string>
+    <string name="field_stop">Stop</string>
+    <string name="field_leg">Length %1$d</string>
+    <string name="field_pace">Pace</string>
+    <string name="practice_field_title">Field tests</string>
+    <string name="practice_field_note">Timed by the phone\'s sensors and GPS</string>
+
+    <!-- Sprint 19: progress, instructions, offline status -->
+    <string name="flow_identity">Photo check</string>
+    <string name="flow_gesture">Hand signal</string>
+    <string name="flow_countdown">Countdown</string>
+    <string name="flow_test">Test</string>
+    <string name="flow_upload">Sent to SAI</string>
+    <string name="flow_step_of">Step %1$d/%2$d · %3$s</string>
+    <string name="instructions_finishing">Finishing, and your result</string>
+    <string name="finish_step_reps">When you have finished, press Stop. Only full reps count; the screen shows any that did not, and why.</string>
+    <string name="finish_step_jump">Jump as many times as you like, standing still between jumps, then press Stop. Your best jump counts.</string>
+    <string name="result_step_practice">You see your result at once. Practice is private: it never counts as an official test.</string>
+    <string name="result_step_official">You see your phone\'s count at once. SAI then checks the video, and an official approves the result. The app tells you when.</string>
+    <string name="field_result_step">Your time shows at once. An official run is sent to SAI with its sensor record, checked, and approved by an official.</string>
+    <string name="field_waiting_to_send">Saved on this phone — it will be sent to SAI when you have signal</string>
+    <string name="field_pace_value">%1$s per km</string>
+
+    <!-- Redesign: entry flow, sign-up steps and the tab bar -->
+    <string name="bib_label">Chest number</string>
+    <string name="splash_tagline">Fitness tests on your phone, checked by SAI</string>
+    <string name="welcome_tag">Checked by SAI officials</string>
+    <string name="welcome_title">Your trials, on your phone</string>
+    <string name="welcome_body">Record official fitness tests wherever you are. Your phone gives a score at once; SAI checks it and confirms the result.</string>
+    <string name="welcome_create">Create account</string>
+    <string name="welcome_sign_in">I already have an account</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="signin_title">Welcome back</string>
+    <string name="create_phone_title">Your mobile number</string>
+    <string name="create_phone_body">We will send a code to confirm it is yours. You will use this number to sign in.</string>
+    <string name="login_code_title">Enter the code</string>
+    <string name="login_code_sent">We sent a code to %1$s</string>
+    <string name="register_about_title">About you</string>
+    <string name="register_place_title">Where you live</string>
+    <string name="register_place_body">Your state decides your regional leaderboard and which SAI team checks your tests.</string>
+    <string name="register_body_title">Height and weight</string>
+    <string name="register_body_body">Your height is needed to measure your vertical jump. Weight is optional.</string>
+    <string name="register_consent_body">Read what you are agreeing to. If you are under 18, a parent or guardian must agree.</string>
+    <string name="action_continue">Continue</string>
+    <string name="ready_title">You\'re all set</string>
+    <string name="ready_body">This is your chest number. SAI officials see the same number next to your results.</string>
+    <string name="ready_action">Go to home</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_progress">Progress</string>
+    <string name="nav_tests">Tests</string>
+    <string name="nav_ranks">Ranks</string>
+    <string name="nav_profile">Profile</string>
+
+    <!-- Redesign: home and tests -->
+    <string name="home_greeting">Hi, %1$s</string>
+    <string name="home_greeting_anon">Hello</string>
+    <string name="home_activity_title">Your activity</string>
+    <string name="home_tests_tried">Tests tried</string>
+    <string name="home_tests_tried_value">Practised: %1$d/%2$d</string>
+    <string name="home_uploads_title">Uploads</string>
+    <string name="home_uploads_all_sent">Everything sent</string>
+    <string name="home_view_all">View all</string>
+    <string name="tests_title">Tests</string>
+    <string name="tests_camera_title">Camera tests</string>
+
+    <!-- Redesign: test instructions -->
+    <string name="instructions_stat_camera">Camera</string>
+    <string name="instructions_stat_side_on">Side-on</string>
+    <string name="instructions_stat_facing">Facing</string>
+    <string name="instructions_stat_distance">2–3 m</string>
+    <string name="instructions_stat_distance_label">Distance</string>
+    <string name="instructions_stat_signal">Hand signal</string>
+    <string name="instructions_stat_signal_label">To start</string>
+
+    <!-- Redesign: results -->
+    <string name="result_complete_title">Test complete!</string>
+    <string name="result_complete_practice">Well done. Here is how it went.</string>
+    <string name="result_complete_official">Well done. Your test goes to SAI to be checked.</string>
+    <string name="result_not_scored_title">Not scored this time</string>
+    <string name="result_not_scored_body">The reason is below, with what to change. Then try again.</string>
+
+    <!-- Redesign: leaderboard podium -->
+    <string name="leaderboard_place_1">1st</string>
+    <string name="leaderboard_place_2">2nd</string>
+    <string name="leaderboard_place_3">3rd</string>
+
+    <!-- Redesign: profile -->
+    <string name="profile_age_value">Age %1$d</string>
+    <string name="profile_stat_height">Height</string>
+    <string name="profile_stat_state">State</string>
 </resources>

@@ -21,8 +21,8 @@ import com.sai.sports.R
 import com.sai.sports.api.ConsentGrant
 import com.sai.sports.ui.kit.Sheet
 import com.sai.sports.ui.kit.StatusLine
-import com.sai.sports.ui.kit.TrialsIcons
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.kit.AppIcons
+import com.sai.sports.ui.theme.AppColors
 
 /**
  * The rules for a consent the app asks for.
@@ -82,13 +82,13 @@ fun ConsentCard(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
             points.forEach { point ->
-                StatusLine(text = stringResource(point), icon = TrialsIcons.Forward, color = TrialsColors.Ink)
+                StatusLine(text = stringResource(point), icon = AppIcons.Forward, color = AppColors.TextPrimary)
             }
             if (minor) {
                 Text(
                     stringResource(R.string.consent_guardian_note),
                     style = MaterialTheme.typography.bodySmall,
-                    color = TrialsColors.Pencil
+                    color = AppColors.TextSecondary
                 )
                 OutlinedTextField(
                     value = guardianName,

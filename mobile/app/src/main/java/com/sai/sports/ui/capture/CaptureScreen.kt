@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.toggleable
@@ -122,12 +123,14 @@ import com.sai.sports.ui.kit.InkButton
 import com.sai.sports.ui.kit.ModeTag
 import com.sai.sports.ui.kit.Page
 import com.sai.sports.ui.kit.PlainButton
+import com.sai.sports.ui.kit.FlowProgress
+import com.sai.sports.ui.kit.OfficialStep
 import com.sai.sports.ui.kit.Sheet
 import com.sai.sports.ui.kit.SheetShape
 import com.sai.sports.ui.kit.TallyMarks
 import com.sai.sports.ui.kit.TitleBar
-import com.sai.sports.ui.kit.TrialsIcons
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.kit.AppIcons
+import com.sai.sports.ui.theme.AppColors
 import com.sai.sports.utils.FrameExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -750,6 +753,23 @@ private fun CameraPreview(
                 recording = phase == CapturePhase.Recording
             )
 
+            // Where an official test has got to: photo check done, then the
+            // hand signal, the countdown and the test itself.
+            if (mode == AttemptMode.OFFICIAL) {
+                Sheet(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    padding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    FlowProgress(
+                        current = when (phase) {
+                            is CapturePhase.Countdown -> OfficialStep.COUNTDOWN
+                            CapturePhase.Recording, CapturePhase.Saving, is CapturePhase.Interrupted -> OfficialStep.TEST
+                            else -> OfficialStep.GESTURE
+                        }
+                    )
+                }
+            }
+
             if (phase == CapturePhase.Ready) {
                 Sheet(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -886,14 +906,14 @@ private fun CameraPreview(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(184.dp)
-                    .background(TrialsColors.Ink.copy(alpha = 0.82f), CircleShape)
+                    .background(AppColors.Background.copy(alpha = 0.82f), CircleShape)
                     .semantics { liveRegion = LiveRegionMode.Assertive },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = countdown.secondsLeft.toString(),
                     style = MaterialTheme.typography.displayLarge.copy(fontSize = 128.sp, lineHeight = 128.sp),
-                    color = TrialsColors.Marigold
+                    color = AppColors.Accent
                 )
             }
         }
@@ -906,7 +926,7 @@ private fun CameraPreview(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(TrialsColors.Ink.copy(alpha = 0.84f))
+                .background(AppColors.Background.copy(alpha = 0.84f))
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -925,7 +945,7 @@ private fun CameraPreview(
                 Text(
                     text = stringResource(R.string.capture_scoring),
                     style = MaterialTheme.typography.titleMedium,
-                    color = TrialsColors.Paper
+                    color = AppColors.TextPrimary
                 )
             }
 
@@ -938,7 +958,7 @@ private fun CameraPreview(
                         PlainButton(
                             text = stringResource(if (attemptInProgress) R.string.capture_cancel else R.string.action_back),
                             onClick = { if (attemptInProgress) abandonAttempt() else onBack() },
-                            color = TrialsColors.Paper
+                            color = AppColors.TextPrimary
                         )
                     }
                 }
@@ -985,7 +1005,7 @@ private fun CameraPreview(
                 Text(
                     text = stringResource(R.string.voice_unavailable),
                     style = MaterialTheme.typography.bodySmall,
-                    color = TrialsColors.InkMuted,
+                    color = AppColors.TextSecondary,
                     textAlign = TextAlign.Center
                 )
             }
@@ -1167,7 +1187,7 @@ private fun CaptureStrip(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(TrialsColors.Ink.copy(alpha = 0.84f))
+            .background(AppColors.Background.copy(alpha = 0.84f))
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1178,14 +1198,14 @@ private fun CaptureStrip(
             Text(
                 text = testName,
                 style = MaterialTheme.typography.titleLarge,
-                color = TrialsColors.Paper,
+                color = AppColors.TextPrimary,
                 modifier = Modifier.semantics { heading() }
             )
             sessionName?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
-                    color = TrialsColors.InkMuted,
+                    color = AppColors.TextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1195,7 +1215,7 @@ private fun CaptureStrip(
             Text(
                 text = stringResource(R.string.capture_recording),
                 style = MaterialTheme.typography.labelLarge,
-                color = TrialsColors.RedPenOnInk
+                color = AppColors.Danger
             )
         }
     }
@@ -1208,10 +1228,10 @@ private fun CaptureStrip(
  */
 @Composable
 private fun LiveCounter(score: String, unit: String, detail: String?) {
-    val shadow = Shadow(color = TrialsColors.Ink.copy(alpha = 0.6f), offset = Offset(0f, 3f), blurRadius = 10f)
+    val shadow = Shadow(color = Color.Black.copy(alpha = 0.6f), offset = Offset(0f, 3f), blurRadius = 10f)
     Column(
         modifier = Modifier
-            .background(TrialsColors.Ink.copy(alpha = 0.5f), SheetShape)
+            .background(AppColors.Background.copy(alpha = 0.5f), SheetShape)
             .padding(horizontal = 28.dp, vertical = 6.dp)
             .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
         horizontalAlignment = Alignment.CenterHorizontally
@@ -1219,18 +1239,18 @@ private fun LiveCounter(score: String, unit: String, detail: String?) {
         Text(
             text = score,
             style = MaterialTheme.typography.displayLarge.copy(fontSize = 120.sp, lineHeight = 116.sp, shadow = shadow),
-            color = TrialsColors.Paper
+            color = AppColors.TextPrimary
         )
         Text(
             text = unit.uppercase(Locale.getDefault()),
             style = MaterialTheme.typography.labelMedium.copy(shadow = shadow),
-            color = TrialsColors.Paper
+            color = AppColors.TextPrimary
         )
         detail?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.bodyMedium.copy(shadow = shadow),
-                color = TrialsColors.Paper,
+                color = AppColors.TextPrimary,
                 modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
             )
         }
@@ -1267,10 +1287,10 @@ private fun CueBanner(text: String, tone: CueTone, speaking: Boolean) {
  * marigold for a warning, red pen for a fault — all readable in sunlight.
  */
 private fun cueStyle(tone: CueTone): Triple<Color, Color, ImageVector?> = when (tone) {
-    CueTone.POSITIVE -> Triple(TrialsColors.Paper, TrialsColors.Ink, TrialsIcons.Check)
-    CueTone.INFO -> Triple(TrialsColors.Ink.copy(alpha = 0.9f), TrialsColors.Paper, null)
-    CueTone.WARNING -> Triple(TrialsColors.Marigold, TrialsColors.Ink, null)
-    CueTone.FAULT -> Triple(TrialsColors.RedPen, TrialsColors.Paper, TrialsIcons.Cross)
+    CueTone.POSITIVE -> Triple(AppColors.Surface, AppColors.TextPrimary, AppIcons.Check)
+    CueTone.INFO -> Triple(AppColors.Background.copy(alpha = 0.88f), AppColors.TextPrimary, null)
+    CueTone.WARNING -> Triple(AppColors.Accent, AppColors.OnAccent, null)
+    CueTone.FAULT -> Triple(AppColors.Danger, AppColors.OnInverse, AppIcons.Cross)
 }
 
 private val ShutterSize = 76.dp
@@ -1288,14 +1308,15 @@ private fun ShutterButton(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
-    val ring = if (enabled) TrialsColors.Paper else TrialsColors.Paper.copy(alpha = 0.35f)
+    val ring = if (enabled) AppColors.Inverse else AppColors.Inverse.copy(alpha = 0.35f)
     val disc = when {
-        !enabled -> TrialsColors.Paper.copy(alpha = 0.25f)
-        official -> TrialsColors.Marigold
-        else -> TrialsColors.Paper
+        !enabled -> AppColors.Inverse.copy(alpha = 0.25f)
+        official -> AppColors.Accent
+        else -> AppColors.Inverse
     }
     Column(
         modifier = Modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(SheetShape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(4.dp),
@@ -1312,7 +1333,7 @@ private fun ShutterButton(
                 Box(
                     Modifier
                         .size(28.dp)
-                        .background(TrialsColors.RedPen, RoundedCornerShape(4.dp))
+                        .background(AppColors.Danger, RoundedCornerShape(4.dp))
                 )
             } else {
                 Box(
@@ -1332,6 +1353,8 @@ private fun VoiceToggle(on: Boolean, available: Boolean, onToggle: () -> Unit) {
     val description = stringResource(R.string.voice_toggle_description)
     Column(
         modifier = Modifier
+            // A 48 dp target whatever the label's length.
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(SheetShape)
             .toggleable(value = on, enabled = available, role = Role.Switch, onValueChange = { onToggle() })
             .semantics { contentDescription = description }
@@ -1340,15 +1363,15 @@ private fun VoiceToggle(on: Boolean, available: Boolean, onToggle: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(
-            imageVector = if (on) TrialsIcons.SpeakerOn else TrialsIcons.SpeakerOff,
+            imageVector = if (on) AppIcons.SpeakerOn else AppIcons.SpeakerOff,
             contentDescription = null,
-            tint = if (available) TrialsColors.Paper else TrialsColors.InkMuted,
+            tint = if (available) AppColors.TextPrimary else AppColors.TextSecondary,
             modifier = Modifier.size(28.dp)
         )
         Text(
             text = stringResource(if (on) R.string.voice_on else R.string.voice_off),
             style = MaterialTheme.typography.labelSmall,
-            color = if (available) TrialsColors.Paper else TrialsColors.InkMuted
+            color = if (available) AppColors.TextPrimary else AppColors.TextSecondary
         )
     }
 }
@@ -1368,20 +1391,20 @@ private fun GesturePanel(
     Column(
         modifier = modifier
             .padding(horizontal = 20.dp)
-            .background(TrialsColors.Ink.copy(alpha = 0.9f), SheetShape)
+            .background(AppColors.Background.copy(alpha = 0.9f), SheetShape)
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
             text = stringResource(R.string.gesture_title).uppercase(Locale.getDefault()),
-            color = TrialsColors.Marigold,
+            color = AppColors.Accent,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.semantics { heading() }
         )
         Text(
             text = stringResource(gestureInstruction(gesture)),
-            color = TrialsColors.Paper,
+            color = AppColors.TextPrimary,
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center
         )
@@ -1390,8 +1413,8 @@ private fun GesturePanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp),
-            color = TrialsColors.Marigold,
-            trackColor = TrialsColors.InkRaised,
+            color = AppColors.Accent,
+            trackColor = AppColors.SurfaceHigh,
             strokeCap = StrokeCap.Butt,
             gapSize = 0.dp,
             drawStopIndicator = {}
@@ -1399,7 +1422,7 @@ private fun GesturePanel(
         hint?.let {
             Text(
                 text = stringResource(gestureHintText(it)),
-                color = if (it == GestureVerifier.Hint.HOLD_IT) TrialsColors.Paper else TrialsColors.Marigold,
+                color = if (it == GestureVerifier.Hint.HOLD_IT) AppColors.TextPrimary else AppColors.Accent,
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
@@ -1407,7 +1430,7 @@ private fun GesturePanel(
         }
         Text(
             text = stringResource(R.string.gesture_seconds_left, secondsLeft),
-            color = TrialsColors.InkMuted,
+            color = AppColors.TextSecondary,
             style = MaterialTheme.typography.bodySmall
         )
     }

@@ -16,6 +16,7 @@ from datetime import date
 import pytest
 from sqlalchemy import select
 
+from app import cli
 from app.models import Benchmark, Test
 from app.services.benchmark_seed import (
     DEFAULT_FILE,
@@ -35,6 +36,18 @@ from app.services.benchmarks import (
 def seeded_benchmarks(db, seeded_tests):
     seed_benchmarks(db)
     return seeded_tests
+
+
+@pytest.fixture
+def full_battery(db) -> dict[str, Test]:
+    """All six tests, exactly as `python -m app.cli seed` creates them."""
+    tests = {entry["code"]: Test(**entry) for entry in cli.TEST_BATTERY}
+    db.add_all(tests.values())
+    db.commit()
+    return tests
+
+
+BUNDLED_ROWS = 80
 
 
 # ---------------------------------------------------------------------------
@@ -58,25 +71,73 @@ def test_leap_day_birthdays_do_not_break():
 # ---------------------------------------------------------------------------
 
 
-def test_the_bundled_file_loads(db, seeded_tests):
+def test_the_bundled_file_loads(db, full_battery):
     report = seed_benchmarks(db)
 
-    assert report.inserted == 20
+    assert report.inserted == BUNDLED_ROWS
     assert report.updated == 0
     assert not report.skipped_unknown_test
 
 
-def test_seeding_is_idempotent(db, seeded_tests):
+def test_seeding_is_idempotent(db, full_battery):
     """Re-running must never change which row an athlete is measured against."""
     seed_benchmarks(db)
     second = seed_benchmarks(db)
 
     assert second.inserted == 0
-    assert second.updated == 20
-    assert len(list(db.execute(select(Benchmark)).scalars())) == 20
+    assert second.updated == BUNDLED_ROWS
+    assert len(list(db.execute(select(Benchmark)).scalars())) == BUNDLED_ROWS
 
 
-def test_every_bundled_row_is_marked_provisional(db, seeded_tests):
+def test_every_test_in_the_battery_has_a_cohort_for_every_registrable_age(
+    db, full_battery
+):
+    """No athlete aged 9-25 of either listed gender is left without a comparison,
+    and no age falls into two bands (which would make the cohort row order)."""
+    seed_benchmarks(db)
+    for code, test in full_battery.items():
+        for gender in ("male", "female"):
+            for age in range(9, 26):
+                rows = (
+                    db.execute(
+                        select(Benchmark)
+                        .where(Benchmark.test_id == test.id)
+                        .where(Benchmark.gender == gender)
+                        .where(Benchmark.age_min <= age)
+                        .where(Benchmark.age_max >= age)
+                    )
+                    .scalars()
+                    .all()
+                )
+                assert len(rows) == 1, (code, gender, age, len(rows))
+
+
+def test_norms_for_tests_without_a_time_limit_say_so(db, full_battery):
+    """The rep tests are one continuous set, and curls have no set load: an
+    athlete or reviewer reading the source must be told why the number is weak."""
+    seed_benchmarks(db)
+    for code in ("SQUATS", "PUSH_UPS", "LUNGES", "BICEP_CURLS"):
+        sources = set(
+            db.execute(
+                select(Benchmark.source).where(Benchmark.test_id == full_battery[code].id)
+            ).scalars()
+        )
+        assert sources, code
+        for source in sources:
+            assert "PROVISIONAL" in source and "no SAI norm" in source, source
+    curls = (
+        db.execute(
+            select(Benchmark.source).where(
+                Benchmark.test_id == full_battery["BICEP_CURLS"].id
+            )
+        )
+        .scalars()
+        .first()
+    )
+    assert "load not standardised" in curls
+
+
+def test_every_bundled_row_is_marked_provisional(db, full_battery):
     """The whole point of the `source` column.
 
     These numbers are placeholders. If any row could load without saying so,

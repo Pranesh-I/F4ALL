@@ -2,6 +2,9 @@ package com.sai.sports.ui.profile
 
 import androidx.annotation.StringRes
 import com.sai.sports.R
+import com.sai.sports.analyzer.FormIssue
+import com.sai.sports.api.PersonalBest
+import com.sai.sports.api.ServerForm
 import com.sai.sports.ui.kit.StepState
 
 /**
@@ -58,6 +61,50 @@ object ResultPresentation {
     @StringRes
     fun officialLabel(official: Boolean): Int =
         if (official) R.string.best_official else R.string.best_not_approved
+
+    /**
+     * Whether a result counts towards the athlete's record — the same rule the
+     * server uses for personal bests and benchmarks. Only a verified or an
+     * approved result counts; a flagged one waits on a reviewer; a rejected
+     * one, or one sent back for resubmission, does not count.
+     */
+    fun validity(status: String): Validity = when (status) {
+        "verified", "approved" -> Validity.COUNTS
+        "flagged" -> Validity.UNDER_REVIEW
+        "rejected", "pending_sync" -> Validity.DOES_NOT_COUNT
+        else -> Validity.PENDING
+    }
+
+    enum class Validity { PENDING, COUNTS, UNDER_REVIEW, DOES_NOT_COUNT }
+
+    @StringRes
+    fun validityLabel(validity: Validity): Int = when (validity) {
+        Validity.PENDING -> R.string.validity_pending
+        Validity.COUNTS -> R.string.validity_counts
+        Validity.UNDER_REVIEW -> R.string.validity_under_review
+        Validity.DOES_NOT_COUNT -> R.string.validity_does_not_count
+    }
+
+    /** Why a result has no benchmark, from its status — never the server's English text. */
+    @StringRes
+    fun benchmarkUnavailable(status: String): Int = when (validity(status)) {
+        Validity.PENDING -> R.string.benchmark_not_verified
+        Validity.UNDER_REVIEW -> R.string.benchmark_under_review
+        Validity.DOES_NOT_COUNT -> R.string.benchmark_not_counted
+        Validity.COUNTS -> R.string.benchmark_no_cohort
+    }
+
+    /** The server's form faults that the app has a label for, most reps first. */
+    fun formFaults(form: ServerForm): List<Pair<FormIssue, Int>> =
+        form.faults.orEmpty()
+            .mapNotNull { fault ->
+                FormIssue.entries.firstOrNull { it.name == fault.code }?.let { it to fault.repsAffected }
+            }
+            .sortedByDescending { it.second }
+
+    /** True when [best] was set by the result with [resultId]. */
+    fun isPersonalBest(best: PersonalBest?, resultId: String): Boolean =
+        best?.resultId != null && best.resultId == resultId
 
     /**
      * Digits only, with no unit — the caller adds the translated unit.

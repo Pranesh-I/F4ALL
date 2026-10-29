@@ -125,7 +125,7 @@ def test_attempt_numbers_increment_per_athlete_and_test(client, seeded_tests, db
     assert [r.attempt_number for r in results] == [1, 2, 3]
 
 
-def test_result_endpoint_exposes_both_scores_and_flags(client, seeded_tests, db):
+def test_result_endpoint_exposes_both_scores_but_not_the_flags(client, seeded_tests, db):
     submit = client.post(
         "/api/tests/submit",
         json={"test_id": "SIT_UPS", "provisional_score": 30},
@@ -155,8 +155,8 @@ def test_result_endpoint_exposes_both_scores_and_flags(client, seeded_tests, db)
     assert body["provisional_score"] == 30
     assert body["server_score"] == 18
     assert body["status"] == "flagged"
-    assert body["flags"][0]["reason"] == "score_discrepancy"
-    assert "18" in body["flags"][0]["detail"]
+    # Not which check fired: that would teach a cheater the checks (Sprint 20).
+    assert body["flags"] == []
 
 
 def test_unknown_result_is_404(client, seeded_tests):

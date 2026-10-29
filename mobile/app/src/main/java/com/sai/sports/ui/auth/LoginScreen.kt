@@ -1,8 +1,21 @@
 package com.sai.sports.ui.auth
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -15,10 +28,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.api.ApiFailure
 import com.sai.sports.api.ApiResult
@@ -28,14 +49,20 @@ import com.sai.sports.sync.PracticeSyncWorker
 import com.sai.sports.sync.SyncScheduler
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
-import com.sai.sports.ui.kit.InkButton
+import com.sai.sports.ui.kit.AppIcons
+import com.sai.sports.ui.kit.MarigoldButton
 import com.sai.sports.ui.kit.Page
 import com.sai.sports.ui.kit.PlainButton
+import com.sai.sports.ui.kit.StepBar
 import com.sai.sports.ui.kit.TitleBar
+import com.sai.sports.ui.theme.AppColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Which door the athlete came in by. Both verify the phone; only the words differ. */
+enum class AuthMode { SIGN_IN, CREATE }
 
 /**
  * Phone number, then the code sent to it.
@@ -43,9 +70,15 @@ import kotlinx.coroutines.withContext
  * Deliberately two steps on one screen rather than two screens: an athlete
  * whose SMS never arrives needs to see their number and a resend button in the
  * same place, not navigate back to find out what they typed.
+ *
+ * A new athlete who came in by "Sign in", or a returning one who came in by
+ * "Create account", is not turned away: the server says which they are, and
+ * the app goes on to registration or home accordingly.
  */
 @Composable
 fun LoginScreen(
+    mode: AuthMode = AuthMode.SIGN_IN,
+    onBack: (() -> Unit)? = null,
     onLoggedIn: (registered: Boolean) -> Unit
 ) {
     val context = LocalContext.current
@@ -130,71 +163,172 @@ fun LoginScreen(
         }
     }
 
-    Page(header = { TitleBar(stringResource(R.string.login_title), onBack = null) }) {
+    val creating = mode == AuthMode.CREATE
 
-        Text(stringResource(R.string.login_body), style = MaterialTheme.typography.bodyMedium)
+    Page(
+        header = { TitleBar(title = "", onBack = onBack) },
+        spacing = 20.dp
+    ) {
+        if (creating) StepBar(step = 1, steps = RegistrationSteps.TOTAL)
 
-        OutlinedTextField(
-            value = phone,
-            onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' || c == ' ' }.take(16) },
-            label = { Text(stringResource(R.string.login_phone_label)) },
-            enabled = !codeSent && !busy,
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            modifier = Modifier.fillMaxWidth()
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(
+                    when {
+                        codeSent -> R.string.login_code_title
+                        creating -> R.string.create_phone_title
+                        else -> R.string.signin_title
+                    }
+                ),
+                style = MaterialTheme.typography.headlineLarge,
+                color = AppColors.TextPrimary,
+                modifier = Modifier.semantics { heading() }
+            )
+            Text(
+                if (codeSent) {
+                    stringResource(R.string.login_code_sent, "+91 " + phone.filter { it.isDigit() }.takeLast(10))
+                } else {
+                    stringResource(if (creating) R.string.create_phone_body else R.string.login_body)
+                },
+                style = MaterialTheme.typography.bodyLarge,
+                color = AppColors.TextSecondary
+            )
+        }
 
-        if (codeSent) {
-            OutlinedTextField(
+        if (!codeSent) {
+            PhoneField(
+                value = phone,
+                onValueChange = { phone = it.filter { c -> c.isDigit() || c == ' ' }.take(14) },
+                enabled = !busy
+            )
+        } else {
+            CodeBoxes(
                 value = code,
                 onValueChange = { code = it.filter(Char::isDigit).take(LoginRules.CODE_LENGTH) },
-                label = { Text(stringResource(R.string.login_code_label, LoginRules.CODE_LENGTH)) },
-                enabled = !busy,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                modifier = Modifier.fillMaxWidth()
+                enabled = !busy
             )
         }
 
         developmentCode?.let {
-            Text(stringResource(R.string.login_dev_code, it), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.login_dev_code, it), style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
         }
 
         error?.let { ErrorText(stringResource(it)) }
 
         if (busy) {
-            CircularProgressIndicator()
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = AppColors.Accent)
+            }
         } else if (!codeSent) {
-            InkButton(
+            MarigoldButton(
                 text = stringResource(R.string.login_send_code),
                 onClick = ::sendCode,
+                icon = AppIcons.Forward,
                 modifier = Modifier.fillMaxWidth()
             )
         } else {
-            InkButton(
+            MarigoldButton(
                 text = stringResource(R.string.login_verify),
                 onClick = ::verify,
                 modifier = Modifier.fillMaxWidth()
             )
-
-            PlainButton(
-                text = if (resendIn > 0) stringResource(R.string.login_resend_in, resendIn)
-                    else stringResource(R.string.login_resend),
-                onClick = ::sendCode,
-                enabled = resendIn == 0
-            )
-
-            PlainButton(
-                text = stringResource(R.string.login_change_number),
-                onClick = {
-                codeSent = false
-                code = ""
-                developmentCode = null
-                error = null
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                PlainButton(
+                    text = stringResource(R.string.login_change_number),
+                    onClick = {
+                        codeSent = false
+                        code = ""
+                        developmentCode = null
+                        error = null
+                    }
+                )
+                PlainButton(
+                    text = if (resendIn > 0) {
+                        stringResource(R.string.login_resend_in, resendIn)
+                    } else {
+                        stringResource(R.string.login_resend)
+                    },
+                    onClick = ::sendCode,
+                    enabled = resendIn == 0,
+                    color = AppColors.Accent
+                )
             }
-            )
         }
     }
+}
+
+/** A mobile number with the country code shown, not typed. */
+@Composable
+private fun PhoneField(value: String, onValueChange: (String) -> Unit, enabled: Boolean) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier
+                .heightIn(min = 56.dp)
+                .background(AppColors.SurfaceHigh, RoundedCornerShape(14.dp))
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(AppIcons.Phone, contentDescription = null, tint = AppColors.TextSecondary, modifier = Modifier.size(18.dp))
+            Text("+91", style = MaterialTheme.typography.titleMedium, color = AppColors.TextPrimary)
+        }
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(stringResource(R.string.login_phone_label)) },
+            enabled = enabled,
+            singleLine = true,
+            shape = RoundedCornerShape(14.dp),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+/**
+ * The code as six boxes, filled as it is typed. One text field underneath,
+ * so the keyboard, paste and the SMS autofill suggestion all work as usual,
+ * and a screen reader hears one field with its label.
+ */
+@Composable
+private fun CodeBoxes(value: String, onValueChange: (String) -> Unit, enabled: Boolean) {
+    val focus = remember { FocusRequester() }
+    val label = stringResource(R.string.login_code_label, LoginRules.CODE_LENGTH)
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        enabled = enabled,
+        singleLine = true,
+        cursorBrush = SolidColor(AppColors.Accent),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focus)
+            .semantics { contentDescription = label },
+        decorationBox = {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(LoginRules.CODE_LENGTH) { index ->
+                    val digit = value.getOrNull(index)?.toString().orEmpty()
+                    val current = index == value.length
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(60.dp)
+                            .background(AppColors.SurfaceHigh, RoundedCornerShape(14.dp))
+                            .border(
+                                1.5.dp,
+                                if (current && enabled) AppColors.Accent else AppColors.SurfaceHigh,
+                                RoundedCornerShape(14.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(digit, style = MaterialTheme.typography.headlineSmall, color = AppColors.TextPrimary)
+                    }
+                }
+            }
+        }
+    )
 }
 
 /** Input rules, kept out of the composable so they are unit-tested. */

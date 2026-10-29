@@ -18,7 +18,6 @@ from ..models import (
     FINAL_REVIEW_ACTIONS,
     AssessmentSession,
     Athlete,
-    FlagSource,
     IdentityCheck,
     ReviewActionRecord,
     Test,
@@ -29,13 +28,13 @@ from ..models import (
 )
 from ..schemas import (
     BenchmarkComparisonResponse,
-    FlagResponse,
     LatestReview,
     ResultWithBenchmarkResponse,
     SubmitTestRequest,
     SubmitTestResponse,
 )
 from ..security import current_athlete
+from ..services import athlete_results
 from ..services import benchmarks as benchmark_service
 from ..services import sessions as session_rules
 from ..verification import finalization
@@ -395,6 +394,7 @@ def get_result(
 
     test = db.get(Test, result.test_id)
     comparison, unavailable = _benchmark_for(db, result, test, athlete)
+    previous = athlete_results.previous_attempt(db, result)
 
     # Decisions only. A reviewer's `flagged` action is an internal note to the
     # next reviewer, not something to show the athlete (Sprint 14).
@@ -437,24 +437,34 @@ def get_result(
         ),
         unit=test.unit if test else "",
         verified_at=result.verified_at,
-        flags=[
-            FlagResponse(
-                reason=flag.reason,
-                detail=flag.detail,
-                severity=flag.severity
-                if isinstance(flag.severity, str)
-                else flag.severity.value,
-                source=flag.source
-                if isinstance(flag.source, str)
-                else flag.source.value,
-                created_at=flag.created_at,
+        created_at=result.created_at,
+        session_id=result.session_id,
+        session_name=_session_name(db, result.session_id),
+        server_form=athlete_results.server_form(result),
+        server_invalid_reason=athlete_results.server_invalid_reason(result),
+        personal_best=(
+            athlete_results.personal_best_for(db, result, test) if test else None
+        ),
+        previous_attempt=(
+            athlete_results.history_item(
+                previous, test, _session_name(db, previous.session_id)
             )
-            for flag in result.flags
-            # A reviewer's own flag carries internal notes; the athlete sees
-            # the automatic findings and, later, the decision.
-            if _value(flag.source) != FlagSource.manual.value
-        ],
+            if previous is not None and test is not None
+            else None
+        ),
+        # Never the flags, automatic ones included (Sprint 20): they describe
+        # the cheat checks, and telling a would-be cheater which one fired is
+        # how the checks stop working. The athlete sees both scores, the
+        # status and, once made, the decision. Officials read flags through
+        # /api/verification and the dashboard. Kept as a field so older apps
+        # still parse the response.
+        flags=[],
     )
+
+
+def _session_name(db: Session, session_id: uuid.UUID | None) -> str | None:
+    session = db.get(AssessmentSession, session_id) if session_id is not None else None
+    return session.name if session is not None else None
 
 
 def _benchmark_for(
@@ -462,6 +472,8 @@ def _benchmark_for(
     result: TestResult,
     test: Test | None,
     athlete: Athlete | None,
+    *,
+    for_reviewer: bool = False,
 ) -> tuple[BenchmarkComparisonResponse | None, str | None]:
     """Where this result stands against the athlete's cohort.
 
@@ -469,6 +481,12 @@ def _benchmark_for(
     provisional on-device number would tell an athlete they placed in the top
     25% on the strength of a measurement that has not been verified — and the
     whole design of this system rests on those two never looking the same.
+
+    For the athlete, only a counting result is benchmarked (verified or
+    approved; see `services/athlete_results.py`): telling them a flagged score
+    is in the top 10% before a reviewer has decided whether it stands, or
+    ranking a rejected one at all, would be telling them something untrue. A
+    reviewer sees the comparison for any measured result, as context.
 
     Returns (comparison, reason_it_is_unavailable); exactly one is non-None.
     """
@@ -484,9 +502,18 @@ def _benchmark_for(
     if score is None:
         return None, "This result has not been verified by SAI yet"
 
+    if not for_reviewer and result.status not in athlete_results.TRUSTED_STATUSES:
+        if result.status is TestResultStatus.flagged:
+            return None, "This result is being reviewed by SAI"
+        return None, "This result was not accepted, so it is not benchmarked"
+
     age = benchmark_service.age_on(athlete.dob)
     benchmark = benchmark_service.find_benchmark(
-        db, test_id=test.id, gender=athlete.gender, age_years=age
+        db,
+        test_id=test.id,
+        gender=athlete.gender,
+        age_years=age,
+        region=athlete.region,
     )
 
     if benchmark is None:
@@ -516,6 +543,7 @@ def _benchmark_for(
             unit=comparison.unit,
             source=comparison.source,
             provisional=comparison.provisional,
+            region=comparison.region,
         ),
         None,
     )

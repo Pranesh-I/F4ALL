@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Mirrors TrialsColors.Ground; used before Compose draws. -->
-    <color name="trials_ground">#FFF4F3EE</color>
+    <!-- Mirrors AppColors.Background; shown before Compose draws, so launch
+         does not flash a different colour first. -->
+    <color name="app_background">#FF0F0F0F</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

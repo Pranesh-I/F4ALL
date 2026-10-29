@@ -20,9 +20,23 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Sprint 20: where a release build talks to, fixed at build time and
+        // HTTPS only. Set `f4all.apiUrl=https://…` in ~/.gradle/gradle.properties
+        // or pass -Pf4all.apiUrl=…; without it a release points at the reserved
+        // `.invalid` domain, which can never resolve, rather than at anything
+        // that might be someone else's server.
+        val apiUrl = (project.findProperty("f4all.apiUrl") as String?) ?: "https://api.f4all.invalid"
+        require(apiUrl.startsWith("https://")) { "f4all.apiUrl must be an https:// address" }
+        buildConfigField("String", "API_BASE_URL", "\"$apiUrl\"")
+        // Only a debug build may be pointed at another server (a developer's laptop).
+        buildConfigField("boolean", "ALLOW_CUSTOM_SERVER", "false")
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "ALLOW_CUSTOM_SERVER", "true")
+        }
         release {
             optimization {
                 enable = false
@@ -35,6 +49,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {

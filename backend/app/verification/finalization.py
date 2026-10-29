@@ -23,6 +23,7 @@ from enum import Enum
 from .analyzers import AnalyzerResult, AttemptStatus, TestType
 from .cheat.findings import CheatReport
 from .discrepancy import DiscrepancyOutcome, FlagReason, Verdict
+from .rep_exercises import FormIssue
 from .validation import ValidationCode, ValidationFailure
 
 # Bump when extraction, scoring or decision rules change, so a stored verdict
@@ -370,6 +371,7 @@ def server_snapshot(
         "unit": server_result.unit,
         **_split_score(server_result.test_type, score),
         "form_score": server_result.form_score,
+        "form_faults": form_faults(server_result),
         "confidence": round(server_result.confidence, 3),
         "frames_analyzed": server_result.frames_analyzed,
         "frames_rejected": server_result.frames_rejected,
@@ -384,6 +386,35 @@ def server_snapshot(
         "video": video,
         "pipeline": pipeline,
     }
+
+
+def form_faults(server_result: AnalyzerResult) -> list[dict] | None:
+    """How many reps each form fault affected, in the analyzers' report order.
+
+    The breakdown behind ``form_score``, shown to the athlete as what to work
+    on. A rep carries its faults on one timestamp — warnings on a counted rep,
+    a comma-separated list on a refused one — so distinct timestamps are reps.
+    Codes are ``FormIssue`` names, which the phone already has labels for.
+    None when there were no reps to judge, the same as ``form_score``.
+    """
+    if server_result.form_score is None:
+        return None
+    reps_by_issue: dict[FormIssue, set[int]] = {}
+    for event in server_result.events:
+        if event.label not in ("form_warning", "rep_rejected_form"):
+            continue
+        for code in event.detail.split(","):
+            issue = _ISSUES_BY_CODE.get(code.strip())
+            if issue is not None:
+                reps_by_issue.setdefault(issue, set()).add(event.timestamp_ms)
+    return [
+        {"code": issue.name, "reps_affected": len(reps_by_issue[issue])}
+        for issue in FormIssue
+        if issue in reps_by_issue
+    ]
+
+
+_ISSUES_BY_CODE = {issue.code: issue for issue in FormIssue}
 
 
 def rep_attempts(server_result: AnalyzerResult) -> dict | None:

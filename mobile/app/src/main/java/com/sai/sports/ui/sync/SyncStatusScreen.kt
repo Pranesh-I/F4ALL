@@ -12,8 +12,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
@@ -22,8 +25,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sai.sports.R
 import com.sai.sports.auth.AppServices
+import com.sai.sports.data.AttemptMode
 import com.sai.sports.data.SyncRepository
 import com.sai.sports.data.local.TestAttemptEntity
+import com.sai.sports.fieldtest.FieldAttempt
+import com.sai.sports.fieldtest.FieldAttemptStore
+import com.sai.sports.fieldtest.FieldOutcome
+import com.sai.sports.fieldtest.FieldSyncWorker
 import com.sai.sports.sync.Delivery
 import com.sai.sports.sync.FailureHint
 import com.sai.sports.sync.NetworkMonitor
@@ -39,15 +47,16 @@ import com.sai.sports.ui.kit.Sheet
 import com.sai.sports.ui.kit.SheetStyle
 import com.sai.sports.ui.kit.StatusLine
 import com.sai.sports.ui.kit.TitleBar
-import com.sai.sports.ui.kit.TrialsIcons
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.kit.AppIcons
+import com.sai.sports.ui.profile.ResultPresentation
+import com.sai.sports.ui.theme.AppColors
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Shows the athlete what has reached SAI and what has not.
@@ -80,19 +89,30 @@ fun SyncStatusScreen(
     val online by remember { NetworkMonitor.observeOnline(context) }
         .collectAsStateWithLifecycle(initialValue = true)
 
+    // Official shuttle and endurance runs: no video, so not in the upload
+    // queue above, but just as much "not sent yet" (Sprint 18).
+    var fieldRefreshes by remember { mutableIntStateOf(0) }
+    val fieldRuns by produceState(initialValue = emptyList<FieldAttempt>(), athleteId, fieldRefreshes, isSyncing) {
+        value = withContext(Dispatchers.IO) {
+            athleteId?.let { FieldAttemptStore(context).list(it) }.orEmpty()
+                .filter { it.mode == AttemptMode.OFFICIAL && it.result.outcome == FieldOutcome.COMPLETE }
+        }
+    }
+    val fieldWaiting = fieldRuns.count { it.waitingToSend }
+
     Page(scrollable = false, header = { TitleBar(stringResource(R.string.sync_title), onBack) }) {
 
         val pending = attempts.count {
             Delivery.of(it) == Delivery.SENDING || Delivery.of(it) == Delivery.WAITING_TO_SUBMIT
-        }
+        } + fieldWaiting
 
         // Said plainly, because the fear is that closing the app loses the test.
         if (!online && pending > 0) {
             Sheet(style = SheetStyle.Field) {
                 StatusLine(
                     text = stringResource(R.string.sync_offline_title),
-                    icon = TrialsIcons.NoSignal,
-                    color = TrialsColors.Marigold
+                    icon = AppIcons.NoSignal,
+                    color = AppColors.Accent
                 )
                 Text(stringResource(R.string.sync_offline_body), style = MaterialTheme.typography.bodyMedium)
             }
@@ -100,7 +120,7 @@ fun SyncStatusScreen(
 
         Text(
             text = when {
-                attempts.isEmpty() -> stringResource(R.string.sync_none)
+                attempts.isEmpty() && fieldRuns.isEmpty() -> stringResource(R.string.sync_none)
                 pending == 0 -> stringResource(R.string.sync_all_sent)
                 isSyncing -> stringResource(R.string.sync_uploading_count, pending)
                 else -> stringResource(R.string.sync_waiting_count, pending)
@@ -111,17 +131,25 @@ fun SyncStatusScreen(
         if (pending > 0 && !isSyncing && online) {
             LineButton(
                 text = stringResource(R.string.sync_try_now),
-                onClick = { SyncScheduler.sendNow(context) },
-                icon = TrialsIcons.Upload
+                onClick = {
+                    SyncScheduler.sendNow(context)
+                    FieldSyncWorker.syncSoon(context)
+                    fieldRefreshes++
+                },
+                icon = AppIcons.Upload
             )
         }
 
+        fieldRuns.forEach { run -> FieldRunRow(run, onResultSelected) }
+
         if (attempts.isEmpty()) {
-            Text(
-                text = stringResource(R.string.sync_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TrialsColors.Pencil
-            )
+            if (fieldRuns.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.sync_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppColors.TextSecondary
+                )
+            }
             return@Page
         }
 
@@ -160,7 +188,7 @@ private fun AttemptRow(
         RegisterRow(
             label = stringResource(Labels.testName(attempt.testType)),
             value = "${formatScore(attempt)} ${stringResource(Labels.unit(attempt.scoreUnit))}",
-            valueColor = TrialsColors.Pencil,
+            valueColor = AppColors.TextSecondary,
             detail = formatTimestamp(attempt.recordedAtMs),
             divider = false
         )
@@ -176,14 +204,14 @@ private fun AttemptRow(
                 }
             ),
             icon = when (delivery) {
-                Delivery.SENDING -> if (attempt.syncStatus == SyncStatus.UPLOADING) TrialsIcons.Upload else TrialsIcons.Clock
-                Delivery.WAITING_TO_SUBMIT -> TrialsIcons.Clock
-                Delivery.SUBMITTED -> TrialsIcons.Check
-                Delivery.NOT_ACCEPTED, Delivery.FAILED -> TrialsIcons.Cross
+                Delivery.SENDING -> if (attempt.syncStatus == SyncStatus.UPLOADING) AppIcons.Upload else AppIcons.Clock
+                Delivery.WAITING_TO_SUBMIT -> AppIcons.Clock
+                Delivery.SUBMITTED -> AppIcons.Check
+                Delivery.NOT_ACCEPTED, Delivery.FAILED -> AppIcons.Cross
             },
             color = when (delivery) {
-                Delivery.FAILED, Delivery.NOT_ACCEPTED -> TrialsColors.RedPen
-                else -> TrialsColors.Ink
+                Delivery.FAILED, Delivery.NOT_ACCEPTED -> AppColors.Danger
+                else -> AppColors.TextPrimary
             }
         )
 
@@ -193,8 +221,8 @@ private fun AttemptRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp),
-                color = TrialsColors.Ink,
-                trackColor = TrialsColors.PaperShade,
+                color = AppColors.TextPrimary,
+                trackColor = AppColors.SurfaceHigh,
                 strokeCap = StrokeCap.Butt,
                 gapSize = 0.dp,
                 drawStopIndicator = {}
@@ -207,7 +235,7 @@ private fun AttemptRow(
                     megabytes(attempt.compressedSizeBytes)
                 ),
                 style = MaterialTheme.typography.bodySmall,
-                color = TrialsColors.Pencil
+                color = AppColors.TextSecondary
             )
         }
 
@@ -219,7 +247,7 @@ private fun AttemptRow(
                 style = MaterialTheme.typography.bodySmall
             )
             attempt.lastError?.let {
-                Text(text = it, style = MaterialTheme.typography.bodySmall, color = TrialsColors.RedPen)
+                Text(text = it, style = MaterialTheme.typography.bodySmall, color = AppColors.Danger)
             }
         }
 
@@ -229,7 +257,7 @@ private fun AttemptRow(
             PlainButton(
                 text = stringResource(R.string.sync_see_result),
                 onClick = { onViewResult(resultId) },
-                icon = TrialsIcons.Forward
+                icon = AppIcons.Forward
             )
         }
 
@@ -250,7 +278,7 @@ private fun AttemptRow(
                     }
                 ),
                 style = MaterialTheme.typography.bodySmall,
-                color = TrialsColors.RedPen
+                color = AppColors.Danger
             )
 
             if (hint.retryable) {
@@ -271,3 +299,24 @@ private fun formatScore(attempt: TestAttemptEntity): String =
 
 private fun formatTimestamp(timestampMs: Long): String =
     SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()).format(Date(timestampMs))
+
+/** An official shuttle or endurance run: its trace is sent in one small request. */
+@Composable
+private fun FieldRunRow(run: FieldAttempt, onViewResult: (String) -> Unit) {
+    val resultId = run.resultId
+    RegisterRow(
+        label = stringResource(Labels.testName(run.testType.name)),
+        value = "${ResultPresentation.formatNumber(run.result.score)} ${stringResource(R.string.unit_seconds)}",
+        valueColor = AppColors.TextSecondary,
+        detail = stringResource(
+            when {
+                resultId != null -> R.string.sync_submitted
+                run.notAccepted -> R.string.sync_not_accepted
+                else -> R.string.field_waiting_to_send
+            }
+        ),
+        detailColor = if (run.notAccepted) AppColors.Danger else AppColors.TextSecondary,
+        onClick = resultId?.let { { onViewResult(it) } },
+        onClickLabel = resultId?.let { stringResource(R.string.sync_see_result) }
+    )
+}

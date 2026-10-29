@@ -19,11 +19,13 @@ export function LeaderboardPage() {
   const [region, setRegion] = useState("");
   const [gender, setGender] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
+  const [sessionId, setSessionId] = useState("");
+  const sessions = useQuery({ queryKey: ["sessions", "all"], queryFn: () => api.sessions() });
 
   const [ageMin, ageMax] = ageGroup ? ageGroup.split("-").map(Number) : [undefined, undefined];
 
   const board = useQuery({
-    queryKey: ["leaderboard", testType, region, gender, ageGroup],
+    queryKey: ["leaderboard", testType, region, gender, ageGroup, sessionId],
     queryFn: () =>
       api.leaderboard({
         testType,
@@ -31,6 +33,7 @@ export function LeaderboardPage() {
         gender: gender || undefined,
         ageMin,
         ageMax,
+        sessionId: sessionId || undefined,
       }),
   });
 
@@ -73,6 +76,14 @@ export function LeaderboardPage() {
           {AGE_GROUPS.map((group) => (
             <option key={group.key} value={group.key}>
               {group.label}
+            </option>
+          ))}
+        </select>
+        <select aria-label="Session" value={sessionId} onChange={(e) => setSessionId(e.target.value)} className={select}>
+          <option value="">All sessions</option>
+          {(sessions.data ?? []).map((session) => (
+            <option key={session.id} value={session.id}>
+              {session.name}
             </option>
           ))}
         </select>

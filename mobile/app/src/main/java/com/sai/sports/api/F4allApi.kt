@@ -8,6 +8,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 /**
@@ -200,7 +201,38 @@ class F4allApi(
 
     /** [scope] is "region" (the athlete's own state) or "national". */
     fun leaderboard(testType: String, scope: String): ApiResult<Leaderboard> =
-        get("/api/athletes/leaderboard/$testType?scope=$scope") { json ->
+        getLeaderboard("/api/athletes/leaderboard/$testType?scope=$scope")
+
+    /** One page of the board [query] describes, starting at [offset]. */
+    fun leaderboard(query: LeaderboardQuery, offset: Int = 0, limit: Int = 20): ApiResult<Leaderboard> {
+        val path = buildString {
+            append("/api/athletes/leaderboard/").append(query.testType)
+            when (query.place) {
+                LeaderboardQuery.PLACE_MY_STATE -> append("?scope=region")
+                LeaderboardQuery.PLACE_INDIA -> append("?scope=national")
+                else -> append("?scope=region&region=").append(URLEncoder.encode(query.place, "UTF-8"))
+            }
+            append("&age_band=").append(URLEncoder.encode(query.ageBand, "UTF-8"))
+            query.sessionId?.let { append("&session_id=").append(it) }
+            append("&limit=").append(limit).append("&offset=").append(offset)
+        }
+        return getLeaderboard(path)
+    }
+
+    fun leaderboardOptions(): ApiResult<LeaderboardOptions> =
+        get("/api/athletes/leaderboard-options") { json ->
+            LeaderboardOptions(
+                ageBands = json.getJSONArray("age_bands").strings(),
+                yourAgeBand = json.optStringOrNull("your_age_band"),
+                yourRegion = json.getString("your_region"),
+                sessions = json.getJSONArray("sessions").objects().map {
+                    LeaderboardSession(id = it.getString("session_id"), name = it.getString("name"))
+                }
+            )
+        }
+
+    private fun getLeaderboard(path: String): ApiResult<Leaderboard> =
+        get(path) { json ->
             Leaderboard(
                 testType = json.getString("test_type"),
                 unit = json.getString("unit"),
@@ -222,7 +254,10 @@ class F4allApi(
                         visibleToOthers = it.getBoolean("visible_to_others")
                     )
                 },
-                totalRanked = json.optInt("total_ranked", 0)
+                totalRanked = json.optInt("total_ranked", 0),
+                ageBand = json.optStringOrNull("age_band"),
+                sessionName = json.optStringOrNull("session_name"),
+                offset = json.optInt("offset", 0)
             )
         }
 
@@ -230,28 +265,27 @@ class F4allApi(
         get("/api/athletes/me/summary") { json ->
             AthleteSummary(
                 profile = athleteProfile(json.getJSONObject("profile")),
-                personalBests = json.getJSONArray("personal_bests").objects().map {
-                    PersonalBest(
-                        testType = it.getString("test_type"),
-                        unit = it.getString("unit"),
-                        score = it.getDouble("score"),
-                        official = it.getBoolean("official")
-                    )
-                },
-                history = json.getJSONArray("history").objects().map {
-                    HistoryItem(
-                        resultId = it.getString("result_id"),
-                        testType = it.getString("test_type"),
-                        unit = it.getString("unit"),
-                        status = it.getString("status"),
-                        provisionalScore = it.optDoubleOrNull("provisional_score"),
-                        serverScore = it.optDoubleOrNull("server_score"),
-                        finalScore = it.optDoubleOrNull("final_score"),
-                        createdAt = it.getString("created_at")
-                    )
-                }
+                personalBests = json.getJSONArray("personal_bests").objects().map(::personalBest),
+                history = json.getJSONArray("history").objects().map(::historyItem)
             )
         }
+
+    /**
+     * Official results, newest first. Page backwards by passing the previous
+     * page's [HistoryPage.nextBefore] as [before].
+     */
+    fun history(before: String? = null, limit: Int = 30): ApiResult<HistoryPage> {
+        val query = buildString {
+            append("?limit=").append(limit)
+            before?.let { append("&before=").append(URLEncoder.encode(it, "UTF-8")) }
+        }
+        return get("/api/athletes/me/history$query") { json ->
+            HistoryPage(
+                items = json.getJSONArray("items").objects().map(::historyItem),
+                nextBefore = json.optStringOrNull("next_before")
+            )
+        }
+    }
 
     // -- tests --------------------------------------------------------------
 
@@ -323,7 +357,105 @@ class F4allApi(
                         action = it.getString("action"),
                         notes = it.optStringOrNull("notes")
                     )
-                }
+                },
+                createdAtMs = json.optStringOrNull("created_at")?.let(::epochMillis),
+                sessionName = json.optStringOrNull("session_name"),
+                serverForm = json.optJSONObject("server_form")?.let { form ->
+                    ServerForm(
+                        score = form.getInt("score"),
+                        faults = form.optJSONArray("faults")?.objects()?.map {
+                            ServerFormFault(code = it.getString("code"), repsAffected = it.getInt("reps_affected"))
+                        }
+                    )
+                },
+                serverInvalidReason = json.optStringOrNull("server_invalid_reason"),
+                personalBest = json.optJSONObject("personal_best")?.let(::personalBest),
+                previousAttempt = json.optJSONObject("previous_attempt")?.let(::historyItem)
+            )
+        }
+
+    // -- notifications (Sprint 17) ------------------------------------------
+
+    /** The signed-in athlete's notifications, newest first. */
+    fun notifications(before: String? = null, unreadOnly: Boolean = false, limit: Int = 30): ApiResult<NotificationPage> {
+        val query = buildString {
+            append("?limit=").append(limit)
+            if (unreadOnly) append("&unread_only=true")
+            before?.let { append("&before=").append(URLEncoder.encode(it, "UTF-8")) }
+        }
+        return get("/api/athletes/me/notifications$query") { json ->
+            NotificationPage(
+                items = json.getJSONArray("items").objects().map { item ->
+                    val data = item.optJSONObject("data")
+                    AppNotification(
+                        id = item.getString("notification_id"),
+                        eventType = item.getString("event_type"),
+                        title = item.getString("title"),
+                        body = item.getString("body"),
+                        data = data?.keys()?.asSequence()?.associateWith { data.optString(it) }.orEmpty(),
+                        createdAtMs = epochMillis(item.getString("created_at")),
+                        read = !item.isNull("read_at")
+                    )
+                },
+                unreadCount = json.optInt("unread_count", 0),
+                nextBefore = json.optStringOrNull("next_before")
+            )
+        }
+    }
+
+    /** Marks [ids] read, or every notification when [all]; returns how many stay unread. */
+    fun markNotificationsRead(ids: List<String> = emptyList(), all: Boolean = false): ApiResult<Int> =
+        post(
+            "/api/athletes/me/notifications/read",
+            JSONObject().put("notification_ids", JSONArray(ids)).put("all", all)
+        ) { it.optInt("unread_count", 0) }
+
+    /** Addresses this phone's push token to the signed-in athlete. */
+    fun registerDevice(token: String): ApiResult<Unit> =
+        post("/api/athletes/me/devices", JSONObject().put("token", token).put("platform", "android")) { }
+
+    /** Stops pushes to this phone; called when the athlete signs out. */
+    fun unregisterDevice(token: String): ApiResult<Unit> =
+        execute(
+            request("/api/athletes/me/devices/${URLEncoder.encode(token, "UTF-8")}", auth = true)
+                .delete()
+                .build()
+        ) { }
+
+    // -- field tests (Sprint 18) ---------------------------------------------
+
+    /**
+     * Submits a shuttle or endurance run with its raw trace; SAI checks it in
+     * the request. Idempotent on [clientAttemptId]: a retry returns the result
+     * the first request created.
+     */
+    fun submitFieldTest(
+        testType: String,
+        clientAttemptId: String,
+        provisionalScore: Double?,
+        motion: JSONArray,
+        fixes: JSONArray,
+        sessionId: String? = null,
+        identityCheckId: String? = null,
+        recordedAtMs: Long? = null
+    ): ApiResult<FieldSubmission> =
+        post(
+            "/api/field-tests/submit",
+            JSONObject()
+                .put("test_type", testType)
+                .put("client_attempt_id", clientAttemptId)
+                .putOpt("provisional_score", provisionalScore)
+                .putOpt("session_id", sessionId)
+                .putOpt("identity_check_id", identityCheckId)
+                .putOpt("recorded_at_ms", recordedAtMs)
+                .put("motion", motion)
+                .put("fixes", fixes)
+        ) { json ->
+            FieldSubmission(
+                resultId = json.getString("result_id"),
+                status = json.getString("status"),
+                serverScore = json.optDoubleOrNull("server_score"),
+                invalidReason = json.optStringOrNull("invalid_reason")
             )
         }
 
@@ -489,7 +621,30 @@ class F4allApi(
         cohort = json.getString("cohort"),
         unit = json.getString("unit"),
         source = json.getString("source"),
-        provisional = json.getBoolean("provisional")
+        provisional = json.getBoolean("provisional"),
+        region = json.optStringOrNull("region")
+    )
+
+    private fun personalBest(json: JSONObject) = PersonalBest(
+        testType = json.getString("test_type"),
+        unit = json.getString("unit"),
+        score = json.getDouble("score"),
+        official = json.getBoolean("official"),
+        resultId = json.optStringOrNull("result_id")
+    )
+
+    private fun historyItem(json: JSONObject) = HistoryItem(
+        resultId = json.getString("result_id"),
+        testType = json.getString("test_type"),
+        unit = json.getString("unit"),
+        status = json.getString("status"),
+        provisionalScore = json.optDoubleOrNull("provisional_score"),
+        serverScore = json.optDoubleOrNull("server_score"),
+        finalScore = json.optDoubleOrNull("final_score"),
+        createdAt = json.getString("created_at"),
+        createdAtMs = epochMillis(json.getString("created_at")),
+        sessionId = json.optStringOrNull("session_id"),
+        sessionName = json.optStringOrNull("session_name")
     )
 
     companion object {
@@ -506,15 +661,20 @@ class F4allApi(
 }
 
 /**
- * ISO-8601 with an offset, as FastAPI writes it ("…Z" or "…+00:00"). A bad
- * value is reported as a malformed response, the same as bad JSON, rather
- * than escaping as an exception the caller never expected.
+ * ISO-8601 with an offset, as FastAPI writes it ("…Z" or "…+00:00"). A time
+ * without one is UTC, which is how the server stores every time. A bad value
+ * is reported as a malformed response, the same as bad JSON, rather than
+ * escaping as an exception the caller never expected.
  */
 private fun epochMillis(value: String): Long =
     try {
         java.time.OffsetDateTime.parse(value).toInstant().toEpochMilli()
     } catch (error: java.time.format.DateTimeParseException) {
-        throw org.json.JSONException("Unreadable time: $value")
+        try {
+            java.time.LocalDateTime.parse(value).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+        } catch (again: java.time.format.DateTimeParseException) {
+            throw org.json.JSONException("Unreadable time: $value")
+        }
     }
 
 private fun JSONObject.optStringOrNull(key: String): String? =

@@ -39,18 +39,6 @@ export function AthleteDetailPage() {
   );
 }
 
-export function AnalyticsPage() {
-  return (
-    <NotYetAvailable title="Analytics">
-      Analytics arrive with Sprint 16. Live counts by state are on the{" "}
-      <Link to={paths.dashboard} className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
-        dashboard
-      </Link>
-      .
-    </NotYetAvailable>
-  );
-}
-
 export function NotFoundPage() {
   return (
     <NotYetAvailable title="Page not found">

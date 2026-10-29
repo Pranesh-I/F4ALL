@@ -491,12 +491,11 @@ def test_several_flags_are_stored_with_evidence_and_shown_to_officials_only(
     assert shown["multiple_people"]["flag_id"]
     assert shown["multiple_people"]["evidence"]["frames_with_multiple_people"] == 70
 
-    # The athlete's own views never carry evidence.
+    # The athlete's own views carry no flags at all, so no evidence (Sprint 20).
     assert client.get(
         f"/api/verification/{result_id}", headers=headers
     ).json()["flags"] is None
-    results = client.get(f"/api/results/{result_id}", headers=headers).json()
-    assert all(flag["evidence"] is None for flag in results["flags"])
+    assert client.get(f"/api/results/{result_id}", headers=headers).json()["flags"] == []
 
 
 def test_review_records_who_resolved_each_flag(

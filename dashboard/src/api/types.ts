@@ -142,6 +142,8 @@ export interface ReviewDetail {
   /** The photo check the athlete took before recording; null when none was taken. */
   identity_check?: IdentityCheckOutcome | null;
   has_pose_sequence: boolean;
+  /** Sprint 20: when the recording was deleted under the retention policy. */
+  video_retired_on?: string | null;
   benchmark: Benchmark | null;
   review_history: ReviewHistoryEntry[];
   allowed_actions: ReviewActionName[];
@@ -235,6 +237,63 @@ export interface DashboardStats {
   by_status: Record<ResultStatus, number>;
   flagged_high_severity: number;
   breaching_sla: number;
+}
+
+/** GET /api/dashboard/analytics (Sprint 16): every metric for one set of filters. */
+export interface Analytics {
+  filters: {
+    submitted_from: string | null;
+    submitted_to: string | null;
+    region: string | null;
+    test_type: string | null;
+    session_id: string | null;
+  };
+  generated_at: string;
+  totals: {
+    athletes: number;
+    active_athletes: number;
+    submissions: number;
+    verified: number;
+    approved: number;
+    flagged: number;
+    rejected: number;
+    awaiting_verification: number;
+    resubmission_requested: number;
+  };
+  by_status: Record<ResultStatus, number>;
+  tests: {
+    test_type: string;
+    name: string;
+    unit: string;
+    higher_is_better: boolean;
+    submissions: number;
+    athletes: number;
+    counted: number;
+    average_score: number | null;
+  }[];
+  regions: { region: string; athletes: number; submissions: number; counted: number; flagged: number; rejected: number }[];
+  sessions: { session_id: string; name: string; submissions: number; athletes: number; counted: number }[];
+  outside_sessions: number;
+  uploads: {
+    started: number;
+    completed: number;
+    in_progress: number;
+    abandoned: number;
+    rejected_by_verification: number;
+  };
+  verification_time: {
+    measured: number;
+    turnaround_p50_seconds: number | null;
+    turnaround_p95_seconds: number | null;
+    processing_p50_seconds: number | null;
+    processing_p95_seconds: number | null;
+    sla_seconds: number;
+    within_sla: number;
+  };
+  bucket: "day" | "week" | "month";
+  participation: { start: string; submissions: number; counted: number }[];
+  /** Null until a test is chosen: reps and centimetres cannot share an axis. */
+  score_distribution: { low: number; high: number; count: number }[] | null;
 }
 
 

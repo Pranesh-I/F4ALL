@@ -136,6 +136,7 @@ class SessionModeTest {
                 tests = listOf(
                     SessionTest("LUNGES", "reps", false, null),
                     SessionTest("SHUTTLE_RUN", "seconds", false, null),
+                    SessionTest("MARATHON", "seconds", false, null),
                     SessionTest("VERTICAL_JUMP", "cm", false, null)
                 )
             )
@@ -143,7 +144,12 @@ class SessionModeTest {
 
         val views = SessionAvailability.views(cache, emptyList(), wallNowMs = 0, elapsedNowMs = 1_000)
 
-        assertEquals(listOf(TestType.LUNGES, TestType.VERTICAL_JUMP), views.single().tests.map { it.testType })
+        // Since Sprint 18 the shuttle run is a field test this app can run;
+        // a test it does not know at all is still left out.
+        val tests = views.single().tests
+        assertEquals(listOf("LUNGES", "SHUTTLE_RUN", "VERTICAL_JUMP"), tests.map { it.code })
+        assertEquals(TestType.LUNGES, tests[0].poseType)
+        assertEquals(com.sai.sports.fieldtest.FieldTestType.SHUTTLE_RUN, tests[1].fieldType)
     }
 
     // -----------------------------------------------------------------

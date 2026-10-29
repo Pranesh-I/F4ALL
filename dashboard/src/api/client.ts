@@ -1,4 +1,5 @@
 import type {
+  Analytics,
   AssessmentSession,
   AssessmentSessionChanges,
   DashboardStats,
@@ -109,6 +110,16 @@ export interface LeaderboardFilters {
   gender?: string;
   ageMin?: number;
   ageMax?: number;
+  sessionId?: string;
+}
+
+export interface AnalyticsFilters {
+  /** ISO timestamps; the window is [from, to). */
+  submittedFrom?: string;
+  submittedTo?: string;
+  region?: string;
+  testType?: string;
+  sessionId?: string;
 }
 
 export class DashboardApi {
@@ -221,7 +232,19 @@ export class DashboardApi {
     if (filters.gender) params.set("gender", filters.gender);
     if (filters.ageMin !== undefined) params.set("age_min", String(filters.ageMin));
     if (filters.ageMax !== undefined) params.set("age_max", String(filters.ageMax));
+    if (filters.sessionId) params.set("session_id", filters.sessionId);
     return this.send("GET", `/api/dashboard/leaderboard?${params}`);
+  }
+
+  analytics(filters: AnalyticsFilters = {}): Promise<Analytics> {
+    const params = new URLSearchParams();
+    if (filters.submittedFrom) params.set("submitted_from", filters.submittedFrom);
+    if (filters.submittedTo) params.set("submitted_to", filters.submittedTo);
+    if (filters.region) params.set("region", filters.region);
+    if (filters.testType) params.set("test_type", filters.testType);
+    if (filters.sessionId) params.set("session_id", filters.sessionId);
+    const query = params.toString();
+    return this.send("GET", `/api/dashboard/analytics${query ? `?${query}` : ""}`);
   }
 
   stats(): Promise<DashboardStats> {

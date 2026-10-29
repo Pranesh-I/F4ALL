@@ -53,10 +53,8 @@
 
     <string name="home_sync">SAI-তে পাঠানো</string>
     <string name="home_sync_waiting">পাঠানো বাকি: %1$d</string>
-    <string name="home_profile">আমার প্রোফাইল ও ফলাফল</string>
     <string name="home_provisional_note">ফোনে দেখানো স্কোর অস্থায়ী। সরকারি ফলাফল SAI নিশ্চিত করে।</string>
 
-    <string name="login_title">সাইন ইন</string>
     <string name="login_body">আপনিই কিনা নিশ্চিত করতে আমরা আপনার ফোনে একটি কোড পাঠাব।</string>
     <string name="login_phone_label">মোবাইল নম্বর</string>
     <string name="login_code_label">%1$d সংখ্যার কোড</string>
@@ -71,7 +69,6 @@
     <string name="login_error_code_length">পুরো কোডটি লিখুন</string>
     <string name="login_error_code_wrong">কোডটি ভুল বা মেয়াদ শেষ হয়ে গেছে</string>
 
-    <string name="register_title">আপনার খেলোয়াড় প্রোফাইল তৈরি করুন</string>
     <string name="register_name">পুরো নাম</string>
     <string name="register_dob_choose">জন্মতারিখ বেছে নিন</string>
     <string name="register_dob_value">জন্মতারিখ: %1$s</string>
@@ -188,14 +185,10 @@
     <string name="sync_synced">SAI-তে পাঠানো হয়েছে ✓</string>
     <string name="sync_failed">পাঠানো যায়নি</string>
 
-    <string name="profile_title">আমার প্রোফাইল</string>
-    <string name="profile_summary_line">%1$d বছর · %2$s · %3$s</string>
-    <string name="profile_height">উচ্চতা: %1$s সেমি</string>
     <string name="profile_no_photo">কোনো ছবি নেই — পরীক্ষার ভিডিওতে আপনিই আছেন কিনা SAI নিশ্চিত করতে পারবে না।</string>
     <string name="profile_add_photo">ছবি যোগ করুন</string>
     <string name="profile_bests">সেরা স্কোর</string>
     <string name="profile_bests_empty">SAI কোনো পরীক্ষা যাচাই করার পরে আপনার সেরা স্কোর এখানে দেখা যাবে।</string>
-    <string name="profile_results">সব ফলাফল</string>
     <string name="profile_results_empty">আপনার রেকর্ড করা পরীক্ষা SAI-তে পৌঁছানোর পরে এখানে দেখা যাবে।</string>
     <string name="profile_open_result">ফলাফল খুলুন</string>
     <string name="best_official">সরকারি</string>
@@ -380,11 +373,9 @@
     <!-- Sprint 6: practice mode -->
     <string name="home_practice">অনুশীলন</string>
     <string name="home_practice_note">যত খুশি অনুশীলন করুন। অনুশীলন আপনার অ্যাকাউন্টে ব্যক্তিগতভাবে সেভ হয় এবং কখনও অফিসিয়াল পরীক্ষা হিসেবে গোনা হয় না।</string>
-    <string name="practice_title">অনুশীলন</string>
     <string name="practice_intro">যেকোনো পরীক্ষা যতবার খুশি অনুশীলন করুন। আপনার অনুশীলন আপনার অ্যাকাউন্টে সেভ হয়, তাই যে ফোনেই সাইন ইন করুন সেখানে পাবেন। শুধু আপনিই এটি দেখতে পারেন, এবং এটি কখনও অফিসিয়াল পরীক্ষা হিসেবে গোনা হয় না।</string>
     <string name="practice_best">সেরা: %1$s</string>
     <string name="practice_not_tried">এখনও চেষ্টা করা হয়নি</string>
-    <string name="practice_attempts">প্রচেষ্টা: %1$d</string>
     <string name="practice_history">অনুশীলনের ইতিহাস</string>
     <string name="practice_badge">অনুশীলন</string>
     <string name="practice_notice">অনুশীলন প্রচেষ্টা — আপনার অ্যাকাউন্টে ব্যক্তিগতভাবে সেভ করা। শুধু আপনিই এটি দেখতে পারেন। এটি অফিসিয়াল পর্যালোচনার জন্য পাঠানো হয় না এবং অফিসিয়াল পরীক্ষা হিসেবে গোনা হয় না।</string>
@@ -495,4 +486,200 @@
     <string name="step_in_progress">চলছে</string>
     <string name="step_waiting">অপেক্ষায়</string>
     <string name="practice_never_counts">ব্যক্তিগত · কখনও অফিসিয়াল পরীক্ষা হিসেবে গোনা হয় না</string>
+
+    <!-- Sprint 15: results, history and benchmarking -->
+    <string name="history_filter_official">অফিসিয়াল</string>
+    <string name="history_filter_practice">অনুশীলন</string>
+    <string name="history_load_more">পুরনো ফলাফল দেখাও</string>
+    <string name="history_none">এখনও কোনো ফলাফল নেই। আপনার অফিসিয়াল টেস্ট ও অনুশীলন এখানে দেখা যাবে।</string>
+    <string name="history_official_test">অফিসিয়াল টেস্ট</string>
+    <string name="profile_recent_results">সাম্প্রতিক ফলাফল</string>
+    <string name="result_record_title">আপনার রেকর্ড</string>
+    <string name="result_date">তারিখ</string>
+    <string name="result_session">সেশন</string>
+    <string name="result_validity">গণ্য হবে?</string>
+    <string name="validity_pending">SAI-এর যাচাইয়ের অপেক্ষায়</string>
+    <string name="validity_counts">আপনার রেকর্ডে গণ্য হবে</string>
+    <string name="validity_under_review">SAI কর্মকর্তার সিদ্ধান্ত পর্যন্ত স্থগিত</string>
+    <string name="validity_does_not_count">গণ্য হবে না</string>
+    <string name="result_not_scored_by_sai">SAI ভিডিওর স্কোর করতে পারেনি: %1$s</string>
+    <string name="result_personal_best">ব্যক্তিগত সেরা</string>
+    <string name="result_best_this">এই ফলাফলই আপনার ব্যক্তিগত সেরা</string>
+    <string name="result_best_none">এখনও কোনো ব্যক্তিগত সেরা নেই। SAI যাচাই করার পরেই ফলাফল গণ্য হয়।</string>
+    <string name="result_previous">আগের প্রচেষ্টা</string>
+    <string name="result_previous_none">এই টেস্টে এটি আপনার প্রথম প্রচেষ্টা।</string>
+    <string name="result_form_unavailable">এখনও পাওয়া যায়নি। SAI আপনার ভিডিও যাচাই করার পরে ফর্মের মূল্যায়ন দেখাবে।</string>
+    <string name="result_form_from_sai">আপনার ভিডিওর SAI যাচাই থেকে ফর্ম স্কোর</string>
+    <string name="result_form_fault">%1$s · প্রভাবিত রেপ: %2$d</string>
+    <string name="benchmark_under_review">SAI কর্মকর্তা এই ফলাফল গ্রহণ করলে তুলনা এখানে দেখা যাবে।</string>
+    <string name="benchmark_not_counted">এই ফলাফল গণ্য হয় না, তাই এর তুলনা করা হয়নি।</string>
+    <string name="benchmark_norms_from">ব্যবহৃত মানদণ্ড: %1$s</string>
+    <string name="benchmark_all_india">সমগ্র ভারত</string>
+
+    <!-- Sprint 16: leaderboard filters -->
+    <string name="leaderboard_filter_place">কোথায়</string>
+    <string name="leaderboard_filter_age">বয়সের গ্রুপ</string>
+    <string name="leaderboard_filter_session">সেশন</string>
+    <string name="leaderboard_other_state">অন্য রাজ্য</string>
+    <string name="leaderboard_my_age">আমার বয়স (%1$s)</string>
+    <string name="leaderboard_my_age_plain">আমার বয়সের গ্রুপ</string>
+    <string name="leaderboard_all_ages">সব বয়স</string>
+    <string name="leaderboard_all_results">সব ফলাফল</string>
+    <string name="leaderboard_in_session">%1$s · সেশন: %2$s</string>
+    <string name="leaderboard_cohort_all_ages">%1$s, সব বয়স · %2$s</string>
+    <string name="leaderboard_show_more">আরও দেখাও</string>
+
+    <!-- Sprint 17: notifications -->
+    <string name="notif_session_opened_title">সেশন খোলা: %1$s</string>
+    <string name="notif_session_opened_body">আপনার অফিসিয়াল টেস্ট এখন খোলা। সেশন বন্ধ হওয়ার আগে রেকর্ড করুন।</string>
+    <string name="notif_session_ending_title">শীঘ্রই বন্ধ হবে: %1$s</string>
+    <string name="notif_session_ending_body">এই সেশনে আপনার কিছু টেস্ট এখনও বাকি। এটি শীঘ্রই বন্ধ হবে।</string>
+    <string name="notif_received_title">%1$s: পাওয়া গেছে</string>
+    <string name="notif_received_body">আপনার টেস্ট SAI পেয়েছে এবং ভিডিও যাচাই করছে।</string>
+    <string name="notif_verified_title">%1$s: SAI যাচাই করেছে</string>
+    <string name="notif_verified_body">আপনার স্কোর যাচাই হয়েছে। এরপর একজন আধিকারিক অনুমোদন করবেন।</string>
+    <string name="notif_flagged_title">%1$s: পর্যালোচনা চলছে</string>
+    <string name="notif_flagged_body">একজন SAI আধিকারিক আপনার টেস্ট দেখবেন। সিদ্ধান্ত হলে আমরা জানাব।</string>
+    <string name="notif_approved_title">%1$s: অনুমোদিত</string>
+    <string name="notif_approved_body">আপনার ফলাফল এখন অফিসিয়াল। দেখতে অ্যাপটি খুলুন।</string>
+    <string name="notif_rejected_title">%1$s: গ্রহণ করা হয়নি</string>
+    <string name="notif_rejected_body">এই ফলাফল গ্রহণ করা হয়নি। কারণ দেখতে অ্যাপটি খুলুন।</string>
+    <string name="notif_resubmission_title">%1$s: আবার রেকর্ড করুন</string>
+    <string name="notif_resubmission_body">একজন SAI আধিকারিক এই টেস্টটি আবার রেকর্ড করতে বলেছেন।</string>
+    <string name="notif_channel_name">ফলাফল ও সেশন</string>
+    <string name="notif_channel_description">যখন SAI কোনো টেস্ট যাচাই বা সিদ্ধান্ত করে, এবং যখন কোনো সেশন খোলে বা বন্ধ হতে চলেছে।</string>
+    <string name="notifications_title">বিজ্ঞপ্তি</string>
+    <string name="notifications_empty">এখনও কিছু নেই। টেস্ট যাচাই হলে এবং সেশন খুললে SAI আপনাকে এখানে জানাবে।</string>
+    <string name="notifications_mark_all">সব পড়া হয়েছে চিহ্নিত করুন</string>
+    <string name="notifications_older">পুরনোগুলো দেখাও</string>
+    <string name="notifications_open">খুলুন</string>
+    <string name="notifications_unread">পড়া হয়নি</string>
+    <string name="home_notifications_unread">নতুন বিজ্ঞপ্তি: %1$d</string>
+
+    <!-- Sprint 18: field tests -->
+    <string name="test_shuttle_run">শাটল দৌড় (4 × 10 মি)</string>
+    <string name="test_endurance_run">সহনশীলতা দৌড় (600 মি)</string>
+    <string name="field_invalid_not_enough_data">খুব কম রেকর্ড হয়েছে। আবার চেষ্টা করুন।</string>
+    <string name="field_invalid_low_sample_rate">এই ফোনের মোশন সেন্সর এই টেস্টের জন্য খুব ধীর।</string>
+    <string name="field_invalid_sensor_gap">দৌড়ের সময় মোশন সেন্সর থেমে গেছে। আবার চেষ্টা করুন।</string>
+    <string name="field_invalid_moved_before_start">আপনি GO-র আগে নড়েছেন। বিপ পর্যন্ত স্থির দাঁড়িয়ে থাকুন।</string>
+    <string name="field_invalid_wrong_turn_count">ফোন তিনটি বাঁক গোনেনি। প্রতিটি লাইনে পুরোপুরি ঘুরুন।</string>
+    <string name="field_invalid_leg_too_fast">একটি দৈর্ঘ্য অসম্ভব দ্রুত ছিল। প্রতিবার পুরো 10 মি দৌড়ান।</string>
+    <string name="field_invalid_too_fast">এই সময় সম্ভবের চেয়ে দ্রুত। আবার চেষ্টা করুন।</string>
+    <string name="field_invalid_no_finish">ফোন ফিনিশ খুঁজে পায়নি। শেষ লাইনের পরে থেমে স্থির দাঁড়ান।</string>
+    <string name="field_invalid_no_start_fix">শুরুতে GPS অবস্থান ছিল না। শুরু করার আগে GPS প্রস্তুত হওয়া পর্যন্ত অপেক্ষা করুন।</string>
+    <string name="field_invalid_gps_weak">GPS সিগন্যাল খুব দুর্বল। উঁচু বাড়ি ও গাছ থেকে দূরে, বাইরে দৌড়ান।</string>
+    <string name="field_invalid_gps_unreliable">দূরত্ব মাপার জন্য GPS অবস্থান খুব ঘন ঘন লাফিয়েছে।</string>
+    <string name="field_invalid_gps_gap">দৌড়ের সময় অনেকক্ষণ GPS ছিল না।</string>
+    <string name="field_invalid_distance_not_reached">দৌড় 600 মি-র আগে থেমে গেছে।</string>
+    <string name="field_invalid_not_on_foot">দৌড়ের পদক্ষেপ টের পাওয়া যায়নি। দৌড়ানোর সময় ফোন সঙ্গে রাখুন।</string>
+    <string name="field_setup_title">শুরু করার আগে</string>
+    <string name="field_shuttle_step_1">সমতল মাটিতে 10 মি দূরে দুটি লাইন চিহ্নিত করুন।</string>
+    <string name="field_shuttle_step_2">ফোন পকেটে বা কোমরবন্ধে রাখুন, বা এক হাতে শক্ত করে ধরুন।</string>
+    <string name="field_shuttle_step_3">একটি লাইনের পিছনে স্থির দাঁড়ান। ফোন GO বিপ দিলে দৌড়ান।</string>
+    <string name="field_shuttle_step_4">দূরের লাইনে গিয়ে দুবার ফিরে আসুন — 4 দৈর্ঘ্য, 3 বাঁক — তারপর লাইন পার হয়ে স্থির দাঁড়ান।</string>
+    <string name="field_endurance_step_1">কমপক্ষে 600 মি-র ট্র্যাক বা সমতল খোলা পথে বাইরে যান।</string>
+    <string name="field_endurance_step_2">GPS প্রস্তুত হওয়া পর্যন্ত এখানে অপেক্ষা করুন।</string>
+    <string name="field_endurance_step_3">দৌড়ানোর সময় ফোন সঙ্গে রাখুন। হাঁটাও চলবে।</string>
+    <string name="field_endurance_step_4">600 মি-তে সময় নিজে থেকেই থামবে। অ্যাপ খোলা রাখুন।</string>
+    <string name="field_no_gyroscope">এই ফোনে জাইরোস্কোপ নেই, তাই শাটল দৌড়ের বাঁক গুনতে পারবে না।</string>
+    <string name="field_location_why">সহনশীলতা দৌড় GPS দিয়ে দূরত্ব মাপে, তাই দৌড়ের সময় অ্যাপের আপনার অবস্থান দরকার।</string>
+    <string name="field_location_allow">অবস্থানের অনুমতি দিন</string>
+    <string name="field_gps_waiting">GPS খোঁজা হচ্ছে…</string>
+    <string name="field_gps_ready">GPS প্রস্তুত · নির্ভুলতা (মি): %1$d</string>
+    <string name="field_start">শুরু করুন</string>
+    <string name="field_stand_still">স্থির দাঁড়ান…</string>
+    <string name="field_turns_so_far">বাঁক: %1$d</string>
+    <string name="field_distance_so_far">এখন পর্যন্ত দূরত্ব (মি): %1$d</string>
+    <string name="field_running_shuttle">দৌড়ান! শেষ লাইনের পরে স্থির দাঁড়ালেই সময় থামবে।</string>
+    <string name="field_running_endurance">দৌড়ান! 600 মি-তে সময় নিজে থেকেই থামবে।</string>
+    <string name="field_stop">থামুন</string>
+    <string name="field_leg">দৈর্ঘ্য %1$d</string>
+    <string name="field_pace">গতি</string>
+    <string name="practice_field_title">মাঠের টেস্ট</string>
+    <string name="practice_field_note">ফোনের সেন্সর ও GPS দিয়ে সময়</string>
+
+    <!-- Sprint 19: progress, instructions, offline status -->
+    <string name="flow_identity">ছবি যাচাই</string>
+    <string name="flow_gesture">হাতের সংকেত</string>
+    <string name="flow_countdown">উল্টো গণনা</string>
+    <string name="flow_test">টেস্ট</string>
+    <string name="flow_upload">SAI-কে পাঠানো হয়েছে</string>
+    <string name="flow_step_of">ধাপ %1$d/%2$d · %3$s</string>
+    <string name="instructions_finishing">শেষ করা ও আপনার ফলাফল</string>
+    <string name="finish_step_reps">শেষ হলে Stop চাপুন। শুধু পুরো রেপ গোনা হয়; যেগুলো গোনা হয়নি সেগুলো কারণসহ স্ক্রিনে দেখা যায়।</string>
+    <string name="finish_step_jump">যতবার খুশি লাফান, প্রতিটি লাফের মাঝে স্থির দাঁড়ান, তারপর Stop চাপুন। আপনার সেরা লাফটি গোনা হয়।</string>
+    <string name="result_step_practice">আপনার ফলাফল সঙ্গে সঙ্গে দেখা যায়। অনুশীলন ব্যক্তিগত: এটি কখনও অফিসিয়াল টেস্ট হিসেবে গোনা হয় না।</string>
+    <string name="result_step_official">আপনার ফোনের গণনা সঙ্গে সঙ্গে দেখা যায়। তারপর SAI ভিডিও যাচাই করে এবং একজন আধিকারিক ফলাফল অনুমোদন করেন। অ্যাপ আপনাকে জানাবে।</string>
+    <string name="field_result_step">আপনার সময় সঙ্গে সঙ্গে দেখা যায়। অফিসিয়াল দৌড় সেন্সর রেকর্ডসহ SAI-কে পাঠানো হয়, যাচাই হয় এবং একজন আধিকারিক অনুমোদন করেন।</string>
+    <string name="field_waiting_to_send">এই ফোনে সংরক্ষিত — সিগন্যাল পেলে SAI-কে পাঠানো হবে</string>
+    <string name="field_pace_value">প্রতি কিমি %1$s</string>
+
+    <!-- Redesign: entry flow, sign-up steps and the tab bar -->
+    <string name="bib_label">চেস্ট নম্বর</string>
+    <string name="splash_tagline">আপনার ফোনে ফিটনেস পরীক্ষা, SAI যাচাই করে</string>
+    <string name="welcome_tag">SAI কর্মকর্তারা যাচাই করেন</string>
+    <string name="welcome_title">আপনার ট্রায়াল, আপনার ফোনে</string>
+    <string name="welcome_body">যেকোনো জায়গা থেকে অফিশিয়াল ফিটনেস পরীক্ষা রেকর্ড করুন। আপনার ফোন সঙ্গে সঙ্গে স্কোর দেয়; SAI তা যাচাই করে ফলাফল নিশ্চিত করে।</string>
+    <string name="welcome_create">অ্যাকাউন্ট তৈরি করুন</string>
+    <string name="welcome_sign_in">আমার আগে থেকেই অ্যাকাউন্ট আছে</string>
+    <string name="onboarding_skip">এড়িয়ে যান</string>
+    <string name="signin_title">আবার স্বাগতম</string>
+    <string name="create_phone_title">আপনার মোবাইল নম্বর</string>
+    <string name="create_phone_body">নম্বরটি আপনার কিনা নিশ্চিত করতে আমরা একটি কোড পাঠাব। সাইন ইন করতে আপনি এই নম্বরটিই ব্যবহার করবেন।</string>
+    <string name="login_code_title">কোডটি লিখুন</string>
+    <string name="login_code_sent">আমরা %1$s নম্বরে কোড পাঠিয়েছি</string>
+    <string name="register_about_title">আপনার সম্পর্কে</string>
+    <string name="register_place_title">আপনি কোথায় থাকেন</string>
+    <string name="register_place_body">আপনার রাজ্যই আপনার আঞ্চলিক লিডারবোর্ড এবং কোন SAI দল আপনার পরীক্ষা যাচাই করবে তা ঠিক করে।</string>
+    <string name="register_body_title">উচ্চতা ও ওজন</string>
+    <string name="register_body_body">ভার্টিক্যাল জাম্প মাপতে আপনার উচ্চতা লাগবে। ওজন দেওয়া ঐচ্ছিক।</string>
+    <string name="register_consent_body">আপনি কীসে সম্মতি দিচ্ছেন তা পড়ুন। আপনার বয়স ১৮-র কম হলে, বাবা-মা বা অভিভাবককে সম্মতি দিতে হবে।</string>
+    <string name="action_continue">চালিয়ে যান</string>
+    <string name="ready_title">সব প্রস্তুত</string>
+    <string name="ready_body">এটি আপনার চেস্ট নম্বর। SAI কর্মকর্তারা আপনার ফলাফলের পাশে এই একই নম্বর দেখেন।</string>
+    <string name="ready_action">হোমে যান</string>
+    <string name="nav_home">হোম</string>
+    <string name="nav_progress">অগ্রগতি</string>
+    <string name="nav_tests">পরীক্ষা</string>
+    <string name="nav_ranks">র‍্যাঙ্ক</string>
+    <string name="nav_profile">প্রোফাইল</string>
+
+    <!-- Redesign: home and tests -->
+    <string name="home_greeting">নমস্কার, %1$s</string>
+    <string name="home_greeting_anon">নমস্কার</string>
+    <string name="home_activity_title">আপনার কার্যকলাপ</string>
+    <string name="home_tests_tried">চেষ্টা করা পরীক্ষা</string>
+    <string name="home_tests_tried_value">অনুশীলন: %1$d/%2$d</string>
+    <string name="home_uploads_title">আপলোড</string>
+    <string name="home_uploads_all_sent">সব পাঠানো হয়েছে</string>
+    <string name="home_view_all">সব দেখুন</string>
+    <string name="tests_title">পরীক্ষা</string>
+    <string name="tests_camera_title">ক্যামেরা পরীক্ষা</string>
+
+    <!-- Redesign: test instructions -->
+    <string name="instructions_stat_camera">ক্যামেরা</string>
+    <string name="instructions_stat_side_on">পাশ থেকে</string>
+    <string name="instructions_stat_facing">সামনে থেকে</string>
+    <string name="instructions_stat_distance">২–৩ মিটার</string>
+    <string name="instructions_stat_distance_label">দূরত্ব</string>
+    <string name="instructions_stat_signal">হাতের সংকেত</string>
+    <string name="instructions_stat_signal_label">শুরু করতে</string>
+
+    <!-- Redesign: results -->
+    <string name="result_complete_title">পরীক্ষা সম্পূর্ণ!</string>
+    <string name="result_complete_practice">দারুণ। দেখুন কেমন হলো।</string>
+    <string name="result_complete_official">দারুণ। আপনার পরীক্ষা যাচাইয়ের জন্য SAI-এর কাছে যাচ্ছে।</string>
+    <string name="result_not_scored_title">এবার স্কোর হয়নি</string>
+    <string name="result_not_scored_body">কারণ এবং কী বদলাতে হবে তা নিচে আছে। তারপর আবার চেষ্টা করুন।</string>
+
+    <!-- Redesign: leaderboard podium -->
+    <string name="leaderboard_place_1">প্রথম</string>
+    <string name="leaderboard_place_2">দ্বিতীয়</string>
+    <string name="leaderboard_place_3">তৃতীয়</string>
+
+    <!-- Redesign: profile -->
+    <string name="profile_age_value">বয়স %1$d</string>
+    <string name="profile_stat_height">উচ্চতা</string>
+    <string name="profile_stat_state">রাজ্য</string>
 </resources>

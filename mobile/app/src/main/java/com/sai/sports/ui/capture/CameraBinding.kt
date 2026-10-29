@@ -76,6 +76,9 @@ class CameraBinding(
 
                 val imageAnalysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    // RGBA straight from CameraX's native converter, so turning
+                    // the frame into a bitmap is a copy, not a colour conversion.
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                     .build()
                     .also { useCase ->
                         useCase.setAnalyzer(analysisExecutor) { image ->

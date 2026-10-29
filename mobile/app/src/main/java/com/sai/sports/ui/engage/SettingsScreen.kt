@@ -24,6 +24,7 @@ import com.sai.sports.R
 import com.sai.sports.api.ApiResult
 import com.sai.sports.auth.AppServices
 import com.sai.sports.i18n.LanguageStore
+import com.sai.sports.notify.NotificationPoster
 import com.sai.sports.ui.common.ErrorText
 import com.sai.sports.ui.common.Labels
 import com.sai.sports.ui.common.SectionTitle
@@ -31,7 +32,7 @@ import com.sai.sports.ui.kit.LineButton
 import com.sai.sports.ui.kit.Page
 import com.sai.sports.ui.kit.TitleBar
 import com.sai.sports.ui.onboarding.LanguagePicker
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.AppColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -118,7 +119,7 @@ fun SettingsScreen(
                     if (current) R.string.settings_visible_explainer else R.string.settings_hidden_explainer
                 ),
                 style = MaterialTheme.typography.bodySmall,
-                color = TrialsColors.Pencil
+                color = AppColors.TextSecondary
             )
         }
 
@@ -127,7 +128,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_data_note),
             style = MaterialTheme.typography.bodySmall,
-            color = TrialsColors.Pencil
+            color = AppColors.TextSecondary
         )
 
         LineButton(
@@ -137,12 +138,15 @@ fun SettingsScreen(
                         // Best effort: signing out must work with no signal.
                         runCatching { api.logout(session.current()?.refreshToken) }
                         session.clear()
+                        // The next person on this phone must not see this
+                        // athlete's results in the notification shade.
+                        NotificationPoster.clearAll(context)
                     }
                     onLoggedOut()
                 }
             },
             text = stringResource(R.string.settings_sign_out),
-            color = TrialsColors.RedPen,
+            color = AppColors.Danger,
             modifier = Modifier.fillMaxWidth()
         )
     }

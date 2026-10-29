@@ -35,8 +35,8 @@ import com.sai.sports.ui.kit.Page
 import com.sai.sports.ui.kit.RegisterRow
 import com.sai.sports.ui.kit.SheetShape
 import com.sai.sports.ui.kit.TitleBar
-import com.sai.sports.ui.kit.TrialsChip
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.kit.ChoiceChip
+import com.sai.sports.ui.theme.AppColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
@@ -75,7 +75,7 @@ fun PracticeHistoryScreen(
 
         val attempts = all
         if (attempts == null) {
-            Text(stringResource(R.string.loading), color = TrialsColors.Pencil)
+            Text(stringResource(R.string.loading), color = AppColors.TextSecondary)
             return@Page
         }
 
@@ -84,7 +84,7 @@ fun PracticeHistoryScreen(
             Text(
                 text = stringResource(R.string.history_empty),
                 style = MaterialTheme.typography.bodyMedium,
-                color = TrialsColors.Pencil
+                color = AppColors.TextSecondary
             )
             return@Page
         }
@@ -96,13 +96,13 @@ fun PracticeHistoryScreen(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            TrialsChip(
+            ChoiceChip(
                 selected = filter == null,
                 onClick = { filterName = null },
                 label = stringResource(R.string.history_all)
             )
             practisedTests.forEach { type ->
-                TrialsChip(
+                ChoiceChip(
                     selected = filter == type,
                     onClick = { filterName = type.name },
                     label = stringResource(Labels.testName(type))
@@ -143,7 +143,7 @@ private fun HistoryRow(attempt: Attempt, isPersonalBest: Boolean, onClick: () ->
             stringResource(R.string.history_not_scored)
         },
         // Practice is pencil; an attempt that was not scored is a red-pen note.
-        valueColor = if (scored) TrialsColors.Pencil else TrialsColors.RedPen,
+        valueColor = if (scored) AppColors.TextSecondary else AppColors.Danger,
         detail = listOfNotNull(recordedAt, form).joinToString(" · "),
         onClick = onClick,
         trailing = if (isPersonalBest) {
@@ -152,9 +152,9 @@ private fun HistoryRow(attempt: Attempt, isPersonalBest: Boolean, onClick: () ->
                 Text(
                     text = stringResource(R.string.history_personal_best),
                     style = MaterialTheme.typography.labelSmall,
-                    color = TrialsColors.Ink,
+                    color = AppColors.TextPrimary,
                     modifier = Modifier
-                        .background(TrialsColors.Marigold, SheetShape)
+                        .background(AppColors.Accent, SheetShape)
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }

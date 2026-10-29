@@ -1,12 +1,30 @@
 package com.sai.sports.ui.home
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +43,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sai.sports.R
 import com.sai.sports.analyzer.TestType
@@ -35,18 +55,24 @@ import com.sai.sports.data.PracticeRecord
 import com.sai.sports.data.PracticeStats
 import com.sai.sports.data.ProfileStatusStore
 import com.sai.sports.data.SyncRepository
+import com.sai.sports.fieldtest.FieldAttemptStore
+import com.sai.sports.notify.NotificationWorker
 import com.sai.sports.sync.NetworkMonitor
 import com.sai.sports.ui.common.Labels
-import com.sai.sports.ui.kit.Bib
-import com.sai.sports.ui.kit.BibNumber
-import com.sai.sports.ui.kit.LaneLines
+import com.sai.sports.ui.common.TestArt
+import com.sai.sports.ui.kit.AppIcons
+import com.sai.sports.ui.kit.Avatar
+import com.sai.sports.ui.kit.Eyebrow
+import com.sai.sports.ui.kit.LineButton
+import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.ProgressRing
+import com.sai.sports.ui.kit.RoundIconButton
+import com.sai.sports.ui.kit.SectionHeader
+import com.sai.sports.ui.kit.Tag
+import com.sai.sports.ui.kit.TagTone
 import com.sai.sports.ui.kit.OfflineBar
-import com.sai.sports.ui.kit.RegisterRow
-import com.sai.sports.ui.kit.Sheet
-import com.sai.sports.ui.kit.SheetStyle
-import com.sai.sports.ui.kit.TrialsIcons
 import com.sai.sports.ui.practice.SyncPracticeOnOpen
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.AppColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.withContext
@@ -63,7 +89,7 @@ import java.util.Locale
  */
 @Composable
 fun HomeScreen(
-    onSessionTest: (sessionId: String, TestType) -> Unit,
+    onSessionTest: (sessionId: String, code: String) -> Unit,
     onPractice: () -> Unit,
     onPracticeTest: (TestType) -> Unit,
     onPracticeHistory: () -> Unit,
@@ -71,7 +97,8 @@ fun HomeScreen(
     onProfile: () -> Unit,
     onLeaderboard: () -> Unit,
     onSettings: () -> Unit,
-    onCompleteProfile: () -> Unit
+    onCompleteProfile: () -> Unit,
+    onNotifications: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val repository = remember { SyncRepository(context) }
@@ -80,9 +107,17 @@ fun HomeScreen(
 
     // This athlete's waiting tests, not everyone who has used the phone.
     val athleteId = remember { AppServices.session(context).current()?.athleteId }
-    val pendingCount by remember(athleteId) {
+    val queuedCount by remember(athleteId) {
         athleteId?.let(repository::observePendingCount) ?: flowOf(0)
     }.collectAsStateWithLifecycle(initialValue = 0)
+    // Official field runs waiting for a signal count too: they have no video
+    // in the upload queue, but they have not reached SAI either.
+    val fieldWaiting by produceState(initialValue = 0, athleteId) {
+        value = withContext(Dispatchers.IO) {
+            athleteId?.let { FieldAttemptStore(context).list(it).count { run -> run.waitingToSend } } ?: 0
+        }
+    }
+    val pendingCount = queuedCount + fieldWaiting
     val online by remember { NetworkMonitor.observeOnline(context) }
         .collectAsStateWithLifecycle(initialValue = true)
 
@@ -102,6 +137,17 @@ fun HomeScreen(
         }
     }
 
+    // News from SAI: how many the athlete has not read yet, from their account.
+    var unread by remember(athleteId) { mutableIntStateOf(0) }
+    LaunchedEffect(athleteId) {
+        if (athleteId == null) return@LaunchedEffect
+        val page = withContext(Dispatchers.IO) {
+            AppServices.api(context).notifications(unreadOnly = true, limit = 1)
+        }
+        if (page is ApiResult.Success) unread = page.value.unreadCount
+    }
+    AskForNotificationsOnce()
+
     // Recomputed on every visit, so a best set a moment ago is already here.
     var practiceRefreshes by remember { mutableIntStateOf(0) }
     val practice by produceState<List<PracticeRecord>?>(initialValue = null, practiceRefreshes) {
@@ -111,8 +157,16 @@ fun HomeScreen(
     }
     SyncPracticeOnOpen(athleteId, attempts) { practiceRefreshes++ }
 
-    com.sai.sports.ui.kit.Page(
-        header = { Masthead() },
+    Page(
+        header = {
+            HomeHeader(
+                name = card?.name,
+                unread = unread,
+                onProfile = onProfile,
+                onNotifications = onNotifications,
+                onSettings = onSettings
+            )
+        },
         footer = {
             /*
              * The pending count is on the home screen, not buried in a menu.
@@ -124,139 +178,300 @@ fun HomeScreen(
                 OfflineBar(stringResource(R.string.home_sync_offline))
             }
         },
-        spacing = 20.dp
+        spacing = 18.dp
     ) {
-        Bib(
-            number = athleteId?.let(BibNumber::of) ?: "—",
-            name = card?.name,
-            detail = card?.region
-        )
-
         // Official tests need a complete profile; say so before the session does.
         ProfileCompletionBanner(missing = missing, onCompleteProfile = onCompleteProfile)
 
         // Official tests only exist inside a session SAI has opened.
         SessionsSection(athleteId = athleteId, onSessionTest = onSessionTest)
 
-        PracticeSheet(
+        SectionHeader(stringResource(R.string.home_activity_title))
+        ActivityTiles(
             records = practice,
+            pendingCount = pendingCount,
             onPractice = onPractice,
+            onSyncStatus = onSyncStatus
+        )
+
+        SectionHeader(
+            title = stringResource(R.string.home_practice),
+            action = stringResource(R.string.home_view_all),
+            onAction = onPractice
+        )
+        PracticeCards(
+            records = practice,
             onPracticeTest = onPracticeTest,
             onPracticeHistory = onPracticeHistory
         )
 
-        Column {
-            RegisterRow(
-                label = stringResource(R.string.home_profile),
-                onClick = onProfile
-            )
-            RegisterRow(
-                label = if (pendingCount > 0) {
-                    stringResource(R.string.home_sync_waiting, pendingCount)
-                } else {
-                    stringResource(R.string.home_sync)
-                },
-                onClick = onSyncStatus,
-                trailing = if (pendingCount > 0) {
-                    { Icon(TrialsIcons.Clock, contentDescription = null, modifier = Modifier.size(20.dp)) }
-                } else {
-                    null
-                }
-            )
-            RegisterRow(
-                label = stringResource(R.string.nav_leaderboard),
-                onClick = onLeaderboard
-            )
-            RegisterRow(
-                label = stringResource(R.string.nav_settings),
-                onClick = onSettings
-            )
-        }
-
         Text(
             stringResource(R.string.home_provisional_note),
             style = MaterialTheme.typography.bodySmall,
-            color = TrialsColors.Pencil
+            color = AppColors.TextSecondary
         )
-    }
-}
-
-/** The app's name over the lane lines, where other screens put their title. */
-@Composable
-private fun Masthead() {
-    Column(Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.app_name).uppercase(Locale.getDefault()),
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier
-                .padding(horizontal = 20.dp, vertical = 18.dp)
-                .semantics { heading() }
-        )
-        LaneLines()
     }
 }
 
 /**
- * Practice, as rough work: every test with the athlete's best at it, one tap
- * from starting. Showing the best turns practice into something to beat.
+ * Android 13 and later need permission to show notifications. Asked once, on
+ * the home screen after signing in, where the athlete can see why it matters;
+ * a refusal is respected, and news still waits in the in-app inbox.
  */
 @Composable
-private fun PracticeSheet(
+private fun AskForNotificationsOnce() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) NotificationWorker.checkSoon(context)
+    }
+    LaunchedEffect(Unit) {
+        val preferences = context.getSharedPreferences(PERMISSION_PREFERENCES, Context.MODE_PRIVATE)
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted && !preferences.getBoolean(ASKED, false)) {
+            preferences.edit { putBoolean(ASKED, true) }
+            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+}
+
+private const val PERMISSION_PREFERENCES = "permissions"
+private const val ASKED = "asked_notifications"
+
+/**
+ * Who is signed in and what day it is, with the bell and settings to hand.
+ * The initials open the profile.
+ */
+@Composable
+private fun HomeHeader(
+    name: String?,
+    unread: Int,
+    onProfile: () -> Unit,
+    onNotifications: () -> Unit,
+    onSettings: () -> Unit
+) {
+    val today = remember {
+        LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()))
+    }
+    val firstName = name?.trim()?.substringBefore(' ')?.takeIf { it.isNotEmpty() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Avatar(
+            name = name,
+            highlight = true,
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable(
+                    role = Role.Button,
+                    onClickLabel = stringResource(R.string.nav_profile),
+                    onClick = onProfile
+                )
+        )
+        Column(Modifier.weight(1f)) {
+            Eyebrow(today)
+            Text(
+                text = firstName?.let { stringResource(R.string.home_greeting, it) }
+                    ?: stringResource(R.string.home_greeting_anon),
+                style = MaterialTheme.typography.headlineMedium,
+                color = AppColors.TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.semantics { heading() }
+            )
+        }
+        RoundIconButton(
+            icon = AppIcons.Bell,
+            contentDescription = if (unread > 0) {
+                stringResource(R.string.home_notifications_unread, unread)
+            } else {
+                stringResource(R.string.notifications_title)
+            },
+            onClick = onNotifications,
+            badge = unread > 0
+        )
+        RoundIconButton(
+            icon = AppIcons.Gear,
+            contentDescription = stringResource(R.string.nav_settings),
+            onClick = onSettings
+        )
+    }
+}
+
+/** Two tiles side by side: how much practice, and whether everything reached SAI. */
+@Composable
+private fun ActivityTiles(
     records: List<PracticeRecord>?,
+    pendingCount: Int,
     onPractice: () -> Unit,
+    onSyncStatus: () -> Unit
+) {
+    val total = records?.size ?: 0
+    val tried = records?.count { it.attempts > 0 } ?: 0
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        ActivityTile(
+            icon = AppIcons.Dumbbell,
+            title = stringResource(R.string.home_tests_tried),
+            detail = stringResource(R.string.home_tests_tried_value, tried, total),
+            onClick = onPractice,
+            modifier = Modifier.weight(1f)
+        ) {
+            ProgressRing(
+                fraction = if (total == 0) 0f else tried.toFloat() / total,
+                label = "$tried/$total",
+                size = 58.dp
+            )
+        }
+        ActivityTile(
+            icon = AppIcons.Upload,
+            title = stringResource(R.string.home_uploads_title),
+            detail = if (pendingCount > 0) {
+                stringResource(R.string.home_sync_waiting, pendingCount)
+            } else {
+                stringResource(R.string.home_uploads_all_sent)
+            },
+            detailColor = if (pendingCount > 0) AppColors.Warning else AppColors.Success,
+            onClick = onSyncStatus,
+            modifier = Modifier.weight(1f)
+        ) {
+            Box(
+                Modifier
+                    .size(58.dp)
+                    .background(
+                        if (pendingCount > 0) AppColors.SurfaceHigh else AppColors.SuccessSoft,
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (pendingCount > 0) AppIcons.Clock else AppIcons.Check,
+                    contentDescription = null,
+                    tint = if (pendingCount > 0) AppColors.Warning else AppColors.Success,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityTile(
+    icon: ImageVector,
+    title: String,
+    detail: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    detailColor: Color = AppColors.TextSecondary,
+    figure: @Composable () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(AppColors.Surface)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(16.dp)
+            .semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .background(AppColors.SurfaceHigh, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = AppColors.TextPrimary, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.weight(1f))
+            figure()
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = AppColors.TextPrimary)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = detailColor)
+        }
+    }
+}
+
+/**
+ * Practice, one card per test: its best so far and its picture, one tap from
+ * starting. Showing the best turns practice into something to beat.
+ */
+@Composable
+private fun PracticeCards(
+    records: List<PracticeRecord>?,
     onPracticeTest: (TestType) -> Unit,
     onPracticeHistory: () -> Unit
 ) {
-    Sheet(
-        style = SheetStyle.Rough,
-        padding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
-        spacing = 0.dp
-    ) {
-        RegisterRow(
-            label = stringResource(R.string.practice_title),
-            labelStyle = MaterialTheme.typography.headlineSmall,
-            detail = stringResource(R.string.practice_never_counts),
-            onClick = onPractice,
-            trailing = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(TrialsIcons.Lock, contentDescription = null, tint = TrialsColors.Pencil, modifier = Modifier.size(18.dp))
-                }
-            }
+    if (records == null) {
+        Text(
+            stringResource(R.string.loading),
+            style = MaterialTheme.typography.bodyMedium,
+            color = AppColors.TextSecondary
         )
-
-        if (records == null) {
-            Text(
-                stringResource(R.string.loading),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TrialsColors.Pencil,
-                modifier = Modifier.padding(vertical = 12.dp)
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                records.forEachIndexed { index, record ->
-                    val best = record.best
-                    RegisterRow(
-                        label = stringResource(Labels.testName(record.testType)),
-                        index = index + 1,
-                        value = best?.let {
-                            "${it.result.formattedScore()} ${stringResource(Labels.unit(it.result.unit))}"
-                        },
-                        valueColor = TrialsColors.Pencil,
-                        detail = when {
-                            best != null -> null
-                            record.attempts == 0 -> stringResource(R.string.practice_not_tried)
-                            else -> stringResource(R.string.history_not_scored)
-                        },
-                        onClick = { onPracticeTest(record.testType) }
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        records.forEach { record ->
+            val best = record.best
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(AppColors.Surface)
+                    .clickable(role = Role.Button, onClick = { onPracticeTest(record.testType) })
+                    .padding(14.dp)
+                    .semantics(mergeDescendants = true) {},
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Tag(
+                        text = stringResource(R.string.practice_badge),
+                        tone = TagTone.Neutral,
+                        icon = AppIcons.Lock
                     )
+                    Text(
+                        stringResource(Labels.testName(record.testType)),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = AppColors.TextPrimary
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (best != null) AppIcons.Trophy else AppIcons.Flame,
+                            contentDescription = null,
+                            tint = if (best != null) AppColors.Accent else AppColors.TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = when {
+                                best != null -> stringResource(
+                                    R.string.practice_best,
+                                    best.result.formattedScore() + " " + stringResource(Labels.unit(best.result.unit))
+                                )
+                                record.attempts == 0 -> stringResource(R.string.practice_not_tried)
+                                else -> stringResource(R.string.history_not_scored)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppColors.TextSecondary
+                        )
+                    }
                 }
+                TestArt(code = record.testType.name)
             }
         }
-
-        RegisterRow(
-            label = stringResource(R.string.practice_history),
+        LineButton(
+            text = stringResource(R.string.practice_history),
             onClick = onPracticeHistory,
-            divider = false
+            icon = AppIcons.List,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }

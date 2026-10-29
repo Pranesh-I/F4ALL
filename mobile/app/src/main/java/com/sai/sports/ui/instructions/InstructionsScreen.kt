@@ -1,41 +1,61 @@
 package com.sai.sports.ui.instructions
 
+import android.provider.Settings
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sai.sports.R
 import com.sai.sports.analyzer.TestType
 import com.sai.sports.auth.AppServices
 import com.sai.sports.data.SessionRepository
 import com.sai.sports.ui.common.Labels
-import com.sai.sports.ui.common.SectionTitle
+import com.sai.sports.ui.kit.AppIcons
+import com.sai.sports.ui.kit.Eyebrow
+import com.sai.sports.ui.kit.GlowBackdrop
 import com.sai.sports.ui.kit.InkButton
-import com.sai.sports.ui.kit.LaneNumber
 import com.sai.sports.ui.kit.MarigoldButton
 import com.sai.sports.ui.kit.ModeTag
 import com.sai.sports.ui.kit.Page
+import com.sai.sports.ui.kit.RoundIconButton
+import com.sai.sports.ui.kit.SectionHeader
 import com.sai.sports.ui.kit.Sheet
 import com.sai.sports.ui.kit.SheetStyle
-import com.sai.sports.ui.kit.TitleBar
-import com.sai.sports.ui.theme.TrialsColors
-import java.util.Locale
+import com.sai.sports.ui.kit.StatRow
+import com.sai.sports.ui.kit.StatTile
+import com.sai.sports.ui.theme.AppColors
+import kotlinx.coroutines.delay
 
 /**
  * How to do the test, before the camera opens.
@@ -64,76 +84,162 @@ fun InstructionsScreen(
         else SessionRepository(context, AppServices.api(context)).session(athleteId, sessionId)
     }
 
-    Page(header = { TitleBar(stringResource(Labels.testName(testType)), onBack) }) {
+    val facing = R.string.setup_step_facing in guide.setupSteps
 
-        // An official attempt: say so, on the floodlit field, and show SAI's
-        // rules for this session before anything else.
-        session?.let {
-            Sheet(style = SheetStyle.Field) {
-                Text(
-                    text = (stringResource(R.string.official_badge) + " · " + it.name).uppercase(Locale.getDefault()),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TrialsColors.Marigold
-                )
-                Text(
-                    text = stringResource(R.string.session_once_note),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                it.rules?.let { rules ->
-                    Text(
-                        text = stringResource(R.string.session_rules_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = TrialsColors.Marigold
+    Page(
+        contentPadding = PaddingValues(0.dp),
+        spacing = 0.dp,
+        footer = {
+            // Orange is the official action; practice starts in white.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(AppColors.Background)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                if (session != null) {
+                    MarigoldButton(
+                        text = stringResource(R.string.instructions_start),
+                        onClick = onStart,
+                        icon = AppIcons.Camera,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    Text(text = rules, style = MaterialTheme.typography.bodyMedium, color = TrialsColors.InkMuted)
-                }
-            }
-        } ?: ModeTag(official = false)
-
-        SectionTitle(stringResource(R.string.instructions_setup))
-        Sheet(padding = PaddingValues(12.dp)) {
-            Diagram(R.drawable.ic_setup_camera, R.string.diagram_setup, Modifier.align(Alignment.CenterHorizontally))
-        }
-        guide.setupSteps.forEachIndexed { index, step -> Step(index + 1, step) }
-
-        SectionTitle(stringResource(R.string.instructions_movement))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            guide.diagrams.forEach { (image, description) ->
-                Sheet(modifier = Modifier.weight(1f), padding = PaddingValues(10.dp), spacing = 6.dp) {
-                    Diagram(image, description, Modifier.align(Alignment.CenterHorizontally))
-                    Text(
-                        stringResource(description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TrialsColors.Pencil,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                } else {
+                    InkButton(
+                        text = stringResource(R.string.instructions_start),
+                        onClick = onStart,
+                        icon = AppIcons.Camera,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
         }
-        guide.movementSteps.forEachIndexed { index, step -> Step(index + 1, step) }
-
-        Sheet(style = SheetStyle.Rough) {
-            Text(stringResource(guide.counts), style = MaterialTheme.typography.bodyMedium)
-        }
-
-        // The ready signal is new to every athlete; say what it is before the
-        // camera asks for it.
-        SectionTitle(stringResource(R.string.instructions_starting))
-        Step(1, R.string.start_step_gesture)
-        Step(2, R.string.start_step_countdown)
-
-        // Marigold is the official action; practice starts in plain ink.
-        if (session != null) {
-            MarigoldButton(
-                text = stringResource(R.string.instructions_start),
-                onClick = onStart,
-                modifier = Modifier.fillMaxWidth()
+    ) {
+        // The hero: the movement itself, large, lit from the corner.
+        GlowBackdrop(
+            Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+        ) {
+            DemoLoop(guide.diagrams, Modifier.align(Alignment.Center))
+            RoundIconButton(
+                icon = AppIcons.Back,
+                contentDescription = stringResource(R.string.action_back),
+                onClick = onBack,
+                modifier = Modifier.padding(16.dp)
             )
-        } else {
-            InkButton(
-                text = stringResource(R.string.instructions_start),
-                onClick = onStart,
-                modifier = Modifier.fillMaxWidth()
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(y = (-28).dp)
+                .background(AppColors.Background, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                .padding(horizontal = 20.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Column(
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                ModeTag(official = session != null)
+                Text(
+                    stringResource(Labels.testName(testType)),
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = AppColors.TextPrimary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.semantics { heading() }
+                )
+                Text(
+                    stringResource(guide.counts),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppColors.TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            StatRow {
+                StatTile(
+                    icon = AppIcons.Camera,
+                    value = stringResource(if (facing) R.string.instructions_stat_facing else R.string.instructions_stat_side_on),
+                    label = stringResource(R.string.instructions_stat_camera)
+                )
+                StatTile(
+                    icon = AppIcons.Ruler,
+                    value = stringResource(R.string.instructions_stat_distance),
+                    label = stringResource(R.string.instructions_stat_distance_label)
+                )
+                StatTile(
+                    icon = AppIcons.Bolt,
+                    value = stringResource(R.string.instructions_stat_signal),
+                    label = stringResource(R.string.instructions_stat_signal_label)
+                )
+            }
+
+            // An official attempt: SAI's rules for this session, before anything else.
+            session?.let {
+                Sheet(style = SheetStyle.Field) {
+                    Eyebrow(stringResource(R.string.official_badge) + " · " + it.name, color = AppColors.Accent)
+                    Text(
+                        text = stringResource(R.string.session_once_note),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    it.rules?.let { rules ->
+                        Text(
+                            text = stringResource(R.string.session_rules_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = AppColors.Accent
+                        )
+                        Text(text = rules, style = MaterialTheme.typography.bodyMedium, color = AppColors.TextSecondary)
+                    }
+                }
+            }
+
+            StepCard(
+                title = stringResource(R.string.instructions_setup),
+                steps = guide.setupSteps,
+                art = { Diagram(R.drawable.ic_setup_camera, R.string.diagram_setup, Modifier.size(88.dp)) }
+            )
+
+            SectionHeader(stringResource(R.string.instructions_movement))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                guide.diagrams.forEach { (image, description) ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(AppColors.Surface, RoundedCornerShape(20.dp))
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Diagram(image, description, Modifier.size(110.dp))
+                        Text(
+                            stringResource(description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppColors.TextSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+            StepCard(title = null, steps = guide.movementSteps)
+
+            // The ready signal is new to every athlete; say what it is before the
+            // camera asks for it.
+            StepCard(
+                title = stringResource(R.string.instructions_starting),
+                steps = listOf(R.string.start_step_gesture, R.string.start_step_countdown)
+            )
+
+            // How it ends, and what happens to the number: the two questions a
+            // first-time athlete otherwise asks someone else.
+            StepCard(
+                title = stringResource(R.string.instructions_finishing),
+                steps = listOf(
+                    guide.finish,
+                    if (session != null) R.string.result_step_official else R.string.result_step_practice
+                )
             )
         }
     }
@@ -144,19 +250,91 @@ private fun Diagram(@DrawableRes image: Int, @StringRes description: Int, modifi
     Image(
         painter = painterResource(image),
         contentDescription = stringResource(description),
-        colorFilter = ColorFilter.tint(TrialsColors.Ink),
-        modifier = modifier.size(120.dp)
+        colorFilter = ColorFilter.tint(AppColors.TextPrimary),
+        modifier = modifier
     )
 }
 
-/** A numbered step, its number in the chest-number face. */
+/**
+ * The movement as a short loop: the two diagrams, start and end position,
+ * one after the other. When the phone's animations are switched off it holds
+ * on the end position, and the two diagrams further down still show both.
+ */
+@Composable
+private fun DemoLoop(diagrams: List<Pair<Int, Int>>, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val animationsOff = remember {
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
+    var frame by remember { mutableIntStateOf(diagrams.lastIndex) }
+    if (!animationsOff && diagrams.size >= 2) {
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(DEMO_FRAME_MS)
+                frame = (frame + 1) % diagrams.size
+            }
+        }
+    }
+    Crossfade(targetState = frame, label = "demo", modifier = modifier) { index ->
+        val (image, description) = diagrams[index]
+        Diagram(image, description, Modifier.size(210.dp))
+    }
+}
+
+private const val DEMO_FRAME_MS = 1100L
+
+/**
+ * A group of numbered steps on one card, like an exercise in a plan: an
+ * optional title and picture, then each step with its number in a disc.
+ */
+@Composable
+private fun StepCard(
+    title: String?,
+    steps: List<Int>,
+    art: (@Composable () -> Unit)? = null
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppColors.Surface, RoundedCornerShape(20.dp))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        if (title != null || art != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                title?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = AppColors.TextPrimary,
+                        modifier = Modifier
+                            .weight(1f)
+                            .semantics { heading() }
+                    )
+                }
+                art?.invoke()
+            }
+        }
+        steps.forEachIndexed { index, step -> Step(index + 1, step) }
+    }
+}
+
+/** A numbered step, its number in a dark disc. */
 @Composable
 private fun Step(number: Int, @StringRes text: Int) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        LaneNumber(number, color = TrialsColors.Ink)
+        Box(
+            Modifier
+                .size(28.dp)
+                .background(AppColors.SurfaceHigh, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(number.toString(), style = MaterialTheme.typography.labelLarge, color = AppColors.Accent)
+        }
         Text(
             stringResource(text),
             style = MaterialTheme.typography.bodyLarge,
+            color = AppColors.TextPrimary,
             modifier = Modifier.padding(top = 2.dp)
         )
     }
@@ -166,7 +344,9 @@ data class TestGuide(
     val setupSteps: List<Int>,
     val diagrams: List<Pair<Int, Int>>,
     val movementSteps: List<Int>,
-    @StringRes val counts: Int
+    @StringRes val counts: Int,
+    /** How the test ends (Sprint 19). */
+    @StringRes val finish: Int = R.string.finish_step_reps
 )
 
 object TestGuides {
@@ -274,7 +454,8 @@ object TestGuides {
                 R.string.jump_step_land,
                 R.string.jump_step_repeat
             ),
-            counts = R.string.jump_counts
+            counts = R.string.jump_counts,
+            finish = R.string.finish_step_jump
         )
     }
 }

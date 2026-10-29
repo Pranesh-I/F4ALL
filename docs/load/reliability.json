@@ -1,0 +1,155 @@
+{
+  "interrupted_upload": {
+    "chunks_total": 7,
+    "chunks_kept": 3,
+    "chunks_resent": 4,
+    "checksum_verified": true,
+    "passed": true,
+    "consistency": {
+      "ok": true,
+      "output": [
+        "Checked 0 result(s)",
+        "No result is in a state it must never be in"
+      ]
+    },
+    "seconds": 9,
+    "at": "2026-10-13T13:19:56+00:00"
+  },
+  "api_down": {
+    "unreachable_while_down": true,
+    "chunks_kept_across_restart": true,
+    "retried_submission_same_result": true,
+    "passed": true,
+    "consistency": {
+      "ok": true,
+      "output": [
+        "Checked 1 result(s)",
+        "No result is in a state it must never be in"
+      ]
+    },
+    "seconds": 15,
+    "at": "2026-10-13T13:20:11+00:00"
+  },
+  "redis_down": {
+    "accepted_while_down": 3,
+    "seconds_per_submission_while_down": 6.06,
+    "statuses_while_down": [
+      "uploaded"
+    ],
+    "ready_while_down": {},
+    "all_verified_after": true,
+    "passed": true,
+    "consistency": {
+      "ok": true,
+      "output": [
+        "Checked 26 result(s)",
+        "No result is in a state it must never be in"
+      ]
+    },
+    "seconds": 109,
+    "at": "2026-10-13T13:33:44+00:00"
+  },
+  "database_down": {
+    "responses_while_down": [
+      [
+        503,
+        6.7
+      ],
+      [
+        503,
+        6.6
+      ],
+      [
+        503,
+        6.6
+      ],
+      [
+        503,
+        6.6
+      ],
+      [
+        503,
+        6.6
+      ]
+    ],
+    "no_success_while_down": true,
+    "slowest_response_s": 6.7,
+    "ready_reported_not_ready": false,
+    "recovery_seconds": 2.6,
+    "serving_after_s": 1.5,
+    "submission_after_recovery": true,
+    "passed": true,
+    "consistency": {
+      "ok": true,
+      "output": [
+        "Checked 27 result(s)",
+        "No result is in a state it must never be in"
+      ]
+    },
+    "seconds": 43,
+    "at": "2026-10-13T13:34:27+00:00"
+  },
+  "worker_crash": {
+    "stranded_by_the_crash": 2,
+    "all_reached_a_verdict": true,
+    "verification_attempts": [
+      1,
+      2
+    ],
+    "recovery_seconds": 54,
+    "passed": true,
+    "consistency": {
+      "ok": true,
+      "output": [
+        "Checked 7 result(s)",
+        "No result is in a state it must never be in"
+      ]
+    },
+    "seconds": 91,
+    "at": "2026-10-13T13:27:40+00:00"
+  },
+  "backlog": {
+    "videos": 16,
+    "workers": 2,
+    "submitted": 16,
+    "reached_a_verdict": 16,
+    "lost": 0,
+    "drain_seconds": 218,
+    "throughput_per_worker_per_minute": 2.21,
+    "processing_s_p50": 24.8,
+    "processing_s_p95": 27.9,
+    "queue_wait_s_p50": 108.7,
+    "queue_wait_s_p95": 190.5,
+    "verdicts": {
+      "approved": 0,
+      "flagged": 16,
+      "rejected": 0,
+      "verified": 0
+    },
+    "passed": true,
+    "consistency": {
+      "ok": true,
+      "output": [
+        "Checked 23 result(s)",
+        "No result is in a state it must never be in"
+      ]
+    },
+    "seconds": 230,
+    "at": "2026-10-13T13:31:30+00:00"
+  },
+  "worker_survives_redis_outage": {
+    "worker_alive_during_outage": true,
+    "worker_alive_after_outage": true,
+    "same_worker_verified_a_new_job": true,
+    "passed": true,
+    "consistency": {
+      "ok": true,
+      "output": [
+        "Checked 28 result(s)",
+        "No result is in a state it must never be in"
+      ]
+    },
+    "seconds": 72,
+    "at": "2026-10-13T13:35:40+00:00"
+  }
+}

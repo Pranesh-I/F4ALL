@@ -11,10 +11,11 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import audit
 from ..config import Settings, get_settings
 from ..database import get_db
 from ..models import Official, RefreshToken
@@ -43,6 +44,7 @@ INVALID_CREDENTIALS = "Incorrect email or password"
 @router.post("/login", response_model=OfficialTokenResponse)
 def login(
     payload: OfficialLoginRequest,
+    request: Request,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ):
@@ -57,6 +59,8 @@ def login(
         # Spend the same scrypt time as a real check, so response timing does
         # not reveal which email addresses belong to officials.
         verify_password(payload.password, DUMMY_HASH)
+        audit.record(db, event="sign_in_failed", request=request, status_code=401,
+                     detail=audit.fingerprint(email))
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, INVALID_CREDENTIALS)
 
     locked_until = _aware(official.locked_until)
@@ -65,6 +69,8 @@ def login(
         # all while locked — otherwise a locked account still answers "right"
         # or "wrong" to anyone who keeps guessing.
         minutes = max(1, int((locked_until - now).total_seconds() // 60) + 1)
+        audit.record(db, event="sign_in_locked", request=request, status_code=423,
+                     actor_id=official.id, actor_role=_value(official.role))
         raise HTTPException(
             status.HTTP_423_LOCKED,
             f"Too many failed sign-ins. Try again in {minutes} minute(s).",
@@ -83,6 +89,8 @@ def login(
                 )
             db.add(official)
             db.commit()
+        audit.record(db, event="sign_in_failed", request=request, status_code=401,
+                     actor_id=official.id, actor_role=_value(official.role))
         # Same message for a wrong password and a deactivated account: whether
         # an account was disabled is not something to tell a stranger.
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, INVALID_CREDENTIALS)
@@ -91,6 +99,8 @@ def login(
     official.locked_until = None
     db.add(official)
     db.commit()
+    audit.record(db, event="sign_in", request=request, status_code=200,
+                 actor_id=official.id, actor_role=_value(official.role))
 
     return _token_response(db, official, settings)
 

@@ -54,8 +54,9 @@ from ..schemas import (
 )
 from ..security import current_official
 from ..services import benchmarks as benchmark_service
+from ..services import retention
 from ..storage import get_storage
-from ..verification.analyzers import TestType
+from ..test_catalog import ASSESSABLE, FIELD_CODES
 from .media import identity_photo_url
 from .tests_submit import _benchmark_for
 
@@ -343,21 +344,22 @@ def tests_catalog(
 ):
     """The tests the backend can assess, in battery order.
 
-    Driven by the scorer registry (`TestType`) — the same list session
-    creation validates against — so the dashboard never offers a test the
-    server cannot score. Names come from the `tests` table where it has been
-    seeded (`python -m app.cli seed`).
+    Driven by the scorer registry (`app/test_catalog.py`: the pose tests and,
+    since Sprint 18, the field tests) — the same list session creation
+    validates against — so the dashboard never offers a test the server cannot
+    score. Names come from the `tests` table where it has been seeded
+    (`python -m app.cli seed`).
     """
     seeded = {test.code: test for test in db.execute(select(Test)).scalars()}
     catalog = []
-    for member in TestType:
-        row = seeded.get(member.value)
+    for code, unit in ASSESSABLE.items():
+        row = seeded.get(code)
         catalog.append(
             TestInfoResponse(
-                code=member.value,
-                name=row.name if row else member.value.replace("_", " ").title(),
-                unit=member.unit,
-                higher_is_better=row.higher_is_better if row else True,
+                code=code,
+                name=row.name if row else code.replace("_", " ").title(),
+                unit=unit,
+                higher_is_better=row.higher_is_better if row else code not in FIELD_CODES,
             )
         )
     return catalog
@@ -377,7 +379,10 @@ def review_detail(
 
     # Signed and short-lived. These recordings show minors; a durable public
     # URL would be a data-protection incident waiting to happen.
-    video_url = storage.signed_url(video.s3_key) if video is not None else None
+    retired = video is not None and retention.is_retired(video.s3_key)
+    video_url = (
+        storage.signed_url(video.s3_key) if video is not None and not retired else None
+    )
 
     # Decrypted by the media router, never by the bucket.
     reference_photo_url = (
@@ -400,7 +405,7 @@ def review_detail(
 
     history_rows = _history(db, result.id)
 
-    benchmark, _ = _benchmark_for(db, result, test, athlete)
+    benchmark, _ = _benchmark_for(db, result, test, athlete, for_reviewer=True)
 
     session = (
         db.get(AssessmentSession, result.session_id)
@@ -440,6 +445,9 @@ def review_detail(
             else None
         ),
         has_pose_sequence=bool(video is not None and video.pose_sequence_key),
+        video_retired_on=(
+            video.s3_key.removeprefix(retention.RETIRED_PREFIX) if retired else None
+        ),
         benchmark=benchmark,
         review_history=[
             ReviewHistoryItem(
@@ -674,6 +682,7 @@ def leaderboard(
     gender: str | None = Query(default=None),
     age_min: int | None = Query(default=None, ge=0, le=100),
     age_max: int | None = Query(default=None, ge=0, le=100),
+    session_id: uuid.UUID | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
     official: Official | None = Depends(current_official),
@@ -701,6 +710,8 @@ def leaderboard(
         query = query.where(Athlete.region == region)
     if gender:
         query = query.where(Athlete.gender == gender.lower())
+    if session_id is not None:
+        query = query.where(TestResult.session_id == session_id)
 
     today = datetime.now(UTC).date()
     if age_min is not None:

@@ -18,6 +18,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ..models import Benchmark, Test
+from ..regions import canonical_region
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +126,7 @@ def seed_benchmarks(
             )
 
         values = _percentiles(row, path, index, higher_is_better)
+        region = _region(row, path, index)
 
         existing = db.execute(
             select(Benchmark)
@@ -132,6 +134,11 @@ def seed_benchmarks(
             .where(Benchmark.gender == gender)
             .where(Benchmark.age_min == age_min)
             .where(Benchmark.age_max == age_max)
+            .where(
+                Benchmark.region.is_(None)
+                if region is None
+                else Benchmark.region == region
+            )
         ).scalar_one_or_none()
 
         if existing is None:
@@ -145,6 +152,7 @@ def seed_benchmarks(
                     percentile_50=values[0],
                     percentile_75=values[1],
                     percentile_90=values[2],
+                    region=region,
                     source=row["source"].strip(),
                 )
             )
@@ -160,6 +168,23 @@ def seed_benchmarks(
     db.commit()
     logger.info("Seeded benchmarks from %s: %s", path, report.summary())
     return report
+
+
+def _region(row: dict, path: Path, line: int) -> str | None:
+    """The optional `region` column: blank for an all-India row.
+
+    Spelled the way athletes' regions are stored, or the row would never match
+    anyone: "tamil nadu" and "Tamil Nadu" must be the same state.
+    """
+    value = (row.get("region") or "").strip()
+    if not value:
+        return None
+    region = canonical_region(value)
+    if region is None:
+        raise BenchmarkSeedError(
+            f"{path}:{line} region '{value}' is not an Indian state or union territory"
+        )
+    return region
 
 
 def _percentiles(

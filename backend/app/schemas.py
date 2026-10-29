@@ -291,6 +291,9 @@ class ReviewDetailResponse(BaseModel):
     # unavailable, or None when none was taken.
     identity_check: str | None = None
     has_pose_sequence: bool = False
+    # Sprint 20: the date the recording was deleted under the retention
+    # policy (services/retention.py); video_url is then null.
+    video_retired_on: str | None = None
     benchmark: BenchmarkComparisonResponse | None = None
     review_history: list[ReviewHistoryItem] = Field(default_factory=list)
 
@@ -494,6 +497,8 @@ class PersonalBest(BaseModel):
     # Whether this best comes from an official's approval or is still only the
     # server's measurement. The two must never look the same to an athlete.
     official: bool
+    # The result that set it, so a result screen can say "this is your best".
+    result_id: uuid.UUID | None = None
 
 
 class BenchmarkComparisonResponse(BaseModel):
@@ -513,14 +518,12 @@ class BenchmarkComparisonResponse(BaseModel):
     source: str
     provisional: bool
 
+    # The state whose own norms were used, or null for all-India norms.
+    region: str | None = None
+
 
 class BenchmarkUnavailable(BaseModel):
     reason: str
-
-
-class ResultWithBenchmarkResponse(TestResultResponse):
-    benchmark: BenchmarkComparisonResponse | None = None
-    benchmark_unavailable: str | None = None
 
 
 class TestHistoryItem(BaseModel):
@@ -534,6 +537,43 @@ class TestHistoryItem(BaseModel):
     created_at: datetime
     # The assessment session an official attempt belonged to.
     session_id: uuid.UUID | None = None
+    session_name: str | None = None
+
+
+class ServerFormFault(BaseModel):
+    # A FormIssue name, e.g. "KNEE_PAST_TOES"; the phone holds its label.
+    code: str
+    reps_affected: int
+
+
+class ServerForm(BaseModel):
+    """The server's own form verdict on the reps it counted (Sprint 15).
+
+    ``score`` is 0-100, the share of attempted reps with no fault — the same
+    measurement as the phone's form score. ``faults`` is null for a result
+    verified before the breakdown was recorded, never an empty stand-in.
+    """
+
+    score: int
+    faults: list[ServerFormFault] | None = None
+
+
+class ResultWithBenchmarkResponse(TestResultResponse):
+    benchmark: BenchmarkComparisonResponse | None = None
+    benchmark_unavailable: str | None = None
+
+    # Sprint 15: everything the athlete's result screen shows, from one call.
+    created_at: datetime | None = None
+    session_id: uuid.UUID | None = None
+    session_name: str | None = None
+    # Null until the server has measured the video, and for a jump.
+    server_form: ServerForm | None = None
+    # The analyzer's reason when the server could not score the video at all.
+    server_invalid_reason: str | None = None
+    # The athlete's best SAI-trusted score at this test, which may be this one.
+    personal_best: PersonalBest | None = None
+    # The athlete's attempt at this test before this one, whatever became of it.
+    previous_attempt: TestHistoryItem | None = None
 
 
 class VerificationComparison(BaseModel):
@@ -583,6 +623,9 @@ class VerificationStatusResponse(BaseModel):
     # where it names what to fix (e.g. "video_unreadable").
     verification_reason: str | None = None
     comparison: VerificationComparison | None = None
+    # The server's form verdict, with the faults behind it (contract §6.2 of
+    # the two-member plan). For athletes and officials alike.
+    server_form: ServerForm | None = None
 
     # Officials only.
     pipeline_version: str | None = None
@@ -667,6 +710,28 @@ class AthleteLeaderboardResponse(BaseModel):
     entries: list[AthleteLeaderboardEntry]
     you: YourStanding | None = None
     total_ranked: int
+
+    # Sprint 16 filters, echoed back. `age_band` is "14-15", or null for all ages.
+    age_band: str | None = None
+    session_id: uuid.UUID | None = None
+    session_name: str | None = None
+    # This page's position in `total_ranked`.
+    offset: int = 0
+
+
+class LeaderboardSessionOption(BaseModel):
+    session_id: uuid.UUID
+    name: str
+
+
+class AthleteLeaderboardOptions(BaseModel):
+    """What the athlete's leaderboard filters can offer (Sprint 16)."""
+
+    age_bands: list[str]
+    your_age_band: str | None
+    your_region: str
+    # Sessions the athlete took part in, newest first.
+    sessions: list[LeaderboardSessionOption]
 
 
 ReviewDetailResponse.model_rebuild()
@@ -780,3 +845,216 @@ class AssessmentSessionResponse(BaseModel):
     submission_count: int
     created_at: datetime
     updated_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Sprint 16: analytics for officials
+# ---------------------------------------------------------------------------
+
+
+class AnalyticsTotals(BaseModel):
+    # Registered athletes in scope (region filter applies, the dates do not).
+    athletes: int
+    # Athletes with at least one submission in the filtered window.
+    active_athletes: int
+    submissions: int
+    verified: int
+    approved: int
+    flagged: int
+    rejected: int
+    awaiting_verification: int
+    resubmission_requested: int
+
+
+class AnalyticsTest(BaseModel):
+    test_type: str
+    name: str
+    unit: str
+    higher_is_better: bool
+    submissions: int
+    athletes: int
+    # Verified or approved: the results that count.
+    counted: int
+    # Over counted results only: the official score once approved, the
+    # server's measurement while verified. Null when nothing counts yet.
+    average_score: float | None = None
+
+
+class AnalyticsRegion(BaseModel):
+    region: str
+    athletes: int
+    submissions: int
+    counted: int
+    flagged: int
+    rejected: int
+
+
+class AnalyticsSession(BaseModel):
+    session_id: uuid.UUID
+    name: str
+    submissions: int
+    athletes: int
+    counted: int
+
+
+class AnalyticsUploads(BaseModel):
+    started: int
+    completed: int
+    in_progress: int
+    # Never completed, and past the time the server would accept the rest.
+    abandoned: int
+    # Uploaded, then refused by the automatic check as unscorable.
+    rejected_by_verification: int
+
+
+class AnalyticsVerificationTime(BaseModel):
+    measured: int
+    # Submission to verdict, queue wait included: what the athlete waits.
+    turnaround_p50_seconds: float | None = None
+    turnaround_p95_seconds: float | None = None
+    # The worker's own time on the video.
+    processing_p50_seconds: float | None = None
+    processing_p95_seconds: float | None = None
+    sla_seconds: int
+    within_sla: int
+
+
+class AnalyticsBucket(BaseModel):
+    # First day of the bucket, in India Standard Time.
+    start: date
+    submissions: int
+    counted: int
+
+
+class AnalyticsScoreBin(BaseModel):
+    low: float
+    high: float
+    count: int
+
+
+class AnalyticsFilters(BaseModel):
+    submitted_from: datetime | None = None
+    submitted_to: datetime | None = None
+    region: str | None = None
+    test_type: str | None = None
+    session_id: uuid.UUID | None = None
+
+
+class AnalyticsResponse(BaseModel):
+    filters: AnalyticsFilters
+    generated_at: datetime
+    totals: AnalyticsTotals
+    by_status: dict[str, int]
+    tests: list[AnalyticsTest]
+    regions: list[AnalyticsRegion]
+    sessions: list[AnalyticsSession]
+    # Submissions made outside any assessment session.
+    outside_sessions: int
+    uploads: AnalyticsUploads
+    verification_time: AnalyticsVerificationTime
+    # "day", "week" or "month", chosen from the span of the window.
+    bucket: str
+    participation: list[AnalyticsBucket]
+    # Counted results of one test; null until a test is chosen, because
+    # reps and centimetres cannot share an axis.
+    score_distribution: list[AnalyticsScoreBin] | None = None
+
+
+
+# ---------------------------------------------------------------------------
+# Sprint 17: notifications
+# ---------------------------------------------------------------------------
+
+
+class DeviceRegistration(BaseModel):
+    token: str = Field(min_length=10, max_length=512)
+    platform: str = Field(default="android", pattern="^(android|ios)$")
+    provider: str = Field(default="fcm", pattern="^fcm$")
+
+
+class NotificationItem(BaseModel):
+    notification_id: uuid.UUID
+    # A stable code the app translates; title and body are the server's
+    # rendering in the athlete's language, for pushes and as a fallback.
+    event_type: str
+    title: str
+    body: str
+    # result_id / session_id / test_type: what the notification opens.
+    data: dict
+    created_at: datetime
+    read_at: datetime | None = None
+
+
+class NotificationPage(BaseModel):
+    items: list[NotificationItem]
+    unread_count: int
+    # Pass as `before` for the next, older page; null on the last.
+    next_before: datetime | None = None
+
+
+class MarkRead(BaseModel):
+    notification_ids: list[uuid.UUID] = Field(default_factory=list, max_length=200)
+    # Every notification, instead of a list.
+    all: bool = False
+
+
+class UnreadCount(BaseModel):
+    unread_count: int
+
+
+# ---------------------------------------------------------------------------
+# Sprint 18: field tests (shuttle run, endurance run)
+# ---------------------------------------------------------------------------
+
+# A 30-second shuttle trace at 100 Hz is 3,000 rows; a 10-minute endurance run
+# at 25 Hz is 15,000. These ceilings leave room and stop a runaway upload.
+MAX_MOTION_ROWS = 40_000
+MAX_FIX_ROWS = 3_000
+
+
+class FieldTestSubmit(BaseModel):
+    test_type: str = Field(max_length=40)
+    # The phone's own id for the attempt; a retry with it returns the same result.
+    client_attempt_id: str = Field(pattern=r"^[A-Za-z0-9_\-]{1,64}$")
+    # Seconds, as the phone scored it. Compared with the server's, never trusted.
+    provisional_score: float | None = Field(default=None, ge=0, le=3600)
+    session_id: uuid.UUID | None = None
+    identity_check_id: uuid.UUID | None = None
+    recorded_at_ms: int | None = None
+    # [t_ms, ax, ay, az] or [t_ms, ax, ay, az, gx, gy, gz]; t from the GO beep.
+    motion: list[list[float]] = Field(max_length=MAX_MOTION_ROWS)
+    # [t_ms, lat, lon, accuracy_m]; endurance run only.
+    fixes: list[list[float]] = Field(default_factory=list, max_length=MAX_FIX_ROWS)
+
+
+class FieldTestSubmitResponse(BaseModel):
+    result_id: uuid.UUID
+    # verified | flagged | rejected: field tests are checked as they arrive.
+    status: str
+    server_score: float | None = None
+    # Why the server could not score the trace (a stable code), when rejected.
+    invalid_reason: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Sprint 20: the access log, for SAI admins
+# ---------------------------------------------------------------------------
+
+
+class AccessLogEntry(BaseModel):
+    id: uuid.UUID
+    created_at: datetime
+    actor_id: uuid.UUID | None = None
+    actor_role: str | None = None
+    event: str
+    method: str
+    path: str
+    status_code: int
+    client_ip: str | None = None
+    request_id: str | None = None
+    detail: str | None = None
+
+
+class AccessLogPage(BaseModel):
+    items: list[AccessLogEntry]
+    total: int

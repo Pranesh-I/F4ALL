@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,6 +32,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -43,46 +42,47 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sai.sports.R
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.AppColors
 import java.util.Locale
 
-/** What a [Sheet] is: the four kinds of paper on a trials day. */
+/** What a [Sheet] holds, which decides how it looks. */
 enum class SheetStyle {
-    /** A printed form: white, ruled in ink. */
+    /** An ordinary card. */
     Paper,
 
-    /** Rough work: practice. Dashed pencil edge — it never counts. */
+    /** Practice: a dashed edge, because it never counts. */
     Rough,
 
-    /** The floodlit field: anything official. Ink, with paper-white text. */
+    /** Anything official: an orange edge and a warm glow from one corner. */
     Field,
 
-    /** A correction in red pen: something the athlete must act on. */
+    /** Something the athlete must act on, in the danger colour. */
     Note
 }
 
 /**
- * The basic surface. Replaces Material cards: no shadows, no rounded pills —
- * a sheet of paper with a ruled edge, so a screen reads like a scoresheet.
+ * The basic surface: a rounded card one step lighter than the screen. Depth
+ * comes from the step in colour, not from shadows.
  */
 @Composable
 fun Sheet(
     modifier: Modifier = Modifier,
     style: SheetStyle = SheetStyle.Paper,
-    padding: PaddingValues = PaddingValues(16.dp),
-    spacing: Dp = 10.dp,
+    padding: PaddingValues = PaddingValues(18.dp),
+    spacing: Dp = 12.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val background = if (style == SheetStyle.Field) TrialsColors.Ink else TrialsColors.Paper
-    val contentColor = if (style == SheetStyle.Field) TrialsColors.Paper else TrialsColors.Ink
+    val background = if (style == SheetStyle.Note) AppColors.DangerSoft else AppColors.Surface
     val edge = when (style) {
-        SheetStyle.Paper -> Modifier.border(1.dp, TrialsColors.Ink, SheetShape)
-        SheetStyle.Note -> Modifier.border(1.5.dp, TrialsColors.RedPen, SheetShape)
-        SheetStyle.Rough -> Modifier.dashedBorder(1.5.dp, TrialsColors.Pencil)
+        SheetStyle.Paper -> Modifier
+        SheetStyle.Note -> Modifier.border(1.dp, AppColors.Danger.copy(alpha = 0.6f), SheetShape)
+        SheetStyle.Rough -> Modifier.dashedBorder(1.dp, AppColors.SurfaceHighest, radius = 20.dp)
         SheetStyle.Field -> Modifier
+            .officialGlow()
+            .border(1.dp, AppColors.Accent.copy(alpha = 0.45f), SheetShape)
     }
 
-    CompositionLocalProvider(LocalContentColor provides contentColor) {
+    CompositionLocalProvider(LocalContentColor provides AppColors.TextPrimary) {
         Column(
             modifier = modifier
                 .fillMaxWidth()
@@ -95,13 +95,25 @@ fun Sheet(
     }
 }
 
-/** A pencil-dashed edge, for rough work and provisional numbers. */
+/** The warm corner glow that marks anything official. */
+fun Modifier.officialGlow(): Modifier = drawBehind {
+    drawRoundRect(
+        brush = Brush.radialGradient(
+            colors = listOf(AppColors.Accent.copy(alpha = 0.28f), Color.Transparent),
+            center = Offset(size.width, 0f),
+            radius = size.maxDimension * 0.75f
+        ),
+        cornerRadius = CornerRadius(20.dp.toPx())
+    )
+}
+
+/** A dashed edge, for practice and provisional numbers. */
 fun Modifier.dashedBorder(
     width: Dp,
     color: Color,
-    radius: Dp = 2.dp,
+    radius: Dp = 14.dp,
     dash: Dp = 6.dp,
-    gap: Dp = 4.dp
+    gap: Dp = 5.dp
 ): Modifier = drawBehind {
     val stroke = width.toPx()
     drawRoundRect(
@@ -117,7 +129,7 @@ fun Modifier.dashedBorder(
 }
 
 /**
- * Every screen's frame: the ground colour, clear of the status bar, the
+ * Every screen's frame: the background colour, clear of the status bar, the
  * gesture bar and the keyboard (Android 15 draws apps edge to edge, so nothing
  * else keeps content out from under them).
  *
@@ -134,30 +146,32 @@ fun Page(
     spacing: Dp = 16.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(TrialsColors.Ground)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-    ) {
-        header?.invoke()
+    CompositionLocalProvider(LocalContentColor provides AppColors.TextPrimary) {
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-                .padding(contentPadding),
-            verticalArrangement = Arrangement.spacedBy(spacing),
-            content = content
-        )
-        footer?.invoke()
+            modifier = modifier
+                .fillMaxSize()
+                .background(AppColors.Background)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+        ) {
+            header?.invoke()
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                    .padding(contentPadding),
+                verticalArrangement = Arrangement.spacedBy(spacing),
+                content = content
+            )
+            footer?.invoke()
+        }
     }
 }
 
 /**
- * A screen's title, with the way back, over a pair of lane lines.
+ * A screen's title, with the way back as a round button.
  *
- * Back is an arrow everyone recognises, named "Back" for screen readers.
+ * Back is a chevron everyone recognises, named "Back" for screen readers.
  */
 @Composable
 fun TitleBar(
@@ -165,98 +179,81 @@ fun TitleBar(
     onBack: (() -> Unit)?,
     trailing: (@Composable RowScope.() -> Unit)? = null
 ) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 64.dp)
-                .padding(start = 4.dp, end = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (onBack != null) {
-                IconButton(onClick = onBack) {
-                    Icon(TrialsIcons.Back, contentDescription = stringResource(R.string.action_back))
-                }
-            } else {
-                Spacer(Modifier.width(16.dp))
-            }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                maxLines = 2,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(vertical = 8.dp)
-                    .semantics { heading() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 68.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        if (onBack != null) {
+            RoundIconButton(
+                icon = AppIcons.Back,
+                contentDescription = stringResource(R.string.action_back),
+                onClick = onBack
             )
-            trailing?.invoke(this)
+        } else {
+            Spacer(Modifier.width(4.dp))
         }
-        LaneLines()
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            color = AppColors.TextPrimary,
+            maxLines = 2,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { heading() }
+        )
+        trailing?.invoke(this)
     }
 }
 
-/** A thick and a thin rule: the lane markings on the ground, used as a header edge. */
+/** A quiet divider under a header. */
 @Composable
-fun LaneLines(modifier: Modifier = Modifier, color: Color = TrialsColors.Ink) {
-    Column(modifier.fillMaxWidth()) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(color)
-        )
-        Spacer(Modifier.height(3.dp))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(color)
-        )
-    }
+fun LaneLines(modifier: Modifier = Modifier, color: Color = AppColors.Divider) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(color)
+    )
 }
 
 /**
- * A section heading as a scoresheet prints it: a short capitalised label over
- * a rule. Announced as a heading, so screen-reader users can jump between them.
+ * A section heading: a sentence-case title, with an optional short value or
+ * "View all" in the accent on the right. Announced as a heading, so
+ * screen-reader users can jump between them.
  */
 @Composable
 fun SectionRule(
     title: String,
     modifier: Modifier = Modifier,
     trailing: String? = null,
-    color: Color = LocalContentColor.current
+    color: Color = AppColors.TextPrimary
 ) {
-    Column(modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = title.uppercase(Locale.getDefault()),
-                style = MaterialTheme.typography.labelMedium,
-                color = color,
-                modifier = Modifier
-                    .weight(1f)
-                    .semantics { heading() }
-            )
-            trailing?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = color
-                )
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(2.dp)
-                .background(color)
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            color = color,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { heading() }
         )
+        trailing?.let {
+            Text(
+                text = it.uppercase(Locale.getDefault()),
+                style = MaterialTheme.typography.labelMedium,
+                color = AppColors.Accent
+            )
+        }
     }
 }
 
-/** A hairline between register rows. */
+/** A hairline between rows. */
 @Composable
-fun RuleLine(modifier: Modifier = Modifier, color: Color = TrialsColors.Rule) {
+fun RuleLine(modifier: Modifier = Modifier, color: Color = AppColors.Divider) {
     Box(
         modifier
             .fillMaxWidth()

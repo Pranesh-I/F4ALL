@@ -111,3 +111,18 @@ def test_late_acknowledgement_is_enabled():
 
     assert celery_app.conf.task_acks_late is True
     assert celery_app.conf.task_reject_on_worker_lost is True
+
+
+def test_a_worker_keeps_reconnecting_through_a_broker_outage():
+    """Sprint 23: a worker must wait out a Redis outage, not exit."""
+    from celery import Celery
+
+    from app.worker import keep_reconnecting
+
+    conf = Celery(broker_connection_max_retries=0).conf
+    conf.broker_connection_max_retries = 0
+    keep_reconnecting(conf=conf)
+
+    assert conf.broker_connection_max_retries is None
+    assert conf.broker_connection_retry is True
+    assert conf.broker_connection_retry_on_startup is True

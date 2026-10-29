@@ -1,0 +1,2 @@
+# One row per thing seen. stage: registration | otp | profile | face | instructions | practice | session | gesture | countdown | camera | detection | form_feedback | upload | offline | result | notification | dashboard
+pilot_id,time,stage,what_happened,needed_help,language,phone_model,signal,issue_id

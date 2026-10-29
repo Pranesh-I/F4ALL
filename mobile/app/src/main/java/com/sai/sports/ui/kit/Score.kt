@@ -3,7 +3,12 @@ package com.sai.sports.ui.kit
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,8 +30,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.AppColors
 import java.util.Locale
 
 /**
@@ -37,10 +41,10 @@ enum class ScoreInk {
     /** The phone's own count: grey, in a dashed box. Provisional. */
     Pencil,
 
-    /** SAI's re-measurement: written over in black. Checked, not yet official. */
+    /** SAI's re-measurement: white. Checked, not yet official. */
     Pen,
 
-    /** Approved by an official: black, and stamped (see [Stamp]). */
+    /** Approved by an official: white, and sealed (see [Stamp]). */
     Official
 }
 
@@ -58,15 +62,15 @@ fun ScoreMark(
     modifier: Modifier = Modifier,
     large: Boolean = true,
     struck: Boolean = false,
-    strikeColor: Color = TrialsColors.Ink
+    strikeColor: Color = AppColors.Danger
 ) {
-    val numberColor = if (ink == ScoreInk.Pencil) TrialsColors.Pencil else TrialsColors.Ink
+    val numberColor = if (ink == ScoreInk.Pencil) AppColors.TextSecondary else AppColors.TextPrimary
     val numberStyle = if (large) MaterialTheme.typography.displayLarge else MaterialTheme.typography.displaySmall
     val boxed = ink == ScoreInk.Pencil
 
     Row(
         modifier = modifier
-            .then(if (boxed) Modifier.dashedBorder(1.5.dp, TrialsColors.Pencil) else Modifier)
+            .then(if (boxed) Modifier.dashedBorder(1.5.dp, AppColors.TextSecondary, radius = 12.dp) else Modifier)
             .padding(horizontal = if (boxed) 14.dp else 0.dp, vertical = if (boxed) 4.dp else 0.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -125,11 +129,12 @@ fun Modifier.strikeThrough(color: Color): Modifier = drawWithContent {
 }
 
 /**
- * The violet rubber stamp. Used for an official result and for nothing else,
- * so violet on this app always means "SAI has approved this".
+ * The official seal: an accent-bordered badge with a check. Used for an
+ * official result and for nothing else, so this badge always means "SAI has
+ * approved this".
  *
- * With [animate], it lands the way a stamp does — dropped from above, a firm
- * press, a small settle — the moment an athlete first sees an approval.
+ * With [animate], it lands with a small spring the moment an athlete first
+ * sees an approval.
  */
 @Composable
 fun Stamp(
@@ -141,40 +146,45 @@ fun Stamp(
     val press = remember { Animatable(if (animate) 0f else 1f) }
     LaunchedEffect(animate) {
         if (animate) {
-            press.animateTo(1f, spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessMediumLow))
+            press.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow))
         }
     }
     val spoken = listOfNotNull(text, caption).joinToString(", ")
-    val shape = RoundedCornerShape(4.dp)
+    val shape = RoundedCornerShape(14.dp)
 
-    Column(
+    Row(
         modifier = modifier
             .graphicsLayer {
                 val p = press.value
-                val scale = 1.6f - 0.6f * p
+                val scale = 1.4f - 0.4f * p
                 scaleX = scale
                 scaleY = scale
-                alpha = p.coerceIn(0f, 1f) * 0.94f
-                rotationZ = -7f
+                alpha = p.coerceIn(0f, 1f)
             }
-            .border(3.dp, TrialsColors.Stamp, shape)
-            .padding(3.dp)
-            .border(1.dp, TrialsColors.Stamp, shape)
-            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .background(AppColors.AccentSoft, shape)
+            .border(1.5.dp, AppColors.Accent, shape)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
             .clearAndSetSemantics { contentDescription = spoken },
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = text.uppercase(Locale.getDefault()),
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.ExtraBold),
-            color = TrialsColors.Stamp
-        )
-        caption?.let {
+        Box(
+            Modifier
+                .size(26.dp)
+                .background(AppColors.Accent, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(AppIcons.Check, contentDescription = null, tint = AppColors.OnAccent, modifier = Modifier.size(16.dp))
+        }
+        Column {
             Text(
-                text = it,
-                style = MaterialTheme.typography.labelSmall,
-                color = TrialsColors.Stamp
+                text = text.uppercase(Locale.getDefault()),
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                color = AppColors.Accent
             )
+            caption?.let {
+                Text(text = it, style = MaterialTheme.typography.labelSmall, color = AppColors.TextSecondary)
+            }
         }
     }
 }

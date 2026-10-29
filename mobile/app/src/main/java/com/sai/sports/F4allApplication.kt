@@ -3,6 +3,8 @@ package com.sai.sports
 import android.app.Application
 import android.util.Log
 import com.sai.sports.data.SyncRepository
+import com.sai.sports.fieldtest.FieldSyncWorker
+import com.sai.sports.notify.NotificationWorker
 import com.sai.sports.sync.PracticeSyncWorker
 import com.sai.sports.sync.NetworkMonitor
 import com.sai.sports.sync.SyncScheduler
@@ -46,6 +48,11 @@ class F4allApplication : Application() {
                 SyncScheduler.syncNow(this@F4allApplication)
                 // Practice saved while offline reaches the account on next launch.
                 PracticeSyncWorker.syncSoon(this@F4allApplication)
+                // Shuttle and endurance runs recorded with no signal.
+                FieldSyncWorker.syncSoon(this@F4allApplication)
+                // News about results and sessions, from the athlete's inbox.
+                NotificationWorker.ensurePeriodic(this@F4allApplication)
+                NotificationWorker.checkSoon(this@F4allApplication)
             }.onFailure {
                 Log.e(TAG, "Could not schedule sync", it)
             }

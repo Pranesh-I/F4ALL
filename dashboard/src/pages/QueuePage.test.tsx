@@ -64,7 +64,7 @@ describe("QueuePage", () => {
 
     const search = screen.getByRole("searchbox", { name: "Athlete" });
     fireEvent.change(search, { target: { value: "meera" } });
-    fireEvent.submit(search);
+    fireEvent.submit(search.closest("form")!);
     await waitFor(() => expect(lastFilters(api).athlete).toBe("meera"));
 
     fireEvent.change(screen.getByLabelText("Submitted from"), { target: { value: "2026-10-01" } });

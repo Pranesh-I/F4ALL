@@ -361,6 +361,14 @@ class TestResult(TimestampMixin, Base):
     )
     verification_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
+    # Sprint 18, field tests (shuttle and endurance runs), which have no video.
+    # The phone's own id for the attempt, so a retried submission returns the
+    # result it created instead of adding a second attempt.
+    client_attempt_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Where the sensor/GPS trace is stored. Named by the trace's own hash, so
+    # the same trace submitted twice is found by its key.
+    telemetry_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     athlete: Mapped[Athlete] = relationship(back_populates="results")
     test: Mapped[Test] = relationship()
     videos: Mapped[list[Video]] = relationship(back_populates="test_result")
@@ -370,7 +378,13 @@ class TestResult(TimestampMixin, Base):
         UniqueConstraint(
             "athlete_id", "test_id", "attempt_number", name="uq_result_attempt"
         ),
+        UniqueConstraint(
+            "athlete_id", "client_attempt_id", name="uq_result_client_attempt"
+        ),
+        Index("ix_test_results_telemetry_key", "telemetry_key"),
         Index("ix_test_results_status", "status"),
+        # The notifier reads results by when they last changed (Sprint 17).
+        Index("ix_test_results_updated_at", "updated_at"),
         # One live official submission per athlete, session and test — enforced
         # by the database, so two submissions racing in cannot both land. A
         # result sent back for resubmission (pending_sync) no longer holds the
@@ -578,6 +592,11 @@ class Benchmark(Base):
     percentile_75: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     percentile_90: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
 
+    # A state or union territory whose own norms these are (Sprint 15), or
+    # null for an all-India row. An athlete is compared with their region's
+    # row when one exists, and with the all-India row otherwise.
+    region: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
     # Where these numbers came from. Not in db-schema-v1, and added because the
     # alternative is a table of authoritative-looking numbers with no way to
     # tell an official SAI norm from a placeholder. This value is surfaced all
@@ -589,10 +608,30 @@ class Benchmark(Base):
     )
 
     __table_args__ = (
-        # Without this, two overlapping rows would make the cohort an athlete
-        # is measured against depend on row order.
-        UniqueConstraint(
-            "test_id", "gender", "age_min", "age_max", name="uq_benchmark_cohort"
+        # Without these, two rows for one cohort would make the norms an
+        # athlete is measured against depend on row order. Two partial indexes
+        # rather than one constraint: a unique constraint treats every null
+        # region as distinct, so it would allow duplicate all-India rows.
+        Index(
+            "uq_benchmark_cohort_national",
+            "test_id",
+            "gender",
+            "age_min",
+            "age_max",
+            unique=True,
+            postgresql_where=text("region IS NULL"),
+            sqlite_where=text("region IS NULL"),
+        ),
+        Index(
+            "uq_benchmark_cohort_regional",
+            "test_id",
+            "gender",
+            "age_min",
+            "age_max",
+            "region",
+            unique=True,
+            postgresql_where=text("region IS NOT NULL"),
+            sqlite_where=text("region IS NOT NULL"),
         ),
         Index("ix_benchmarks_lookup", "test_id", "gender"),
     )
@@ -904,4 +943,146 @@ class IdentityCheck(Base):
 
     __table_args__ = (
         Index("ix_identity_checks_athlete_created", "athlete_id", "created_at"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Sprint 17: notifications
+# ---------------------------------------------------------------------------
+
+
+class DeviceToken(Base):
+    """A phone's push token, addressed to the athlete signed in on it.
+
+    A token belongs to one athlete at a time. When someone else signs in on a
+    shared phone, registering the token moves it to them, and signing out
+    deletes it — so the phone only ever receives the signed-in athlete's
+    notifications. A token the provider reports as invalid is disabled, not
+    deleted, so the record says why pushes to it stopped.
+    """
+
+    __tablename__ = "device_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_new_uuid)
+    athlete_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("athletes.id", ondelete="CASCADE"), nullable=False
+    )
+    token: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
+    platform: Mapped[str] = mapped_column(String(20), nullable=False, default="android")
+    provider: Mapped[str] = mapped_column(String(20), nullable=False, default="fcm")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    disabled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    disabled_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    __table_args__ = (Index("ix_device_tokens_athlete", "athlete_id"),)
+
+
+class Notification(Base):
+    """One message to one athlete: the outbox row and the inbox row in one.
+
+    Created by the notifier from database state (``app/notifications``), never
+    by the request that changed the state, so a notification problem cannot
+    fail a submission or a review. ``dedupe_key`` is unique: the same event can
+    be detected any number of times and is stored once.
+
+    ``title`` and ``body`` are rendered in the athlete's language when the row
+    is created; the phone shows its own translation of ``event_type`` and uses
+    these only as a fallback.
+    """
+
+    __tablename__ = "notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_new_uuid)
+    athlete_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("athletes.id", ondelete="CASCADE"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    # What the notification is about, for opening the right screen.
+    data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    language: Mapped[str] = mapped_column(String(5), nullable=False, default="en")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    # pending -> sent | retrying -> sent | failed; "inbox" when there was no
+    # device to push to (or push is off) and the inbox is the only delivery.
+    delivery_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending"
+    )
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_notifications_athlete_created", "athlete_id", "created_at"),
+        Index("ix_notifications_delivery", "delivery_status", "next_attempt_at"),
+        CheckConstraint(
+            "delivery_status IN ('pending','retrying','sent','failed','inbox')",
+            name="ck_notifications_delivery_status",
+        ),
+    )
+
+
+class NotifierState(Base):
+    """Where the notifier has read up to, so a restart neither misses nor repeats."""
+
+    __tablename__ = "notifier_state"
+
+    name: Mapped[str] = mapped_column(String(50), primary_key=True)
+    value: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Sprint 20: data-access audit log
+# ---------------------------------------------------------------------------
+
+
+class AccessLog(Base):
+    """Who looked at or changed what, on the officials' side.
+
+    One row per dashboard request (and per official read of verification
+    evidence or signed media), and one per sign-in attempt. Append-only: no
+    endpoint edits or deletes it; only the retention job removes rows older
+    than the audit period. The review decisions themselves stay in
+    ``review_actions``, which records what was decided and why.
+    """
+
+    __tablename__ = "access_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_new_uuid)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    # The official, when the request carried a valid official token.
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    actor_role: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # read | change | media | sign_in | sign_in_failed | sign_in_locked
+    event: Mapped[str] = mapped_column(String(30), nullable=False)
+    method: Mapped[str] = mapped_column(String(10), nullable=False)
+    path: Mapped[str] = mapped_column(String(500), nullable=False)
+    status_code: Mapped[int] = mapped_column(Integer, nullable=False)
+    client_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    __table_args__ = (
+        Index("ix_access_log_created", "created_at"),
+        Index("ix_access_log_actor_created", "actor_id", "created_at"),
     )

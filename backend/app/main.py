@@ -8,18 +8,25 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import OperationalError as SQLAlchemyOperationalError
 
+from .audit import AuditMiddleware
 from .config import get_settings
 from .errors import ApiError, api_error_handler
 from .logging_config import RequestIdMiddleware, configure_logging, request_id_var
+from .rate_limit import RateLimitMiddleware
 from .routers import (
+    access_log,
+    analytics,
     athletes,
     auth,
     dashboard,
     dashboard_auth,
+    field_tests,
     health,
     identity,
     media,
+    notifications,
     practice,
     sessions,
     tests_submit,
@@ -78,8 +85,19 @@ def create_app() -> FastAPI:
         ),
         version="1.0.0",
         lifespan=lifespan,
+        # The interactive docs are for developers; in production they would
+        # only map the API for whoever finds them. The contract is published
+        # as docs/openapi.yaml instead.
+        docs_url=None if settings.is_production else "/docs",
+        redoc_url=None if settings.is_production else "/redoc",
+        openapi_url=None if settings.is_production else "/openapi.json",
     )
 
+    # Added innermost first. The audit log sees the final answer to every
+    # officials' request; the rate limit, outside it, refuses a flood before
+    # it costs a database query, and its refusal still carries a request id.
+    app.add_middleware(AuditMiddleware, settings=settings)
+    app.add_middleware(RateLimitMiddleware, settings=settings)
     app.add_middleware(RequestIdMiddleware)
 
     # The official dashboard runs on its own origin. Bearer tokens, not
@@ -102,12 +120,33 @@ def create_app() -> FastAPI:
     app.include_router(sessions.admin_router)
     app.include_router(videos.router)
     app.include_router(tests_submit.router)
+    app.include_router(field_tests.router)
     app.include_router(verification.router)
     app.include_router(dashboard_auth.router)
     app.include_router(dashboard.router)
+    app.include_router(analytics.router)
+    app.include_router(access_log.router)
     app.include_router(media.router)
+    app.include_router(notifications.router)
 
     app.add_exception_handler(ApiError, api_error_handler)
+
+    @app.exception_handler(SQLAlchemyOperationalError)
+    async def database_unavailable_handler(request: Request, exc: Exception):
+        # Sprint 23: with Postgres down, requests hung until the client gave up.
+        # A clear "try again" lets the phone keep its queue and back off, and
+        # a load balancer see the outage. Nothing was saved, so it is safe.
+        logger.warning(
+            "Database unavailable on %s %s: %s", request.method, request.url.path, exc
+        )
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "The service is briefly unavailable. Try again shortly.",
+                "code": "database_unavailable",
+            },
+            headers={"Retry-After": "30"},
+        )
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):

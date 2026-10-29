@@ -1,0 +1,10 @@
+# F4ALL accuracy dataset (Sprint 22). One row per recording; see docs/accuracy/README.md.
+#
+# human_result is what a human evaluator measured: reps counted frame by frame
+# by a strict judge, jump height against a wall mark or jump mat, a field run
+# hand-timed with a stopwatch. Leave it blank until someone has measured it:
+# blank rows are run and listed, but never counted in the accuracy numbers.
+#
+# Paths are relative to this file. The .mp4 files are git-ignored.
+video,test,human_result,evaluator,height_cm,person,device,lighting,distance_m,camera_angle,clothing,background,human_form,cheat_label,ai_result,notes
+../reference-videos/vertical-jump/vj_01.mp4,VERTICAL_JUMP,,,,P01,unknown (downloaded clip),indoor,,side-on,,gym wall,,,,Genuine side-on jump with a wall reach; needs the jumper's height and the measured jump height

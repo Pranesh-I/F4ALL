@@ -506,8 +506,9 @@ def test_the_athlete_sees_decisions_but_never_a_reviewers_flag(
     mine = client.get(
         f"/api/results/{result.id}", headers=athlete_auth(athlete, settings)
     ).json()
-    assert [flag["reason"] for flag in mine["flags"]] == ["abrupt_cut"]
-    assert "INTERNAL" not in str(mine)
+    # No flag at all, the machine's included (Sprint 20).
+    assert mine["flags"] == []
+    assert "INTERNAL" not in str(mine) and "abrupt_cut" not in str(mine)
     assert mine["latest_review"] is None
 
     act(

@@ -10,23 +10,117 @@ Update the checkboxes as work lands. **Do not tick a sprint's Definition of Done
 - `[~]` — partially done (details in the note beside it)
 - **DoD** — Definition of Done, the gate that closes a sprint
 
-## Current Position
+## Current Position — F4ALL plan (the numbering in use since 2026-09-28)
+
+Work now follows [F4ALL_FULL_IMPLEMENTATION_SPRINT_PLAN.md](F4ALL_FULL_IMPLEMENTATION_SPRINT_PLAN.md)
+and its detailed companion [F4ALL_Sprints_11_to_24_Detailed_Implementation_Plan.md](F4ALL_Sprints_11_to_24_Detailed_Implementation_Plan.md).
+Its sprint numbers differ from the README board further down, which is kept as the
+record of the first pass (README Sprints 0–9). Checked 2026-10-13 against the code
+and a full test run: backend 539 passed, dashboard 117 passed (typecheck clean),
+mobile 315 passed / 1 skipped (the reference-video accuracy harness, no data yet).
+
+| Sprint | Title | Status |
+|---|---|---|
+| 1–2 | Capture pipeline, on-device pose (README Sprints 1–2) | `[~]` Done on a mid-range phone; low-end device benchmark pending |
+| 3 | Rep counting & jump measurement (squat, push-up, curl, lunge, jump, sit-up) | `[~]` Built, Kotlin/Python parity enforced; accuracy vs reference video is Sprint 22 |
+| 4 | Real-time form correction & voice feedback | `[x]` Done |
+| 5 | Gesture verification & camera reliability | `[x]` Done |
+| 6 | Practice mode (private, follows the account) | `[x]` Done |
+| 7 | Session mode (admin sessions, one submission per test) | `[x]` Done |
+| 8 | Authentication, profile & identity (consent, photo, pre-test check) | `[x]` Done; real SMS gateway needs SAI's DLT registration |
+| 9 | Offline-first storage & sync | `[x]` Done; airplane-mode walk needs a device (Sprint 21) |
+| 10 | Backend foundation (Docker, API contract, verification API) | `[x]` Done |
+| 11 | Server-side AI verification | `[x]` Done — [docs/SPRINT-11.md](docs/SPRINT-11.md) |
+| 12 | Anti-cheat & authenticity | `[x]` Done — [docs/SPRINT-12.md](docs/SPRINT-12.md) |
+| 13 | Admin dashboard foundation | `[x]` Done — [docs/SPRINT-13.md](docs/SPRINT-13.md) |
+| 14 | Athlete submission review | `[x]` Done — [docs/SPRINT-14.md](docs/SPRINT-14.md) |
+| — | Trials Day visual design (athlete app + dashboard) | `[x]` Done — commit 4c19fe8 |
+| 15 | Results, history & benchmarking | `[x]` Done — [docs/SPRINT-15.md](docs/SPRINT-15.md); not yet walked on a phone |
+| 16 | Leaderboards & analytics | `[x]` Done — [docs/SPRINT-16.md](docs/SPRINT-16.md); analytics checked against raw SQL on Postgres; not yet viewed in a browser |
+| 17 | Notifications | `[x]` Done — [docs/SPRINT-17.md](docs/SPRINT-17.md); delivered via the in-app inbox + phone notifications; real FCM pushes need SAI's Firebase project |
+| 18 | Additional test battery (shuttle run, endurance run) | `[x]` Done — [docs/SPRINT-18.md](docs/SPRINT-18.md); real reference runs are Sprint 22 |
+| 19 | UX, languages & accessibility | `[x]` Done — [docs/SPRINT-19.md](docs/SPRINT-19.md); real-user, screen-reader and native-speaker checks deferred |
+| 20 | Security & privacy | `[x]` Done — [docs/SPRINT-20.md](docs/SPRINT-20.md), [SECURITY-REVIEW](docs/SECURITY-REVIEW.md), [PRIVACY](docs/PRIVACY.md); SAI's bucket, certificate and an independent review deferred |
+| 21 | Device compatibility | `[~]` Built + 1 phone measured — [docs/SPRINT-21.md](docs/SPRINT-21.md), [DEVICE-MATRIX](docs/DEVICE-MATRIX.md); GPU pose path (16 → 23 fps); `device_check.py` for the rest; device batch deferred |
+| 22 | Accuracy validation | `[~]` Tooling done — [docs/SPRINT-22.md](docs/SPRINT-22.md); `app.cli accuracy` + dataset format; **no human ground truth yet**, so no accuracy claimed; first poor case found (far ankle in side-on jump) |
+| 23 | Backend load & reliability | `[x]` Done — [docs/SPRINT-23.md](docs/SPRINT-23.md), [LOAD-TEST](docs/LOAD-TEST.md); 100 users 0 errors p95 < 1 s; 7 failure scenarios pass; 4 outage bugs fixed |
+| 24 | End-to-end pilot | `[~]` Rehearsed 24/24 on the live stack — [docs/SPRINT-24.md](docs/SPRINT-24.md), [PILOT](docs/PILOT.md); the pilot itself needs real athletes |
+
+## Deferred until all sprints are done
+
+One list of everything blocked or left for the end, kept up to date after every
+sprint. Nothing here stops the next sprint.
+
+**Device batch (phones over USB; run `python mobile/scripts/device_check.py --offline` per phone — docs/SPRINT-21.md)**
+- [ ] Sprint 21: 2–3 entry-level phones (≤ 3 GB RAM, one 32-bit/Android Go if available) and 1–2 more mid-range phones into docs/DEVICE-MATRIX.md
+- [ ] Sprint 21: on the OPPO Reno13 — resume, 10 camera open/close cycles, offline → sync, background sync, and battery/heat re-measured on battery above 50% (first run was charging from 12%)
+- [ ] Sprint 21: confirm the proposed minimum requirements (3 GB RAM, OpenGL ES 3.1 for the GPU path) on entry-level phones; check the CPU fallback on a phone whose GPU cannot run the model
+- [ ] Sprint 21: instrumented tests on a device (`gradlew connectedDebugAndroidTest`: Room migrations, offline sync)
+
+**App redesign (dark + orange, new flow): built, not yet seen on a phone**
+- [ ] Visual pass on a phone: splash, language, intro, welcome, create account (6 steps), sign in, "You're all set", the five tabs, test detail, results burst, podium, notifications; fix what looks off. Then a screenshot set for the report
+- [ ] Native-speaker review of the ~60 new strings in Hindi, Tamil and Bengali (added with the redesign)
+- [ ] Dashboard restyle to match the app (same palette and components)
+
+**Needs a physical phone**
+- [ ] Sprints 1–2: low-end device recording and pose FPS / battery benchmark
+- [ ] Sprint 9 (offline sync): airplane-mode record → reconnect → upload walk; Room migration instrumented tests
+- [ ] Sprint 15: result screen, "My results" history, profile changes
+- [ ] Sprint 16: leaderboard filters (place, age group, session, "Show more")
+- [ ] Sprint 17: phone notifications appear, open the right screen, permission prompt on Android 13+, cleared on sign-out
+- [ ] Sprint 18: shuttle run and endurance run on a real phone, outdoors; check sensor/GPS timestamps line up on an older phone (docs/SPRINT-18.md)
+
+**Needs real people**
+- [ ] A non-technical athlete completes onboarding and a full test without help, in a non-English language, on a slow connection (README Sprint 9, F4ALL Sprint 19)
+- [ ] TalkBack walk through the key screens, and the app at 200% text size, on a phone (Sprint 19)
+- [ ] Film short demonstration videos for each test, to replace the looping diagrams (Sprint 19)
+
+**Needs a browser**
+- [ ] Sprint 16: analytics page and its charts looked at in a real browser (labels, overflow, phone width)
+
+**Needs SAI (accounts, data or decisions)**
+- [ ] Real SMS gateway: DLT-registered sender and template (Sprint 8)
+- [ ] Firebase project for instant pushes, then add the Firebase client to the app and register its token (Sprint 17)
+- [ ] Official benchmark norms for all tests, replacing the provisional placeholders (Sprints 7, 15)
+- [ ] Policy: which benchmark/leaderboard cohort an athlete registered as "other" belongs to
+- [ ] Labelled reference videos for accuracy validation (Sprint 22): 15–20 app recordings per test from 5+ people, measured by a human, into docs/accuracy/dataset.csv, then `python -m app.cli accuracy` (docs/accuracy/README.md). The four clips in docs/reference-videos/ turned out to be downloaded videos (two "sit-ups" are not sit-ups); only vj_01 is usable and needs the jumper's height and a measured jump
+- [ ] Run the pilot (Sprint 24, docs/PILOT.md): 15–25 athletes with guardian consent, 2 districts, 2 evaluators, an admin and 2 reviewers; fill docs/pilot/*.csv; fix P0/P1; regenerate the accuracy report from pilot data
+- [ ] Hand-timed reference runs on a measured 4 × 10 m course and a 600 m route, to calibrate the field-test thresholds (Sprint 22)
+- [ ] SAI's own 600 m norms (Khelo India), to replace the provisional endurance rows
+- [ ] Confirm the retention periods in docs/PRIVACY.md (videos 1 year after decision, etc.) and the account-deletion process for athlete/guardian requests (Sprint 20)
+- [ ] Privacy notice in the app written from docs/PRIVACY.md and reviewed by SAI's legal team (DPDP Act 2023) (Sprint 20)
+
+**Needs SAI's infrastructure**
+- [ ] API domain with a real TLS certificate; build the release app with `-Pf4all.apiUrl=https://…`; HSTS at the load balancer (Sprint 20)
+- [ ] Run `python -m app.cli check-storage` against the real bucket; lifecycle rule expiring noncurrent versions; S3 access logging on (Sprint 20)
+- [ ] Postgres with TLS (`sslmode=require`), encrypted storage and encrypted backups; secrets in a secrets manager (Sprint 20)
+- [ ] Independent security review / penetration test before the pilot (Sprint 20)
+
+**Code follow-ups already scheduled**
+- [ ] Whether analytics need caching — not exercised by the athlete load mix; decide on staging with a dashboard-heavy run (Sprint 23)
+- [ ] PRE-01 (P1): vertical jump requires both ankles but side-on hides the far one — confirm on pilot jump recordings, then change both analyzers + parity fixtures + threshold-changes entry (Sprints 22, 24)
+- [ ] A whole school behind one IP address vs the per-IP rate limit — watch in the pilot; raise `RATE_LIMIT_PER_MINUTE` or trust the proxy's X-Forwarded-For (Sprints 20, 23)
+- [ ] Load test on SAI's staging (S3, managed Postgres with TLS, several API hosts) with the same scripts; size verification workers by the LOAD-TEST.md formula; health-check timeout ≥ 10 s (Sprint 23)
+- [ ] Native-speaker review of Hindi, Tamil and Bengali strings (Sprint 19); SAI to decide on languages for the pilot regions
+- [ ] Attach an offline identity photo check to official field runs (today only an online check is attached)
+
+## README board (first pass, historical)
 
 | Sprint | Title | Status |
 |---|---|---|
 | 0 | Foundations | `[~]` Cloud + design + reference data pending |
 | 1 | Capture UI + Camera Pipeline | `[~]` Low-end device validation pending |
 | 2 | On-Device Pose Estimation | `[~]` Low-end benchmark pending |
-| **3** | **Rep-Counting & Jump Measurement** | **`[~]` Built + unit-tested; accuracy validation blocked on reference videos** |
-| **4** | **Offline Queue, Compression & Sync** | **`[~]` Built + 99 tests; backend now exists — DoD walk needs only a device** |
-| **5** | **Backend Ingest + Re-Verification** | **`[~]` Built + 63 tests; SLA + Postgres unmeasured** |
-| **6** | **Cheat Detection v1** | **`[x]` Complete — 114 tests, DoD met against rendered tampered video** |
-| **7** | **Auth, Profiles & Benchmarking** | **`[x]` Complete — backend + mobile; walked live. Benchmarks honestly provisional (no SAI norms exist for these tests)** |
-| **8** | **Official Dashboard v1** | **`[x]` Complete — DoD walked live end to end** |
-| **9** | **Gamification & UX Polish** | **`[x]` Built — 4 languages, badges, private leaderboards. DoD needs a real-user session** |
-| **10** | **Shuttle Run & Endurance Run** | **`[ ]` ← NEXT** |
-| 11–12 | Hardening | `[ ]` Not started |
-| 13–14 | Field Pilot | `[ ]` Not started |
+| 3 | Rep-Counting & Jump Measurement | `[~]` Built + unit-tested; accuracy validation blocked on reference videos |
+| 4 | Offline Queue, Compression & Sync | `[~]` Built; DoD walk needs only a device |
+| 5 | Backend Ingest + Re-Verification | `[x]` Superseded by F4ALL Sprints 10–11 (Postgres verified, live worker E2E run) |
+| 6 | Cheat Detection v1 | `[x]` Complete — extended in F4ALL Sprint 12 |
+| 7 | Auth, Profiles & Benchmarking | `[x]` Complete — benchmarks honestly provisional (no SAI norms exist for these tests) |
+| 8 | Official Dashboard v1 | `[x]` Complete — extended in F4ALL Sprints 13–14 |
+| 9 | Gamification & UX Polish | `[x]` Built — 4 languages, badges, private leaderboards. DoD needs a real-user session |
+| 10 | Shuttle Run & Endurance Run | `[ ]` Moved to F4ALL Sprint 18 |
+| 11–12 | Hardening | `[ ]` Moved to F4ALL Sprints 20, 21, 23 |
+| 13–14 | Field Pilot | `[ ]` Moved to F4ALL Sprint 24 |
 
 ---
 

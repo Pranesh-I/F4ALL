@@ -76,6 +76,13 @@ describe("ReviewPage", () => {
     expect(panel.getByText("Not decided")).toBeInTheDocument();
   });
 
+  it("says when a recording was deleted under the retention policy", async () => {
+    renderPage(async () => reviewDetail({ status: "approved", video_url: null, video_retired_on: "2027-06-01" }));
+    const recording = within(await screen.findByRole("region", { name: "Recording" }));
+    expect(recording.getByText(/deleted on 2027-06-01 under the retention policy/)).toBeInTheDocument();
+    expect(recording.queryByText("No recording is attached to this submission.")).not.toBeInTheDocument();
+  });
+
   it("adapts to the exercise: a jump is a measurement, not reps", async () => {
     renderPage(
       async () => reviewDetail({ test_type: "VERTICAL_JUMP", unit: "cm", provisional_score: 41, server_score: 39.7 }),

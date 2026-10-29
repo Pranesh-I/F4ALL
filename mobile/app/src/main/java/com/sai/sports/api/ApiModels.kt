@@ -133,9 +133,12 @@ data class PersonalBest(
     val unit: String,
     val score: Double,
     /** Approved by an official, rather than only measured by the server. */
-    val official: Boolean
+    val official: Boolean,
+    /** The result that set it; null from a server older than Sprint 15. */
+    val resultId: String? = null
 )
 
+/** One official result in the athlete's history. */
 data class HistoryItem(
     val resultId: String,
     val testType: String,
@@ -144,7 +147,19 @@ data class HistoryItem(
     val provisionalScore: Double?,
     val serverScore: Double?,
     val finalScore: Double?,
-    val createdAt: String
+    /** The server's timestamp as sent, which is also the paging cursor. */
+    val createdAt: String,
+    val createdAtMs: Long,
+    /** The assessment session it was submitted to, if any. */
+    val sessionId: String? = null,
+    val sessionName: String? = null
+)
+
+/** A page of official history, newest first. */
+data class HistoryPage(
+    val items: List<HistoryItem>,
+    /** Pass back to fetch the next, older page; null on the last one. */
+    val nextBefore: String?
 )
 
 data class AthleteSummary(
@@ -163,7 +178,23 @@ data class Benchmark(
     val unit: String,
     val source: String,
     /** True when the norms are placeholders rather than official SAI standards. */
-    val provisional: Boolean
+    val provisional: Boolean,
+    /** The state whose own norms were used; null for all-India norms. */
+    val region: String? = null
+)
+
+/** The server's form verdict on the reps it counted. */
+data class ServerForm(
+    /** 0..100, the share of attempted reps with no fault: the same measure as the phone's FormSummary. */
+    val score: Int,
+    /** Null for a result checked before the breakdown was recorded. */
+    val faults: List<ServerFormFault>?
+)
+
+data class ServerFormFault(
+    /** A FormIssue name, e.g. "KNEE_PAST_TOES". */
+    val code: String,
+    val repsAffected: Int
 )
 
 data class ReviewNote(
@@ -181,7 +212,17 @@ data class ServerResult(
     val finalScore: Double?,
     val benchmark: Benchmark?,
     val benchmarkUnavailable: String?,
-    val review: ReviewNote?
+    val review: ReviewNote?,
+    val createdAtMs: Long? = null,
+    val sessionName: String? = null,
+    /** Null until SAI has measured the video, and always for a jump. */
+    val serverForm: ServerForm? = null,
+    /** The analyzer's reason when SAI could not score the video at all. */
+    val serverInvalidReason: String? = null,
+    /** The athlete's best SAI-trusted score at this test; may be this result. */
+    val personalBest: PersonalBest? = null,
+    /** The athlete's attempt at this test before this one, whatever became of it. */
+    val previousAttempt: HistoryItem? = null
 )
 
 data class Badge(
@@ -220,8 +261,43 @@ data class Leaderboard(
     val cohort: String,
     val entries: List<LeaderboardEntry>,
     val you: YourStanding?,
-    val totalRanked: Int
+    val totalRanked: Int,
+    /** "14-15", or null for all ages. */
+    val ageBand: String? = null,
+    val sessionName: String? = null,
+    /** This page's position within [totalRanked]. */
+    val offset: Int = 0
+) {
+    val hasMore: Boolean get() = offset + entries.size < totalRanked
+}
+
+/** Which board to show; every field is a filter the server applies. */
+data class LeaderboardQuery(
+    val testType: String,
+    /** [PLACE_MY_STATE], [PLACE_INDIA], or the name of any state. */
+    val place: String = PLACE_MY_STATE,
+    /** [AGE_MINE], [AGE_ALL] or a band such as "12-13". */
+    val ageBand: String = AGE_MINE,
+    val sessionId: String? = null
+) {
+    companion object {
+        const val PLACE_MY_STATE = "my_state"
+        const val PLACE_INDIA = "india"
+        const val AGE_MINE = "mine"
+        const val AGE_ALL = "all"
+    }
+}
+
+/** What the leaderboard's filters can offer this athlete. */
+data class LeaderboardOptions(
+    val ageBands: List<String>,
+    val yourAgeBand: String?,
+    val yourRegion: String,
+    /** Sessions the athlete took part in, newest first. */
+    val sessions: List<LeaderboardSession>
 )
+
+data class LeaderboardSession(val id: String, val name: String)
 
 /**
  * A practice attempt as it travels to and from the athlete's account.
@@ -272,4 +348,35 @@ data class SessionTest(
     val submitted: Boolean,
     /** The latest result's status; "pending_sync" means an official asked for a resubmission. */
     val resultStatus: String?
+)
+
+/** One notification from the athlete's inbox (Sprint 17). */
+data class AppNotification(
+    val id: String,
+    /** Stable code; the app phrases it in the athlete's language. */
+    val eventType: String,
+    /** The server's rendering, used only for an event this app does not know. */
+    val title: String,
+    val body: String,
+    /** result_id / session_id / session_name / test_type. */
+    val data: Map<String, String>,
+    val createdAtMs: Long,
+    val read: Boolean
+)
+
+data class NotificationPage(
+    val items: List<AppNotification>,
+    val unreadCount: Int,
+    /** Pass back to fetch the next, older page; null on the last one. */
+    val nextBefore: String?
+)
+
+/** SAI's answer to a field-test submission, decided as it arrives (Sprint 18). */
+data class FieldSubmission(
+    val resultId: String,
+    /** verified / flagged / rejected. */
+    val status: String,
+    val serverScore: Double?,
+    /** Why SAI could not score the trace, as a stable code. */
+    val invalidReason: String?
 )

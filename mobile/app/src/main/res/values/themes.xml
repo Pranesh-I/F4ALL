@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- The ground colour shows while the first frame draws, so launch does not
-         flash white before the trials palette appears. -->
-    <style name="Theme.SAISportsTalentAssessment" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/trials_ground</item>
+    <!-- The background colour shows while the first frame draws, so launch does
+         not flash white before the app's dark palette appears. -->
+    <style name="Theme.SAISportsTalentAssessment" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/app_background</item>
     </style>
 </resources>

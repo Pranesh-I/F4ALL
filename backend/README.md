@@ -154,6 +154,13 @@ dashboard show that caveat. Load an official table with
 `python -m app.cli seed-benchmarks --file official.csv --replace` and the caveat
 disappears without a code change.
 
+Rows may carry an optional `region` column (a state or union territory). An
+athlete is compared with their own state's row when one exists, and with the
+all-India row (blank region) otherwise. Squats, push-ups, curls and lunges
+have placeholder rows too, weaker than the others: SAI has no norm for them,
+the app scores one continuous set with no time limit, and curls have no set
+load. Their `source` says so, and every comparison stays marked provisional.
+
 ## Operations
 
 ```bash
@@ -166,7 +173,19 @@ python -m app.cli create-official     # provision or reset a dashboard account
 python -m app.cli identity-key        # a new key for IDENTITY_ENCRYPTION_KEY
 python -m app.cli encrypt-photos      # encrypt photos stored before encryption existed
 python -m app.cli export-openapi      # regenerate docs/openapi.yaml after an API change
+python -m app.cli retention           # delete personal data past its period (--dry-run to count)
+python -m app.cli check-storage       # the bucket is private, encrypted, and deletes are final
+python -m scripts.scan_secrets        # fail on a credential about to be committed
+python -m app.cli consistency         # results in a state they must never be in (exit 1 if any)
+python -m app.cli accuracy            # the accuracy report from docs/accuracy/dataset.csv
 ```
+
+Load and reliability runs, and the pilot rehearsal, live in `loadtest/`. See
+[docs/LOAD-TEST.md](../docs/LOAD-TEST.md) and [docs/PILOT.md](../docs/PILOT.md).
+
+`retention` runs daily (the `retention` service in `docker-compose.yml`, or a
+cron job); the periods and the reasons for them are in
+[docs/PRIVACY.md](../docs/PRIVACY.md).
 
 An SAI admin can also re-run a stuck verification from the API:
 `POST /api/verification/{result_id}/process`.
@@ -185,13 +204,20 @@ setting that is wrong (`Settings.production_problems`):
 | `IDENTITY_ENCRYPTION_KEY` | set; back it up, since losing it loses every face photo |
 | `STORAGE_BACKEND` / `S3_BUCKET` | `s3` and a bucket — local disk vanishes with the container |
 | `SMS_BACKEND` / `SMS_API_URL` | `http` and a gateway — otherwise no OTP is ever delivered |
+| `DATABASE_URL` | for Postgres, `sslmode=require` (or `verify-ca` / `verify-full`) |
+| `RATE_LIMIT_BACKEND` | `redis`, so every worker shares one count |
+| `NOTIFICATION_PROVIDER` | `fcm` with its project and service account, or `inbox` |
 | `DEBUG` | false |
 | `PUBLIC_BASE_URL` | an `https://` address |
 | `CORS_ORIGINS` | only the dashboard's real origin — no `*`, no localhost |
 
 Also: `ALLOW_UNAUTHENTICATED` is ignored outside development; uploads are
 written with `ServerSideEncryption=AES256` and only exposed through short-lived
-signed URLs, because these recordings show minors.
+signed URLs, because these recordings show minors; the interactive docs
+(`/docs`, `/redoc`, `/openapi.json`) are not served.
+
+Security controls (rate limits, the access log, retention) and the review that
+checked them are in [docs/SECURITY-REVIEW.md](../docs/SECURITY-REVIEW.md).
 
 ## API map
 
@@ -215,6 +241,5 @@ test `tests/test_api_contract.py` checks every one exists.
 
 ## Known gaps
 
-- **Notifications do not exist yet** (the plan's `notifications/` module).
 - **The SLA is monitored but unproven.** The end-to-end timing target needs a
   real worker under real load; `GET /health/verification` reports it.

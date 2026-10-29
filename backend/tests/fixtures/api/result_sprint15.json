@@ -1,0 +1,60 @@
+{
+  "benchmark": {
+    "band": "above_average",
+    "cohort": "female, 9-40",
+    "label": "Above average for your age group",
+    "next_target": 26.0,
+    "percentile": 67,
+    "percentile_50": 20.0,
+    "percentile_75": 26.0,
+    "percentile_90": 32.0,
+    "provisional": true,
+    "region": "Tamil Nadu",
+    "source": "PROVISIONAL contract fixture",
+    "unit": "reps"
+  },
+  "benchmark_unavailable": null,
+  "created_at": "2026-10-01T11:00:00",
+  "final_score": null,
+  "flags": [],
+  "latest_review": null,
+  "personal_best": {
+    "achieved_at": "2026-10-01T09:03:00",
+    "official": true,
+    "result_id": "00000000-0000-0000-0000-00000000000a",
+    "score": 30.0,
+    "test_type": "SIT_UPS",
+    "unit": "reps"
+  },
+  "previous_attempt": {
+    "created_at": "2026-10-01T10:00:00",
+    "final_score": null,
+    "provisional_score": 18.0,
+    "result_id": "00000000-0000-0000-0000-00000000000b",
+    "server_score": 18.0,
+    "session_id": null,
+    "session_name": null,
+    "status": "rejected",
+    "test_type": "SIT_UPS",
+    "unit": "reps"
+  },
+  "provisional_score": 25.0,
+  "result_id": "00000000-0000-0000-0000-00000000000c",
+  "server_form": {
+    "faults": [
+      {
+        "code": "TORSO_LEAN",
+        "reps_affected": 2
+      }
+    ],
+    "score": 75
+  },
+  "server_invalid_reason": null,
+  "server_score": 24.0,
+  "session_id": "00000000-0000-0000-0000-000000000002",
+  "session_name": "District trials",
+  "status": "verified",
+  "test_type": "SIT_UPS",
+  "unit": "reps",
+  "verified_at": "2026-10-01T11:05:00"
+}

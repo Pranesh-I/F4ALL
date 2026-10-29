@@ -1,4 +1,4 @@
-"""Where an athlete's score stands against their age and gender cohort.
+"""Where an athlete's score stands against their age, gender and regional cohort.
 
 ## The honesty problem at the centre of this module
 
@@ -47,7 +47,7 @@ from dataclasses import dataclass
 from datetime import date
 from enum import Enum
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..models import Benchmark, Gender
@@ -101,6 +101,9 @@ class BenchmarkComparison:
     # ranking: "four more reps reaches the top 25%".
     next_target: float | None = None
 
+    # The state whose own norms these are, or None for all-India norms.
+    region: str | None = None
+
 
 def age_on(dob: date, *, today: date | None = None) -> int:
     """Completed years, counting birthdays rather than dividing by 365.25."""
@@ -110,9 +113,19 @@ def age_on(dob: date, *, today: date | None = None) -> int:
 
 
 def find_benchmark(
-    db: Session, *, test_id: uuid.UUID, gender: Gender | str, age_years: int
+    db: Session,
+    *,
+    test_id: uuid.UUID,
+    gender: Gender | str,
+    age_years: int,
+    region: str | None = None,
 ) -> Benchmark | None:
     """The cohort row for this athlete, or None when none applies.
+
+    A row for the athlete's own region wins over the all-India row for the
+    same age; the all-India row is the fallback, so a state without norms of
+    its own is still compared with something rather than with nothing. A row
+    for another region never applies.
 
     Returns None for `other` rather than assigning the athlete to the male or
     female table. Which cohort a non-binary athlete is assessed against is a
@@ -126,13 +139,26 @@ def find_benchmark(
         logger.info("No benchmark cohort defined for gender '%s'", value)
         return None
 
-    return db.execute(
+    candidates = db.execute(
         select(Benchmark)
         .where(Benchmark.test_id == test_id)
         .where(Benchmark.gender == value)
         .where(Benchmark.age_min <= age_years)
         .where(Benchmark.age_max >= age_years)
-    ).scalars().first()
+        .where(
+            Benchmark.region.is_(None)
+            if region is None
+            else or_(Benchmark.region.is_(None), Benchmark.region == region)
+        )
+        # Narrowest age band first, so overlapping rows resolve the same way
+        # on every database rather than by row order.
+        .order_by(Benchmark.age_max - Benchmark.age_min, Benchmark.age_min)
+    ).scalars().all()
+
+    for row in candidates:
+        if row.region is not None:
+            return row
+    return candidates[0] if candidates else None
 
 
 def compare(
@@ -186,6 +212,7 @@ def compare(
         source=source,
         provisional=is_provisional(source),
         next_target=next_target,
+        region=getattr(benchmark, "region", None),
     )
 
 

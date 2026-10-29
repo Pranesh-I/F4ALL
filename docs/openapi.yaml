@@ -425,7 +425,8 @@ paths:
       tags:
       - Athletes
       summary: My Personal Bests
-      description: Best trusted score per test — see `_personal_bests` for what counts.
+      description: Best trusted score per test — see `services/athlete_results.py`
+        for what counts.
       operationId: my_personal_bests_api_athletes_me_personal_bests_get
       responses:
         '200':
@@ -451,13 +452,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BadgesResponse'
+  /api/athletes/leaderboard-options:
+    get:
+      tags:
+      - Athletes
+      summary: Athlete Leaderboard Options
+      description: The choices the leaderboard's filters offer this athlete.
+      operationId: athlete_leaderboard_options_api_athletes_leaderboard_options_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AthleteLeaderboardOptions'
   /api/athletes/leaderboard/{test_type}:
     get:
       tags:
       - Athletes
       summary: Athlete Leaderboard
-      description: Top athletes in the caller's age band and gender, by region or
-        nationally.
+      description: Top athletes in one gender and age band, by state, nationally or
+        in a session.
       operationId: athlete_leaderboard_api_athletes_leaderboard__test_type__get
       parameters:
       - name: test_type
@@ -473,6 +488,54 @@ paths:
           type: string
           default: region
           title: Scope
+      - name: region
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          description: Any state; overrides `scope`
+          title: Region
+        description: Any state; overrides `scope`
+      - name: age_band
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 10
+          description: '"mine", "all", or a band such as "12-13"'
+          default: mine
+          title: Age Band
+        description: '"mine", "all", or a band such as "12-13"'
+      - name: session_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 10000
+          minimum: 0
+          default: 0
+          title: Offset
       responses:
         '200':
           description: Successful Response
@@ -1007,6 +1070,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/field-tests/submit:
+    post:
+      tags:
+      - Field tests
+      summary: Submit Field Test
+      operationId: submit_field_test_api_field_tests_submit_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FieldTestSubmit'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldTestSubmitResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/verification/{result_id}:
     get:
       tags:
@@ -1445,13 +1533,15 @@ paths:
       description: 'The tests the backend can assess, in battery order.
 
 
-        Driven by the scorer registry (`TestType`) — the same list session
+        Driven by the scorer registry (`app/test_catalog.py`: the pose tests and,
 
-        creation validates against — so the dashboard never offers a test the
+        since Sprint 18, the field tests) — the same list session creation
 
-        server cannot score. Names come from the `tests` table where it has been
+        validates against — so the dashboard never offers a test the server cannot
 
-        seeded (`python -m app.cli seed`).'
+        score. Names come from the `tests` table where it has been seeded
+
+        (`python -m app.cli seed`).'
       operationId: tests_catalog_api_dashboard_tests_get
       responses:
         '200':
@@ -1622,6 +1712,15 @@ paths:
             minimum: 0
           - type: 'null'
           title: Age Max
+      - name: session_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
       - name: limit
         in: query
         required: false
@@ -1658,8 +1757,350 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DashboardStats'
+  /api/dashboard/analytics:
+    get:
+      tags:
+      - Dashboard
+      summary: Analytics
+      operationId: analytics_api_dashboard_analytics_get
+      parameters:
+      - name: submitted_from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Submitted From
+      - name: submitted_to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Submitted To
+      - name: region
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Region
+      - name: test_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Test Type
+      - name: session_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/dashboard/access-log:
+    get:
+      tags:
+      - Dashboard
+      summary: Access Log
+      operationId: access_log_api_dashboard_access_log_get
+      parameters:
+      - name: actor_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Actor Id
+      - name: event
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 30
+          - type: 'null'
+          title: Event
+      - name: path_contains
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Path Contains
+      - name: since
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Since
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessLogPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/devices:
+    post:
+      tags:
+      - Notifications
+      summary: Register Device
+      description: 'Address this phone''s push token to the signed-in athlete.
+
+
+        Idempotent. A token registered by another athlete before — the same phone,
+
+        someone else signed in — is moved, so their notifications stop arriving
+
+        here. A token disabled as invalid is enabled again: the phone has just
+
+        proved it is alive.'
+      operationId: register_device_api_athletes_me_devices_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRegistration'
+        required: true
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/devices/{token}:
+    delete:
+      tags:
+      - Notifications
+      summary: Unregister Device
+      description: 'Stop pushing to this phone — called when the athlete signs out.
+
+
+        Only the athlete it is addressed to can remove it; anyone else gets the
+
+        same empty answer, which says nothing about whose token it is.'
+      operationId: unregister_device_api_athletes_me_devices__token__delete
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/notifications:
+    get:
+      tags:
+      - Notifications
+      summary: My Notifications
+      description: The athlete's notifications, newest first, a page at a time.
+      operationId: my_notifications_api_athletes_me_notifications_get
+      parameters:
+      - name: before
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Before
+      - name: unread_only
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Unread Only
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 30
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/athletes/me/notifications/read:
+    post:
+      tags:
+      - Notifications
+      summary: Mark Read
+      description: Mark the given notifications (or all of them) read. Unknown ids
+        are ignored.
+      operationId: mark_read_api_athletes_me_notifications_read_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkRead'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCount'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
+    AccessLogEntry:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        actor_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Actor Id
+        actor_role:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Actor Role
+        event:
+          type: string
+          title: Event
+        method:
+          type: string
+          title: Method
+        path:
+          type: string
+          title: Path
+        status_code:
+          type: integer
+          title: Status Code
+        client_ip:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Ip
+        request_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Request Id
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+      type: object
+      required:
+      - id
+      - created_at
+      - event
+      - method
+      - path
+      - status_code
+      title: AccessLogEntry
+    AccessLogPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/AccessLogEntry'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - items
+      - total
+      title: AccessLogPage
     ActiveSessionResponse:
       properties:
         session_id:
@@ -1717,6 +2158,336 @@ components:
       required:
       - server_time
       title: ActiveSessionsResponse
+    AnalyticsBucket:
+      properties:
+        start:
+          type: string
+          format: date
+          title: Start
+        submissions:
+          type: integer
+          title: Submissions
+        counted:
+          type: integer
+          title: Counted
+      type: object
+      required:
+      - start
+      - submissions
+      - counted
+      title: AnalyticsBucket
+    AnalyticsFilters:
+      properties:
+        submitted_from:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Submitted From
+        submitted_to:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Submitted To
+        region:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Region
+        test_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Test Type
+        session_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+      type: object
+      title: AnalyticsFilters
+    AnalyticsRegion:
+      properties:
+        region:
+          type: string
+          title: Region
+        athletes:
+          type: integer
+          title: Athletes
+        submissions:
+          type: integer
+          title: Submissions
+        counted:
+          type: integer
+          title: Counted
+        flagged:
+          type: integer
+          title: Flagged
+        rejected:
+          type: integer
+          title: Rejected
+      type: object
+      required:
+      - region
+      - athletes
+      - submissions
+      - counted
+      - flagged
+      - rejected
+      title: AnalyticsRegion
+    AnalyticsResponse:
+      properties:
+        filters:
+          $ref: '#/components/schemas/AnalyticsFilters'
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        totals:
+          $ref: '#/components/schemas/AnalyticsTotals'
+        by_status:
+          additionalProperties:
+            type: integer
+          type: object
+          title: By Status
+        tests:
+          items:
+            $ref: '#/components/schemas/AnalyticsTest'
+          type: array
+          title: Tests
+        regions:
+          items:
+            $ref: '#/components/schemas/AnalyticsRegion'
+          type: array
+          title: Regions
+        sessions:
+          items:
+            $ref: '#/components/schemas/AnalyticsSession'
+          type: array
+          title: Sessions
+        outside_sessions:
+          type: integer
+          title: Outside Sessions
+        uploads:
+          $ref: '#/components/schemas/AnalyticsUploads'
+        verification_time:
+          $ref: '#/components/schemas/AnalyticsVerificationTime'
+        bucket:
+          type: string
+          title: Bucket
+        participation:
+          items:
+            $ref: '#/components/schemas/AnalyticsBucket'
+          type: array
+          title: Participation
+        score_distribution:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/AnalyticsScoreBin'
+            type: array
+          - type: 'null'
+          title: Score Distribution
+      type: object
+      required:
+      - filters
+      - generated_at
+      - totals
+      - by_status
+      - tests
+      - regions
+      - sessions
+      - outside_sessions
+      - uploads
+      - verification_time
+      - bucket
+      - participation
+      title: AnalyticsResponse
+    AnalyticsScoreBin:
+      properties:
+        low:
+          type: number
+          title: Low
+        high:
+          type: number
+          title: High
+        count:
+          type: integer
+          title: Count
+      type: object
+      required:
+      - low
+      - high
+      - count
+      title: AnalyticsScoreBin
+    AnalyticsSession:
+      properties:
+        session_id:
+          type: string
+          format: uuid
+          title: Session Id
+        name:
+          type: string
+          title: Name
+        submissions:
+          type: integer
+          title: Submissions
+        athletes:
+          type: integer
+          title: Athletes
+        counted:
+          type: integer
+          title: Counted
+      type: object
+      required:
+      - session_id
+      - name
+      - submissions
+      - athletes
+      - counted
+      title: AnalyticsSession
+    AnalyticsTest:
+      properties:
+        test_type:
+          type: string
+          title: Test Type
+        name:
+          type: string
+          title: Name
+        unit:
+          type: string
+          title: Unit
+        higher_is_better:
+          type: boolean
+          title: Higher Is Better
+        submissions:
+          type: integer
+          title: Submissions
+        athletes:
+          type: integer
+          title: Athletes
+        counted:
+          type: integer
+          title: Counted
+        average_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Average Score
+      type: object
+      required:
+      - test_type
+      - name
+      - unit
+      - higher_is_better
+      - submissions
+      - athletes
+      - counted
+      title: AnalyticsTest
+    AnalyticsTotals:
+      properties:
+        athletes:
+          type: integer
+          title: Athletes
+        active_athletes:
+          type: integer
+          title: Active Athletes
+        submissions:
+          type: integer
+          title: Submissions
+        verified:
+          type: integer
+          title: Verified
+        approved:
+          type: integer
+          title: Approved
+        flagged:
+          type: integer
+          title: Flagged
+        rejected:
+          type: integer
+          title: Rejected
+        awaiting_verification:
+          type: integer
+          title: Awaiting Verification
+        resubmission_requested:
+          type: integer
+          title: Resubmission Requested
+      type: object
+      required:
+      - athletes
+      - active_athletes
+      - submissions
+      - verified
+      - approved
+      - flagged
+      - rejected
+      - awaiting_verification
+      - resubmission_requested
+      title: AnalyticsTotals
+    AnalyticsUploads:
+      properties:
+        started:
+          type: integer
+          title: Started
+        completed:
+          type: integer
+          title: Completed
+        in_progress:
+          type: integer
+          title: In Progress
+        abandoned:
+          type: integer
+          title: Abandoned
+        rejected_by_verification:
+          type: integer
+          title: Rejected By Verification
+      type: object
+      required:
+      - started
+      - completed
+      - in_progress
+      - abandoned
+      - rejected_by_verification
+      title: AnalyticsUploads
+    AnalyticsVerificationTime:
+      properties:
+        measured:
+          type: integer
+          title: Measured
+        turnaround_p50_seconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Turnaround P50 Seconds
+        turnaround_p95_seconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Turnaround P95 Seconds
+        processing_p50_seconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Processing P50 Seconds
+        processing_p95_seconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Processing P95 Seconds
+        sla_seconds:
+          type: integer
+          title: Sla Seconds
+        within_sla:
+          type: integer
+          title: Within Sla
+      type: object
+      required:
+      - measured
+      - sla_seconds
+      - within_sla
+      title: AnalyticsVerificationTime
     AssessmentSessionCreate:
       properties:
         name:
@@ -1922,6 +2693,34 @@ components:
       - region
       - score
       title: AthleteLeaderboardEntry
+    AthleteLeaderboardOptions:
+      properties:
+        age_bands:
+          items:
+            type: string
+          type: array
+          title: Age Bands
+        your_age_band:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Your Age Band
+        your_region:
+          type: string
+          title: Your Region
+        sessions:
+          items:
+            $ref: '#/components/schemas/LeaderboardSessionOption'
+          type: array
+          title: Sessions
+      type: object
+      required:
+      - age_bands
+      - your_age_band
+      - your_region
+      - sessions
+      title: AthleteLeaderboardOptions
+      description: What the athlete's leaderboard filters can offer (Sprint 16).
     AthleteLeaderboardResponse:
       properties:
         test_type:
@@ -1953,6 +2752,26 @@ components:
         total_ranked:
           type: integer
           title: Total Ranked
+        age_band:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Age Band
+        session_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+        session_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Session Name
+        offset:
+          type: integer
+          title: Offset
+          default: 0
       type: object
       required:
       - test_type
@@ -2279,6 +3098,11 @@ components:
         provisional:
           type: boolean
           title: Provisional
+        region:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Region
       type: object
       required:
       - band
@@ -2387,6 +3211,27 @@ components:
       - flagged_high_severity
       - breaching_sla
       title: DashboardStats
+    DeviceRegistration:
+      properties:
+        token:
+          type: string
+          maxLength: 512
+          minLength: 10
+          title: Token
+        platform:
+          type: string
+          pattern: ^(android|ios)$
+          title: Platform
+          default: android
+        provider:
+          type: string
+          pattern: ^fcm$
+          title: Provider
+          default: fcm
+      type: object
+      required:
+      - token
+      title: DeviceRegistration
     FaceVerificationResponse:
       properties:
         status:
@@ -2409,6 +3254,86 @@ components:
       - similarity_score
       - verified_at
       title: FaceVerificationResponse
+    FieldTestSubmit:
+      properties:
+        test_type:
+          type: string
+          maxLength: 40
+          title: Test Type
+        client_attempt_id:
+          type: string
+          pattern: ^[A-Za-z0-9_\-]{1,64}$
+          title: Client Attempt Id
+        provisional_score:
+          anyOf:
+          - type: number
+            maximum: 3600.0
+            minimum: 0.0
+          - type: 'null'
+          title: Provisional Score
+        session_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+        identity_check_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Identity Check Id
+        recorded_at_ms:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Recorded At Ms
+        motion:
+          items:
+            items:
+              type: number
+            type: array
+          type: array
+          maxItems: 40000
+          title: Motion
+        fixes:
+          items:
+            items:
+              type: number
+            type: array
+          type: array
+          maxItems: 3000
+          title: Fixes
+      type: object
+      required:
+      - test_type
+      - client_attempt_id
+      - motion
+      title: FieldTestSubmit
+    FieldTestSubmitResponse:
+      properties:
+        result_id:
+          type: string
+          format: uuid
+          title: Result Id
+        status:
+          type: string
+          title: Status
+        server_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Server Score
+        invalid_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invalid Reason
+      type: object
+      required:
+      - result_id
+      - status
+      title: FieldTestSubmitResponse
     FlagResponse:
       properties:
         reason:
@@ -2605,6 +3530,20 @@ components:
       - higher_is_better
       - entries
       title: LeaderboardResponse
+    LeaderboardSessionOption:
+      properties:
+        session_id:
+          type: string
+          format: uuid
+          title: Session Id
+        name:
+          type: string
+          title: Name
+      type: object
+      required:
+      - session_id
+      - name
+      title: LeaderboardSessionOption
     LogoutRequest:
       properties:
         refresh_token:
@@ -2618,6 +3557,21 @@ components:
           default: false
       type: object
       title: LogoutRequest
+    MarkRead:
+      properties:
+        notification_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 200
+          title: Notification Ids
+        all:
+          type: boolean
+          title: All
+          default: false
+      type: object
+      title: MarkRead
     MessageResponse:
       properties:
         message:
@@ -2627,6 +3581,65 @@ components:
       required:
       - message
       title: MessageResponse
+    NotificationItem:
+      properties:
+        notification_id:
+          type: string
+          format: uuid
+          title: Notification Id
+        event_type:
+          type: string
+          title: Event Type
+        title:
+          type: string
+          title: Title
+        body:
+          type: string
+          title: Body
+        data:
+          additionalProperties: true
+          type: object
+          title: Data
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        read_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Read At
+      type: object
+      required:
+      - notification_id
+      - event_type
+      - title
+      - body
+      - data
+      - created_at
+      title: NotificationItem
+    NotificationPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/NotificationItem'
+          type: array
+          title: Items
+        unread_count:
+          type: integer
+          title: Unread Count
+        next_before:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Next Before
+      type: object
+      required:
+      - items
+      - unread_count
+      title: NotificationPage
     OfficialLoginRequest:
       properties:
         email:
@@ -2714,6 +3727,12 @@ components:
         official:
           type: boolean
           title: Official
+        result_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Result Id
       type: object
       required:
       - test_type
@@ -2984,6 +4003,40 @@ components:
           - type: string
           - type: 'null'
           title: Benchmark Unavailable
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Created At
+        session_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Session Id
+        session_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Session Name
+        server_form:
+          anyOf:
+          - $ref: '#/components/schemas/ServerForm'
+          - type: 'null'
+        server_invalid_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Server Invalid Reason
+        personal_best:
+          anyOf:
+          - $ref: '#/components/schemas/PersonalBest'
+          - type: 'null'
+        previous_attempt:
+          anyOf:
+          - $ref: '#/components/schemas/TestHistoryItem'
+          - type: 'null'
       type: object
       required:
       - result_id
@@ -3167,6 +4220,11 @@ components:
           type: boolean
           title: Has Pose Sequence
           default: false
+        video_retired_on:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Video Retired On
         benchmark:
           anyOf:
           - $ref: '#/components/schemas/BenchmarkComparisonResponse'
@@ -3271,6 +4329,44 @@ components:
       - official_name
       - created_at
       title: ReviewHistoryItem
+    ServerForm:
+      properties:
+        score:
+          type: integer
+          title: Score
+        faults:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ServerFormFault'
+            type: array
+          - type: 'null'
+          title: Faults
+      type: object
+      required:
+      - score
+      title: ServerForm
+      description: 'The server''s own form verdict on the reps it counted (Sprint
+        15).
+
+
+        ``score`` is 0-100, the share of attempted reps with no fault — the same
+
+        measurement as the phone''s form score. ``faults`` is null for a result
+
+        verified before the breakdown was recorded, never an empty stand-in.'
+    ServerFormFault:
+      properties:
+        code:
+          type: string
+          title: Code
+        reps_affected:
+          type: integer
+          title: Reps Affected
+      type: object
+      required:
+      - code
+      - reps_affected
+      title: ServerFormFault
     SessionTestStatus:
       properties:
         test_type:
@@ -3506,6 +4602,11 @@ components:
             format: uuid
           - type: 'null'
           title: Session Id
+        session_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Session Name
       type: object
       required:
       - result_id
@@ -3585,6 +4686,15 @@ components:
       - refresh_token
       - expires_in
       title: TokenResponse
+    UnreadCount:
+      properties:
+        unread_count:
+          type: integer
+          title: Unread Count
+      type: object
+      required:
+      - unread_count
+      title: UnreadCount
     UploadChunkResponse:
       properties:
         received_chunks_count:
@@ -3835,6 +4945,10 @@ components:
         comparison:
           anyOf:
           - $ref: '#/components/schemas/VerificationComparison'
+          - type: 'null'
+        server_form:
+          anyOf:
+          - $ref: '#/components/schemas/ServerForm'
           - type: 'null'
         pipeline_version:
           anyOf:

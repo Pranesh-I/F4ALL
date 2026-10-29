@@ -17,6 +17,9 @@ export const TEST_NAMES: Record<string, string> = {
   LUNGES: "Lunges",
   VERTICAL_JUMP: "Vertical jump",
   SIT_UPS: "Sit-ups",
+  // Sprint 18 field tests, timed by the phone's sensors and GPS.
+  SHUTTLE_RUN: "Shuttle run (4 × 10 m)",
+  ENDURANCE_RUN: "Endurance run (600 m)",
 };
 
 /**
@@ -139,6 +142,22 @@ const FLAG_REASONS: Record<string, string> = {
   impossible_movement: "Movement too fast to be real",
   duplicate_submission: "Same video submitted before",
   integrity_check_failed: "An integrity check could not run",
+  // Sprint 18 field tests: the trace, rather than a video.
+  duplicate_trace: "Same sensor trace submitted before",
+  not_enough_data: "Too little was recorded",
+  low_sample_rate: "Motion sensor too slow",
+  sensor_gap: "Motion sensor stopped during the run",
+  moved_before_start: "Moved before GO",
+  wrong_turn_count: "Not three turns",
+  leg_too_fast: "A length impossibly quick",
+  too_fast: "Faster than possible",
+  no_finish: "No finish found",
+  no_start_fix: "No GPS position at the start",
+  gps_weak: "GPS signal too weak",
+  gps_unreliable: "GPS positions jumped too often",
+  gps_gap: "GPS lost during the run",
+  distance_not_reached: "Stopped before 600 m",
+  not_on_foot: "No running steps (vehicle or bicycle?)",
   processing_error: "Verification hit an error",
   // Reasons a reviewer can give when flagging (Sprint 14).
   identity_mismatch: "Identity does not match",

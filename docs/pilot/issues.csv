@@ -1,0 +1,3 @@
+# P0 blocks an official assessment, loses a submission or shows a wrong official result; P1 major; P2 usability; P3 minor.
+issue_id,priority,reported_at,pilot_id,stage,phone_model,description,evidence,owner,status,fixed_in
+PRE-01,P1,2026-10-13,,detection,(downloaded clip),"Vertical jump: side-on view hides the far ankle; the jump analyzer requires both ankles, so 53% of frames are rejected and the jump is not detected",docs/accuracy/README.md (poor-performing case),,open — confirm on pilot recordings,

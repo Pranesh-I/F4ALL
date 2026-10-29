@@ -1,5 +1,23 @@
 package com.sai.sports.ui.auth
 
+import com.sai.sports.ui.kit.AppIcons
+import com.sai.sports.ui.kit.MarigoldButton
+import com.sai.sports.ui.kit.StepBar
+import com.sai.sports.ui.theme.AppColors
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -56,7 +74,10 @@ fun ReferencePhotoStep(
     faceConsentGiven: Boolean,
     initialGuardianName: String = "",
     onDone: () -> Unit,
-    onSkip: (() -> Unit)? = null
+    onSkip: (() -> Unit)? = null,
+    /** Shown as the last step of creating an account; null on its own. */
+    registrationStep: Int? = null,
+    onBack: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -127,17 +148,47 @@ fun ReferencePhotoStep(
         }
     }
 
-    Page(header = { TitleBar(stringResource(R.string.photo_title), onBack = null) }) {
+    Page(header = { TitleBar(title = "", onBack = onBack) }, spacing = 20.dp) {
 
-        Text(
-            stringResource(R.string.photo_body),
-            style = MaterialTheme.typography.bodyMedium
-        )
+        registrationStep?.let { StepBar(step = it, steps = RegistrationSteps.TOTAL) }
 
-        Text(
-            stringResource(R.string.photo_privacy),
-            style = MaterialTheme.typography.bodySmall
-        )
+        Box(
+            Modifier
+                .size(96.dp)
+                .background(AppColors.AccentSoft, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(AppIcons.Camera, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(42.dp))
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(R.string.photo_title),
+                style = MaterialTheme.typography.headlineLarge,
+                color = AppColors.TextPrimary,
+                modifier = Modifier.semantics { heading() }
+            )
+            Text(
+                stringResource(R.string.photo_body),
+                style = MaterialTheme.typography.bodyLarge,
+                color = AppColors.TextSecondary
+            )
+        }
+
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(AppColors.Surface, RoundedCornerShape(16.dp))
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(AppIcons.Shield, contentDescription = null, tint = AppColors.Success, modifier = Modifier.size(22.dp))
+            Text(
+                stringResource(R.string.photo_privacy),
+                style = MaterialTheme.typography.bodyMedium,
+                color = AppColors.TextSecondary
+            )
+        }
 
         if (!consented) {
             ConsentCard(
@@ -154,15 +205,22 @@ fun ReferencePhotoStep(
         message?.let { ErrorText(stringResource(it)) }
 
         if (busy) {
-            CircularProgressIndicator()
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = AppColors.Accent)
+            }
         } else {
-            InkButton(
+            MarigoldButton(
                 text = stringResource(R.string.photo_take),
                 onClick = ::takePhoto,
+                icon = AppIcons.Camera,
                 modifier = Modifier.fillMaxWidth()
             )
             onSkip?.let { skip ->
-                PlainButton(text = stringResource(R.string.photo_skip), onClick = skip)
+                PlainButton(
+                    text = stringResource(R.string.photo_skip),
+                    onClick = skip,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }

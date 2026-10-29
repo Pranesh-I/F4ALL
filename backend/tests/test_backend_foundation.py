@@ -158,6 +158,8 @@ def test_personal_bests_respect_timed_tests(client, db, athlete, settings):
             "score": 10.4,
             "achieved_at": bests[0]["achieved_at"],
             "official": False,
+            # Sprint 15: the result that set it.
+            "result_id": bests[0]["result_id"],
         }
     ]
 
@@ -328,6 +330,11 @@ def production(**overrides) -> Settings:
         "s3_bucket": "f4all-videos",
         "sms_backend": "http",
         "sms_api_url": "https://sms.example/send",
+        "database_url": "postgresql+psycopg://f4all@db.internal/f4all?sslmode=require",
+        "rate_limit_backend": "redis",
+        "notification_provider": "fcm",
+        "fcm_project_id": "f4all-sai",
+        "fcm_service_account_file": "/run/secrets/fcm.json",
         "public_base_url": "https://api.f4all.example",
         "cors_origins": ["https://dashboard.f4all.example"],
     }
@@ -346,6 +353,10 @@ def test_a_properly_configured_production_has_no_problems():
         ({"identity_encryption_key": ""}, "IDENTITY_ENCRYPTION_KEY"),
         ({"storage_backend": "local"}, "STORAGE_BACKEND"),
         ({"sms_backend": "console"}, "SMS_BACKEND"),
+        ({"notification_provider": "console"}, "NOTIFICATION_PROVIDER"),
+        ({"fcm_service_account_file": ""}, "FCM_PROJECT_ID"),
+        ({"database_url": "postgresql+psycopg://db.internal/f4all"}, "DATABASE_URL"),
+        ({"rate_limit_backend": "memory"}, "RATE_LIMIT_BACKEND"),
         ({"debug": True}, "DEBUG"),
         ({"public_base_url": "http://api.f4all.example"}, "PUBLIC_BASE_URL"),
         ({"cors_origins": ["http://localhost:5173"]}, "CORS_ORIGINS"),
@@ -367,6 +378,19 @@ def test_a_misconfigured_production_refuses_to_start(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="STORAGE_BACKEND"):
         main_module.create_app()
+
+
+def test_production_does_not_serve_the_interactive_docs(monkeypatch):
+    monkeypatch.setattr(main_module, "get_settings", lambda: production())
+    app = main_module.create_app()
+    assert (app.docs_url, app.redoc_url, app.openapi_url) == (None, None, None)
+
+    monkeypatch.setattr(
+        main_module,
+        "get_settings",
+        lambda: Settings(_env_file=None, environment="development"),
+    )
+    assert main_module.create_app().docs_url == "/docs"
 
 
 # ---------------------------------------------------------------------------
@@ -399,3 +423,20 @@ def test_an_unexpected_error_hides_the_trace_but_gives_the_request_id():
     assert response.status_code == 500
     assert response.json() == {"detail": "Internal server error", "request_id": "req-123"}
     assert "secret internals" not in response.text
+
+
+def test_an_unreachable_database_is_a_503_to_retry_not_a_500(client):
+    """Sprint 23: the phone keeps its queue and tries again later."""
+    from sqlalchemy.exc import OperationalError
+
+    from app.database import get_db
+
+    def unreachable():
+        raise OperationalError("SELECT 1", {}, Exception("connection refused"))
+
+    client.app.dependency_overrides[get_db] = unreachable
+    response = client.get("/api/sessions/active")
+
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "30"
+    assert response.json()["code"] == "database_unavailable"

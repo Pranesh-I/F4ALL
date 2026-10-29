@@ -1,6 +1,7 @@
 package com.sai.sports.data
 
 import com.sai.sports.analyzer.TestType
+import com.sai.sports.fieldtest.FieldTestType
 import com.sai.sports.api.ActiveSessions
 import com.sai.sports.api.AssessmentSessionInfo
 import com.sai.sports.data.local.SessionAttemptRow
@@ -19,7 +20,14 @@ enum class SessionTestState {
     val canRecord: Boolean get() = this == AVAILABLE || this == RESUBMIT
 }
 
-data class SessionTestView(val testType: TestType, val state: SessionTestState)
+/**
+ * One test of a session. [code] is the server's test code: a camera-scored
+ * [TestType], or (Sprint 18) a [FieldTestType] timed by sensors and GPS.
+ */
+data class SessionTestView(val code: String, val state: SessionTestState) {
+    val poseType: TestType? get() = TestType.entries.firstOrNull { it.name == code }
+    val fieldType: FieldTestType? get() = FieldTestType.fromCode(code)
+}
 
 /** Whether an official attempt may be recorded right now, and if not, why. */
 enum class SessionGate {
@@ -88,9 +96,10 @@ object SessionAvailability {
                 SessionView(
                     session = session,
                     tests = session.tests.mapNotNull { test ->
-                        val type = TestType.entries.firstOrNull { it.name == test.testType }
-                            ?: return@mapNotNull null
-                        SessionTestView(type, stateOf(session.id, test.testType, cached, local))
+                        val known = TestType.entries.any { it.name == test.testType } ||
+                            FieldTestType.fromCode(test.testType) != null
+                        if (!known) return@mapNotNull null
+                        SessionTestView(test.testType, stateOf(session.id, test.testType, cached, local))
                     }
                 )
             }

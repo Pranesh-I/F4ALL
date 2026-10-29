@@ -51,7 +51,9 @@ describe("format", () => {
 
   it("names tests", () => {
     expect(testName("SIT_UPS")).toBe("Sit-ups");
-    expect(testName("SHUTTLE_RUN")).toBe("shuttle run");
+    expect(testName("SHUTTLE_RUN")).toBe("Shuttle run (4 × 10 m)");
+    // A test the dashboard has no name for is still readable.
+    expect(testName("LONG_JUMP")).toBe("long jump");
   });
   it("never presents a missing photo check as a pass", () => {
     expect(identityCheckLabel("match")).toBe("matched the registration photo");

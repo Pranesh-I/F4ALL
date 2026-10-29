@@ -26,20 +26,17 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import com.sai.sports.ui.theme.TrialsColors
-import com.sai.sports.ui.theme.TrialsFonts
+import com.sai.sports.ui.theme.AppColors
+import com.sai.sports.ui.theme.AppFonts
 import java.util.Locale
 
 /**
- * One line of a register: `Squats ............ 22 reps`.
- *
- * The dotted leader is what makes a list read as a scoresheet rather than a
- * stack of cards, and it ties a label to its value across a wide screen. The
- * whole row is the touch target when [onClick] is set.
+ * One row of a list: a label, and its value on the same baseline at the
+ * right. The whole row is the touch target when [onClick] is set.
  *
  * @param index a lane number ("01") in front of the label, for ordered lists.
  * @param detail a second, quieter line under the label.
- * @param valueColor pencil for provisional numbers, ink for checked ones.
+ * @param valueColor grey for provisional numbers, white for checked ones.
  */
 @Composable
 fun RegisterRow(
@@ -48,7 +45,7 @@ fun RegisterRow(
     value: String? = null,
     index: Int? = null,
     detail: String? = null,
-    detailColor: Color = TrialsColors.Pencil,
+    detailColor: Color = AppColors.TextSecondary,
     valueColor: Color = LocalContentColor.current,
     labelStyle: TextStyle = MaterialTheme.typography.titleSmall,
     valueStyle: TextStyle = MaterialTheme.typography.titleMedium,
@@ -96,7 +93,7 @@ fun RegisterRow(
 
             if (onClick != null) {
                 Icon(
-                    TrialsIcons.Forward,
+                    AppIcons.Forward,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
@@ -108,10 +105,10 @@ fun RegisterRow(
 
 /** "01", "02" — a lane number, in the chest-number face. */
 @Composable
-fun LaneNumber(number: Int, color: Color = TrialsColors.Pencil) {
+fun LaneNumber(number: Int, color: Color = AppColors.TextSecondary) {
     Text(
         text = String.format(Locale.US, "%02d", number),
-        style = MaterialTheme.typography.titleLarge.copy(fontFamily = TrialsFonts.Numerals),
+        style = MaterialTheme.typography.titleLarge.copy(fontFamily = AppFonts.Numerals),
         color = color,
         modifier = Modifier.width(30.dp)
     )
@@ -128,7 +125,7 @@ fun LeaderLine(
     label: @Composable () -> Unit,
     value: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    dotColor: Color = TrialsColors.Line
+    dotColor: Color = Color.Transparent
 ) {
     Layout(
         modifier = modifier,

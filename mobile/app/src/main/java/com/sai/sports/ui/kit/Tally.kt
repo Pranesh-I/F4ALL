@@ -20,7 +20,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sai.sports.R
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.AppColors
 
 /**
  * Reps as a coach counts them on paper: four strokes and a fifth across.
@@ -35,8 +35,8 @@ fun TallyMarks(
     counted: Int,
     missed: Int,
     modifier: Modifier = Modifier,
-    color: Color = TrialsColors.Paper,
-    missedColor: Color = TrialsColors.RedPenOnInk,
+    color: Color = AppColors.TextPrimary,
+    missedColor: Color = AppColors.Danger,
     markHeight: Dp = 40.dp,
     maxRows: Int = 2
 ) {

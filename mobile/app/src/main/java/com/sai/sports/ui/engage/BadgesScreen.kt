@@ -44,9 +44,9 @@ import com.sai.sports.ui.kit.Page
 import com.sai.sports.ui.kit.RuleLine
 import com.sai.sports.ui.kit.Sheet
 import com.sai.sports.ui.kit.TitleBar
-import com.sai.sports.ui.kit.TrialsIcons
+import com.sai.sports.ui.kit.AppIcons
 import com.sai.sports.ui.kit.dashedBorder
-import com.sai.sports.ui.theme.TrialsColors
+import com.sai.sports.ui.theme.AppColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -97,7 +97,7 @@ fun BadgesScreen(onBack: () -> Unit) {
                                 Text(
                                     stringResource(R.string.badges_streak_longest, current.longestStreakWeeks),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = TrialsColors.Pencil
+                                    color = AppColors.TextSecondary
                                 )
                             }
                         }
@@ -108,7 +108,7 @@ fun BadgesScreen(onBack: () -> Unit) {
                     Text(
                         stringResource(R.string.badges_note),
                         style = MaterialTheme.typography.bodySmall,
-                        color = TrialsColors.Pencil,
+                        color = AppColors.TextSecondary,
                         modifier = Modifier.padding(top = 16.dp)
                     )
                 }
@@ -150,31 +150,31 @@ private fun BadgeRow(badge: Badge) {
                     .size(46.dp)
                     .then(
                         if (badge.earned) {
-                            Modifier.background(TrialsColors.Marigold, CircleShape)
+                            Modifier.background(AppColors.Accent, CircleShape)
                         } else {
-                            Modifier.dashedBorder(1.5.dp, TrialsColors.Pencil, radius = 23.dp)
+                            Modifier.dashedBorder(1.5.dp, AppColors.TextSecondary, radius = 23.dp)
                         }
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    TrialsIcons.Star,
+                    AppIcons.Star,
                     contentDescription = null,
-                    tint = if (badge.earned) TrialsColors.Ink else TrialsColors.Pencil,
+                    tint = if (badge.earned) AppColors.TextPrimary else AppColors.TextSecondary,
                     modifier = Modifier.size(24.dp)
                 )
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(title, style = MaterialTheme.typography.titleSmall)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = TrialsColors.Pencil)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
                 if (!badge.earned && badge.target > 1) {
                     LinearProgressIndicator(
                         progress = { badge.progress.toFloat() / badge.target },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(6.dp),
-                        color = TrialsColors.Ink,
-                        trackColor = TrialsColors.PaperShade,
+                        color = AppColors.TextPrimary,
+                        trackColor = AppColors.SurfaceHigh,
                         strokeCap = StrokeCap.Butt,
                         gapSize = 0.dp,
                         drawStopIndicator = {}

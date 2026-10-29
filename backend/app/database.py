@@ -13,14 +13,22 @@ from .config import get_settings
 _settings = get_settings()
 
 _connect_args: dict[str, object] = {}
+_pool_args: dict[str, object] = {}
 if _settings.database_url.startswith("sqlite"):
     _connect_args["check_same_thread"] = False
+else:
+    # Sprint 23: with Postgres unreachable, a connection attempt behind a
+    # proxy waited for the client to give up (30 s and more). Fail in seconds
+    # instead, so the API answers 503 and the phone retries later.
+    _connect_args["connect_timeout"] = 3
+    _pool_args["pool_timeout"] = 10
 
 engine = create_engine(
     _settings.database_url,
     pool_pre_ping=True,
     connect_args=_connect_args,
     echo=False,
+    **_pool_args,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

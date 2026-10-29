@@ -51,6 +51,7 @@ from ..security import (
     current_official,
     decode_token,
 )
+from ..services import athlete_results
 from . import tests_submit
 from .dashboard import _flag, _load_scoped, _ordered_flags
 
@@ -199,6 +200,7 @@ def _status(
         ),
         processing_duration_ms=result.processing_duration_ms,
         comparison=_comparison(result, official_view=official_view),
+        server_form=athlete_results.server_form(result),
     )
 
     if not official_view:

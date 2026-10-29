@@ -65,8 +65,12 @@ object Labels {
     }
 
     @StringRes
-    fun testName(code: String): Int =
-        runCatching { testName(TestType.valueOf(code)) }.getOrDefault(R.string.test_unknown)
+    fun testName(code: String): Int = when (code) {
+        // Sprint 18 field tests: timed by sensors and GPS, not by the camera.
+        "SHUTTLE_RUN" -> R.string.test_shuttle_run
+        "ENDURANCE_RUN" -> R.string.test_endurance_run
+        else -> runCatching { testName(TestType.valueOf(code)) }.getOrDefault(R.string.test_unknown)
+    }
 
     @StringRes
     fun unit(unit: String): Int = when (unit) {
@@ -165,9 +169,28 @@ object Labels {
     @StringRes
     fun invalidReason(reason: String?): Int {
         val text = reason ?: return R.string.invalid_generic
+        FIELD_INVALID_REASONS[text]?.let { return it }
         return INVALID_REASONS.entries.firstOrNull { text.startsWith(it.key) }?.value
             ?: R.string.invalid_generic
     }
+
+    /** The field tests' reasons, which are stable codes (see FieldInvalid), not English text. */
+    val FIELD_INVALID_REASONS: Map<String, Int> = mapOf(
+        "not_enough_data" to R.string.field_invalid_not_enough_data,
+        "low_sample_rate" to R.string.field_invalid_low_sample_rate,
+        "sensor_gap" to R.string.field_invalid_sensor_gap,
+        "moved_before_start" to R.string.field_invalid_moved_before_start,
+        "wrong_turn_count" to R.string.field_invalid_wrong_turn_count,
+        "leg_too_fast" to R.string.field_invalid_leg_too_fast,
+        "too_fast" to R.string.field_invalid_too_fast,
+        "no_finish" to R.string.field_invalid_no_finish,
+        "no_start_fix" to R.string.field_invalid_no_start_fix,
+        "gps_weak" to R.string.field_invalid_gps_weak,
+        "gps_unreliable" to R.string.field_invalid_gps_unreliable,
+        "gps_gap" to R.string.field_invalid_gps_gap,
+        "distance_not_reached" to R.string.field_invalid_distance_not_reached,
+        "not_on_foot" to R.string.field_invalid_not_on_foot
+    )
 
     val INVALID_REASONS: Map<String, Int> = linkedMapOf(
         "No usable pose data" to R.string.invalid_no_pose,

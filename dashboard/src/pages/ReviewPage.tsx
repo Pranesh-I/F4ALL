@@ -17,6 +17,7 @@ import { SubmissionFacts } from "../components/review/SubmissionFacts";
 import { VerificationSummary } from "../components/review/VerificationSummary";
 import { ErrorState, LoadingState, SuccessNotice } from "../components/StateViews";
 import { VideoWithSkeleton } from "../components/VideoWithSkeleton";
+import { FieldEvidence, isFieldResult } from "../components/review/FieldEvidence";
 import { paths } from "../routes";
 import { Bib } from "../components/Trials";
 import { ui } from "../lib/ui";
@@ -47,6 +48,10 @@ export function ReviewPage() {
     queryFn: () => api.verification(resultId),
     enabled: Boolean(resultId),
   });
+
+  // A shuttle or endurance run has no video: its evidence is the server's reading of the trace.
+  const serverResult = verification.data?.server_result;
+  const fieldResult = isFieldResult(serverResult) ? serverResult : null;
 
   const pose = useQuery({
     queryKey: ["pose", resultId],
@@ -107,9 +112,16 @@ export function ReviewPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="space-y-5">
-          <Panel title="Recording">
+          <Panel title={fieldResult ? "Run evidence" : "Recording"}>
             {result.video_url ? (
               <VideoWithSkeleton src={result.video_url} pose={pose.data ?? null} seekToMs={seekToMs} />
+            ) : fieldResult ? (
+              <FieldEvidence result={fieldResult} testType={result.test_type} />
+            ) : result.video_retired_on ? (
+              <div className="rounded-xs bg-paper-shade p-6 text-sm text-pencil">
+                The recording was deleted on {result.video_retired_on} under the retention policy. The
+                result and its review history are kept.
+              </div>
             ) : (
               <div className="rounded-xs bg-paper-shade p-6 text-sm text-pencil">
                 No recording is attached to this submission.
